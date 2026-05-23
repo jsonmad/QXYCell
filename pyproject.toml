@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quxycell"
+version = "0.1.0"
+description = "QuPath exported single-cell measurements to annotated AnnData."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "QUXYCell contributors" }
+]
+dependencies = [
+  "anndata>=0.10",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+  "scipy>=1.10",
+  "shapely>=2.0"
+]
+
+[project.optional-dependencies]
+geo = [
+  "geopandas>=0.14"
+]
+plot = [
+  "matplotlib>=3.8",
+  "seaborn>=0.13"
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4"
+]
+
+[project.scripts]
+quxycell = "quxycell.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quxycell"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
