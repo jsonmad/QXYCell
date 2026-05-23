@@ -164,12 +164,13 @@ qupath_project = "/path/to/qupath_export"
 
 report = qxy.check(qupath_project)
 
-quxy = qxy.run(qupath_project)
+adata = qxy.run(qupath_project)</code></pre>
 
-adata = quxy.adata</code></pre>
+    <p>If no output folder is supplied, <code>qxy.check(...)</code> writes reports to:</p>
+    <pre><code>./outputs/qxy_check</code></pre>
 
-    <p>The saved <code>.h5ad</code> is written by default to:</p>
-    <pre><code>./quxycell_output/run/h5ad/quxycell.h5ad</code></pre>
+    <p>The saved <code>.h5ad</code> from <code>qxy.run(...)</code> is written by default to:</p>
+    <pre><code>./outputs/qxy_run/run/h5ad/quxycell.h5ad</code></pre>
 
     <h2>Inputs</h2>
     <p>QUXYCell currently expects a manually exported QuPath project/export folder containing:</p>
@@ -184,7 +185,7 @@ Centroid X µm
 Centroid Y µm</code></pre>
 
     <h2>Outputs</h2>
-    <pre><code>quxycell_output/
+    <pre><code>outputs/qxy_run/
   check_report.txt
   check_report.json
   tables/
@@ -259,6 +260,16 @@ Centroid Y µm</code></pre>
     <pre><code>measurement column &gt;= threshold</code></pre>
     <p>Composite classifiers are detected and skipped with warnings. They are reported in:</p>
     <pre><code>tables/classifier_report.csv</code></pre>
+
+    <h2>Cell Type Logic Prompt</h2>
+    <p>QUXYCell can generate a copy-pasteable prompt for an external LLM to draft a first-pass cell type logic YAML from the markers present in a loaded AnnData object:</p>
+    <pre><code>prompt = qxy.celltype_prompt(adata)</code></pre>
+    <p>By default, the prompt is printed below the notebook cell and saved to:</p>
+    <pre><code>outputs/qxy_run/celltype/celltype_prompt_YYMMDD_HHMMSS.txt</code></pre>
+    <p>The generated YAML can be saved as:</p>
+    <pre><code>outputs/qxy_run/celltype/celltype_logic.yaml</code></pre>
+    <p>and applied with:</p>
+    <pre><code>qxy.celltype(adata, "outputs/qxy_run/celltype/celltype_logic.yaml")</code></pre>
 
     <h2>Annotation Handling</h2>
     <p>GeoJSON annotation polygons are mapped to cells by testing each cell centroid against annotation boundaries. Each annotation class/name becomes a boolean column in <code>adata.obs</code>.</p>

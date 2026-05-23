@@ -12,4 +12,5 @@ build/
 # Local QUXYCell outputs
 quxycell_output*/
 quxycell_run*/
+outputs/
 *.ipynb

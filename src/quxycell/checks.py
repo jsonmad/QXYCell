@@ -166,7 +166,7 @@ def _write_report(report: CheckReport) -> None:
 
 def check(
     project_dir: str | Path,
-    output_dir: str | Path = "quxycell_output",
+    output_dir: str | Path = "outputs/qxy_check",
     *,
     count_rows: bool = False,
 ) -> CheckReport:
@@ -226,4 +226,3 @@ def check(
     )
     _write_report(report)
     return report
-

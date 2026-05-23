@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         "--output-dir",
         dest="output_dir",
-        default="quxycell_output",
+        default="outputs/qxy_check",
         help="Output folder for check reports.",
     )
     check_parser.add_argument(
@@ -34,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         "--output-dir",
         dest="output_dir",
-        default="quxycell_output",
+        default="outputs/qxy_run",
         help="Output folder for QUXYCell reports and AnnData.",
     )
     run_parser.add_argument(
@@ -42,6 +42,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.28,
         help="Pixel size used to scale QuPath GeoJSON coordinates into microns.",
+    )
+    run_parser.add_argument(
+        "--celltype-logic",
+        default=None,
+        help="Optional YAML file with ordered cell type rules.",
     )
     return parser
 
@@ -62,14 +67,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if report.ok else 1
 
     if args.command == "run":
-        result = run(
+        adata = run(
             args.project_dir,
             output_dir=args.output_dir,
             pixel_size_um=args.pixel_size_um,
+            celltype_logic=args.celltype_logic,
         )
         print("QUXYCell run complete")
-        print(f"H5AD: {result.h5ad_path}")
-        print(f"Output: {result.output_dir}")
+        print(f"H5AD: {adata.uns['quxycell']['h5ad_path']}")
+        print(f"Output: {adata.uns['quxycell']['run_dir']}")
         return 0
 
     parser.error(f"Unknown command: {args.command}")

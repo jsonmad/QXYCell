@@ -2,26 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from quxycell.classifiers import ClassifierDefinition
+from quxycell.celltyping import apply_celltypes
 from quxycell.checks import check
 from quxycell.geojson import _classification_name
 from quxycell.markers import marker_name_from_classifier_name
 from quxycell.measurements import required_columns
-
-
-@dataclass(frozen=True)
-class RunResult:
-    """Result returned by :func:`run`."""
-
-    adata: Any
-    output_dir: Path
-    h5ad_path: Path
-    check_report_path: Path
 
 
 def _import_runtime_dependencies():
@@ -196,11 +186,13 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
 
 def run(
     project_dir: str | Path,
-    output_dir: str | Path = "quxycell_output",
+    output_dir: str | Path = "outputs/qxy_run",
     *,
     fail_on_check_error: bool = True,
     pixel_size_um: float = 0.28,
-) -> RunResult:
+    celltype_logic: str | Path | dict[str, Any] | None = None,
+    verbose: bool = True,
+) -> Any:
     """Run QUXYCell on a manually exported QuPath project.
 
     The v1 pipeline imports one ``adata.X`` column per usable simple measurement
@@ -212,7 +204,28 @@ def run(
     ad, np, pd = _import_runtime_dependencies()
 
     output_path = Path(output_dir).expanduser().resolve()
+    log_lines: list[str] = []
+
+    def log(message: str) -> None:
+        log_lines.append(message)
+        if verbose:
+            print(message)
+
+    log("QUXYCell run started")
+    log(f"Project: {Path(project_dir).expanduser().resolve()}")
+    log(f"Output: {output_path}")
+
     report = check(project_dir, output_dir=output_path)
+    log(
+        "Check: "
+        f"{'PASS' if report.ok else 'FAIL'} "
+        f"({report.n_errors} errors, {report.n_warnings} warnings)"
+    )
+    log(f"Measurement files: {len(report.measurement_files)}")
+    log(f"Classifier JSON files: {len(report.classifiers)}")
+    log(f"Simple classifiers imported: {sum(1 for item in report.classifiers if item.is_simple)}")
+    log(f"GeoJSON files: {len(report.geojson_files)}")
+
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
             "QUXYCell check failed. See "
@@ -223,7 +236,9 @@ def run(
     if not simple_classifiers:
         raise ValueError("No simple classifier JSON files are available for adata.X import.")
 
+    log("Loading measurement table(s)...")
     measurements = _read_measurements(report.measurement_files, pd)
+    log(f"Loaded cells: {len(measurements):,}")
     for column in required_columns():
         if column not in measurements.columns:
             raise ValueError(f"Missing required QuPath measurement column: {column}")
@@ -237,6 +252,7 @@ def run(
             + ", ".join(str(column) for column in missing_marker_columns)
         )
 
+    log("Building marker matrix...")
     x = measurements[marker_columns].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy()
 
     obs_columns = list(required_columns()) + ["quxy_source_file", "quxy_source_row"]
@@ -264,15 +280,42 @@ def run(
         adata.obs[f"{marker_name}_pos"] = (
             adata.X[:, classifier_index] >= float(classifier.threshold)
         ).astype("int8")
+    log(f"Created AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} markers")
+    log(f"Added marker positivity columns: {len(simple_classifiers)}")
 
+    log("Mapping GeoJSON annotations...")
     annotation_conflicts = _apply_annotations(
         adata,
         report.geojson_files,
         pixel_size_um=pixel_size_um,
     )
+    annotation_cols = [column for column in adata.obs.columns if str(column).startswith("annotation__")]
+    log(f"Annotation columns: {len(annotation_cols)}")
+    log(f"Annotation conflicts: {len(annotation_conflicts)}")
+
+    celltyping_summary = None
+    if celltype_logic is not None:
+        log("Applying cell type logic...")
+        celltyping_summary = apply_celltypes(adata, celltype_logic)
+        log(
+            "Celltyping: "
+            f"{celltyping_summary['n_rules']} rules, "
+            f"{celltyping_summary['unknown_count']:,} Unknown cells"
+        )
+
+    run_dir = output_path / "run"
+    h5ad_dir = run_dir / "h5ad"
+    h5ad_dir.mkdir(parents=True, exist_ok=True)
+    h5ad_path = h5ad_dir / "quxycell.h5ad"
+    tables_dir = run_dir / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+
     adata.uns["quxycell"] = {
         "project_dir": str(Path(project_dir).expanduser().resolve()),
         "output_dir": str(output_path),
+        "run_dir": str(run_dir),
+        "h5ad_path": str(h5ad_path),
+        "tables_dir": str(tables_dir),
         "created": datetime.now().isoformat(timespec="seconds"),
         "pixel_size_um": pixel_size_um,
         "check_report_txt": str(output_path / "check_report.txt"),
@@ -285,26 +328,25 @@ def run(
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),
         "n_geojson_files": int(len(report.geojson_files)),
         "n_annotation_conflicts": int(len(annotation_conflicts)),
+        "celltyping_applied": bool(celltyping_summary is not None),
     }
-
-    run_dir = output_path / "run"
-    h5ad_dir = run_dir / "h5ad"
-    h5ad_dir.mkdir(parents=True, exist_ok=True)
-    h5ad_path = h5ad_dir / "quxycell.h5ad"
+    log(f"Writing H5AD: {h5ad_path}")
     adata.write_h5ad(h5ad_path)
 
-    tables_dir = run_dir / "tables"
-    tables_dir.mkdir(parents=True, exist_ok=True)
+    log(f"Writing tables: {tables_dir}")
     adata.obs.to_csv(tables_dir / "cells_obs.csv")
     adata.var.to_csv(tables_dir / "markers_var.csv")
     pd.DataFrame(annotation_conflicts).to_csv(
         tables_dir / "annotation_conflicts.csv",
         index=False,
     )
+    if celltyping_summary is not None:
+        counts = adata.obs["celltype"].value_counts(dropna=False).rename_axis("celltype")
+        counts.reset_index(name="cell_count").to_csv(
+            tables_dir / "celltype_counts.csv",
+            index=False,
+        )
+    log("QUXYCell run complete")
+    (run_dir / "qxy_run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 
-    return RunResult(
-        adata=adata,
-        output_dir=run_dir,
-        h5ad_path=h5ad_path,
-        check_report_path=output_path / "check_report.txt",
-    )
+    return adata
