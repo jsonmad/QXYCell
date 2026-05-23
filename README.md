@@ -50,3 +50,34 @@ summary = qxy.celltype(adata)
 ```
 
 QUXYCell prints the YAML file path it used.
+It also saves a cell type rule summary table to
+`outputs/qxy_run/celltype/celltype_rules_summary.tsv`.
+
+Generic plotting helpers:
+
+```python
+qxy.plot_stacked_bar(adata, category_col="celltype", group_col="Group")
+qxy.plot_spatial_celltypes(adata, category_col="celltype")
+```
+
+Use another image label column, such as a shortened `ImageID`, with
+`sample_col`:
+
+```python
+qxy.plot_stacked_bar(adata, category_col="celltype", sample_col="ImageID")
+qxy.plot_spatial_celltypes(adata, category_col="celltype", sample_col="ImageID")
+```
+
+Spatial plots use a shared centered x/y range across all selected samples,
+centered by median cell coordinate by default, and include a 1 mm scale bar.
+To force a fixed square window:
+
+```python
+qxy.plot_spatial_celltypes(adata, sample_col="ImageID", fixed_window_um=11500)
+```
+
+Remove cells inside annotation columns containing `Ignore`:
+
+```python
+adata = qxy.remove_ignore(adata)
+```

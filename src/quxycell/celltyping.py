@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -176,6 +177,85 @@ def _derived_mask(obs, spec: dict[str, Any], missing_references: set[str]):
     return mask
 
 
+def _stringify_definition_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        return ", ".join(str(item) for item in value)
+    if isinstance(value, dict):
+        return json.dumps(value, sort_keys=True)
+    return str(value)
+
+
+def _rule_definition(rule: dict[str, Any]) -> str:
+    parts = []
+    for key, label in (
+        ("positive", "positive"),
+        ("negative", "negative"),
+        ("any_positive", "any_positive"),
+    ):
+        value = rule.get(key)
+        if value:
+            parts.append(f"{label}: {_stringify_definition_value(value)}")
+    return "; ".join(parts)
+
+
+def _write_rule_summary_table(
+    rules: list[dict[str, Any]],
+    assigned_counts: dict[str, int],
+    *,
+    celltype_dir: str | Path,
+    logic_source: Path | None,
+    celltype_column: str,
+    unknown_label: str,
+) -> Path:
+    import pandas as pd
+
+    celltype_dir = Path(celltype_dir).expanduser().resolve()
+    celltype_dir.mkdir(parents=True, exist_ok=True)
+    output_path = celltype_dir / "celltype_rules_summary.tsv"
+
+    known_keys = {"name", "positive", "negative", "any_positive"}
+    rows = []
+    for index, rule in enumerate(rules, start=1):
+        name = str(rule.get("name") or "").strip()
+        extra = {key: value for key, value in rule.items() if key not in known_keys}
+        rows.append(
+            {
+                "rule_order": index,
+                "celltype": name,
+                "positive": _stringify_definition_value(rule.get("positive")),
+                "negative": _stringify_definition_value(rule.get("negative")),
+                "any_positive": _stringify_definition_value(rule.get("any_positive")),
+                "definition": _rule_definition(rule),
+                "assigned_cells": int(assigned_counts.get(name, 0)) if name else 0,
+                "celltype_column": celltype_column,
+                "unknown_label": unknown_label,
+                "logic_source": str(logic_source) if logic_source is not None else "<dict>",
+                "extra_definition": json.dumps(extra, sort_keys=True) if extra else "",
+            }
+        )
+
+    table = pd.DataFrame(
+        rows,
+        columns=[
+            "rule_order",
+            "celltype",
+            "positive",
+            "negative",
+            "any_positive",
+            "definition",
+            "assigned_cells",
+            "celltype_column",
+            "unknown_label",
+            "logic_source",
+            "extra_definition",
+        ],
+    )
+    table.to_csv(output_path, sep="\t", index=False)
+    return output_path
+
+
 def apply_celltypes(
     adata,
     logic: str | Path | dict[str, Any] | None = None,
@@ -261,5 +341,16 @@ def apply_celltypes(
         "assigned_counts": assigned_counts,
         "unknown_count": int((obs[celltype_column] == unknown_label).sum()),
     }
+    rule_summary_tsv = _write_rule_summary_table(
+        rules,
+        assigned_counts,
+        celltype_dir=celltype_dir,
+        logic_source=logic_source,
+        celltype_column=celltype_column,
+        unknown_label=unknown_label,
+    )
+    summary["rule_summary_tsv"] = str(rule_summary_tsv)
     adata.uns["quxycell_celltyping"] = summary
+    if verbose:
+        print(f"Saved cell type rule summary TSV:\n{rule_summary_tsv}")
     return summary
