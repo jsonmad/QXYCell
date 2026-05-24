@@ -12,6 +12,7 @@ from quxycell.checks import check
 from quxycell.geojson import _classification_name
 from quxycell.markers import marker_name_from_classifier_name
 from quxycell.measurements import required_columns
+from quxycell.paths import resolve_output_dir
 
 
 def _import_runtime_dependencies():
@@ -186,7 +187,7 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
 
 def run(
     project_dir: str | Path,
-    output_dir: str | Path = "outputs/qxy_run",
+    output_dir: str | Path | None = None,
     *,
     fail_on_check_error: bool = True,
     pixel_size_um: float = 0.28,
@@ -203,7 +204,7 @@ def run(
 
     ad, np, pd = _import_runtime_dependencies()
 
-    output_path = Path(output_dir).expanduser().resolve()
+    output_path = resolve_output_dir(output_dir)
     log_lines: list[str] = []
 
     def log(message: str) -> None:
@@ -296,7 +297,11 @@ def run(
     celltyping_summary = None
     if celltype_logic is not None:
         log("Applying cell type logic...")
-        celltyping_summary = apply_celltypes(adata, celltype_logic)
+        celltyping_summary = apply_celltypes(
+            adata,
+            celltype_logic,
+            celltype_dir=output_path / "celltype",
+        )
         log(
             "Celltyping: "
             f"{celltyping_summary['n_rules']} rules, "
@@ -347,6 +352,6 @@ def run(
             index=False,
         )
     log("QUXYCell run complete")
-    (run_dir / "qxy_run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+    (run_dir / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 
     return adata

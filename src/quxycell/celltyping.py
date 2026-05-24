@@ -3,17 +3,40 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
+from quxycell.paths import latest_timestamped_output_dir
+from quxycell.paths import output_dir_from_adata
+from quxycell.paths import resolve_output_dir
 
-DEFAULT_CELLTYPE_DIR = Path("outputs") / "qxy_run" / "celltype"
+
+def _safe_name(value: str) -> str:
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value).strip())
+    return safe.strip("_") or "value"
 
 
-def find_latest_celltype_yaml(celltype_dir: str | Path = DEFAULT_CELLTYPE_DIR) -> Path:
+def _default_celltype_dir(adata=None, logic_source: Path | None = None) -> Path:
+    adata_output_dir = output_dir_from_adata(adata) if adata is not None else None
+    if adata_output_dir is not None:
+        return adata_output_dir / "celltype"
+    if logic_source is not None:
+        return logic_source.parent
+    latest_output_dir = latest_timestamped_output_dir()
+    if latest_output_dir is not None:
+        return latest_output_dir / "celltype"
+    return resolve_output_dir() / "celltype"
+
+
+def find_latest_celltype_yaml(celltype_dir: str | Path | None = None) -> Path:
     """Return the newest YAML file in the cell type output folder."""
 
-    celltype_dir = Path(celltype_dir).expanduser().resolve()
+    celltype_dir = (
+        Path(celltype_dir).expanduser().resolve()
+        if celltype_dir is not None
+        else _default_celltype_dir()
+    )
     candidates = [
         path
         for pattern in ("*.yaml", "*.yml")
@@ -213,7 +236,8 @@ def _write_rule_summary_table(
 
     celltype_dir = Path(celltype_dir).expanduser().resolve()
     celltype_dir.mkdir(parents=True, exist_ok=True)
-    output_path = celltype_dir / "celltype_rules_summary.tsv"
+    logic_name = _safe_name(logic_source.stem) if logic_source is not None else "dict"
+    output_path = celltype_dir / f"celltype_rules_summary_{logic_name}.tsv"
 
     known_keys = {"name", "positive", "negative", "any_positive"}
     rows = []
@@ -230,8 +254,6 @@ def _write_rule_summary_table(
                 "definition": _rule_definition(rule),
                 "assigned_cells": int(assigned_counts.get(name, 0)) if name else 0,
                 "celltype_column": celltype_column,
-                "unknown_label": unknown_label,
-                "logic_source": str(logic_source) if logic_source is not None else "<dict>",
                 "extra_definition": json.dumps(extra, sort_keys=True) if extra else "",
             }
         )
@@ -247,8 +269,6 @@ def _write_rule_summary_table(
             "definition",
             "assigned_cells",
             "celltype_column",
-            "unknown_label",
-            "logic_source",
             "extra_definition",
         ],
     )
@@ -262,7 +282,7 @@ def apply_celltypes(
     *,
     celltype_column: str = "celltype",
     unknown_label: str = "Unknown",
-    celltype_dir: str | Path = DEFAULT_CELLTYPE_DIR,
+    celltype_dir: str | Path | None = None,
     verbose: bool = True,
 ) -> dict[str, Any]:
     """Apply ordered exclusive cell type rules and optional feature flags.
@@ -274,11 +294,16 @@ def apply_celltypes(
     import numpy as np
 
     logic_source = None
-    if logic is None:
-        logic_source = find_latest_celltype_yaml(celltype_dir)
-        logic = logic_source
-    elif isinstance(logic, (str, Path)):
+    if isinstance(logic, (str, Path)):
         logic_source = Path(logic).expanduser().resolve()
+    resolved_celltype_dir = (
+        Path(celltype_dir).expanduser().resolve()
+        if celltype_dir is not None
+        else _default_celltype_dir(adata, logic_source)
+    )
+    if logic is None:
+        logic_source = find_latest_celltype_yaml(resolved_celltype_dir)
+        logic = logic_source
 
     if verbose and logic_source is not None:
         print(f"Using QUXYCell cell type logic YAML:\n{logic_source}")
@@ -344,7 +369,7 @@ def apply_celltypes(
     rule_summary_tsv = _write_rule_summary_table(
         rules,
         assigned_counts,
-        celltype_dir=celltype_dir,
+        celltype_dir=resolved_celltype_dir,
         logic_source=logic_source,
         celltype_column=celltype_column,
         unknown_label=unknown_label,

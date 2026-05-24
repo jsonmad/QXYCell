@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from quxycell.checks import check
 from quxycell.pipeline import run
@@ -19,8 +18,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         "--output-dir",
         dest="output_dir",
-        default="outputs/qxy_check",
-        help="Output folder for check reports.",
+        default=None,
+        help="Output folder for check reports. Defaults to qxy_outputs_YYMMDD-HHMM.",
     )
     check_parser.add_argument(
         "--count-rows",
@@ -34,8 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--out",
         "--output-dir",
         dest="output_dir",
-        default="outputs/qxy_run",
-        help="Output folder for QUXYCell reports and AnnData.",
+        default=None,
+        help="Output folder for QUXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
     )
     run_parser.add_argument(
         "--pixel-size-um",
@@ -59,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         report = check(args.project_dir, output_dir=args.output_dir, count_rows=args.count_rows)
         status = "PASS" if report.ok else "FAIL"
         print(f"QUXYCell check {status}")
-        print(f"Report: {Path(args.output_dir).expanduser().resolve() / 'check_report.txt'}")
+        print(f"Report: {report.output_dir / 'check_report.txt'}")
         print(f"Measurement files: {len(report.measurement_files)}")
         print(f"Classifier JSON files: {len(report.classifiers)}")
         print(f"GeoJSON files: {len(report.geojson_files)}")

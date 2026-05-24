@@ -28,8 +28,8 @@ QUXYCell does not parse QuPath `.qpdata` directly in v1.
 
 If `output_dir` is omitted:
 
-- `qxy.check(...)` writes reports to `outputs/qxy_check/`
-- `qxy.run(...)` writes outputs to `outputs/qxy_run/`
+- `qxy.check(...)` writes reports to `qxy_outputs_YYMMDD-HHMM/`
+- `qxy.run(...)` writes outputs to `qxy_outputs_YYMMDD-HHMM/`
 
 To draft a first-pass cell type YAML prompt from a loaded AnnData object:
 
@@ -39,11 +39,13 @@ print(prompt)
 ```
 
 By default, this prints the prompt below the notebook cell, prints usage
-instructions, and saves a timestamped prompt to `outputs/qxy_run/celltype/`.
+instructions, and saves a timestamped prompt to the current run's
+`qxy_outputs_YYMMDD-HHMM/celltype/` folder.
 Use `save=False` to return the prompt without writing a file, or
 `print_prompt=False` to avoid printing.
 
-To apply cell typing from the newest YAML in `outputs/qxy_run/celltype/`:
+To apply cell typing from the newest YAML in the current run's
+`qxy_outputs_YYMMDD-HHMM/celltype/` folder:
 
 ```python
 summary = qxy.celltype(adata)
@@ -51,7 +53,7 @@ summary = qxy.celltype(adata)
 
 QUXYCell prints the YAML file path it used.
 It also saves a cell type rule summary table to
-`outputs/qxy_run/celltype/celltype_rules_summary.tsv`.
+`qxy_outputs_YYMMDD-HHMM/celltype/celltype_rules_summary_<logic-name>.tsv`.
 
 Generic plotting helpers:
 

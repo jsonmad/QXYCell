@@ -19,6 +19,7 @@ from quxycell.measurements import (
     summarize_measurement_file,
     validate_measurement_files,
 )
+from quxycell.paths import resolve_output_dir
 from quxycell.types import ClassifierDefinition, GeoJsonFile, MeasurementFile, Message
 
 
@@ -166,7 +167,7 @@ def _write_report(report: CheckReport) -> None:
 
 def check(
     project_dir: str | Path,
-    output_dir: str | Path = "outputs/qxy_check",
+    output_dir: str | Path | None = None,
     *,
     count_rows: bool = False,
 ) -> CheckReport:
@@ -176,7 +177,7 @@ def check(
     """
 
     project_path = Path(project_dir).expanduser().resolve()
-    output_path = Path(output_dir).expanduser().resolve()
+    output_path = resolve_output_dir(output_dir)
     messages: list[Message] = []
 
     if not project_path.exists():

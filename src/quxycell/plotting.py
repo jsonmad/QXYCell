@@ -7,8 +7,13 @@ import re
 from pathlib import Path
 from typing import Iterable
 
+from quxycell.paths import resolve_output_dir
 
-DEFAULT_PLOT_DIR = Path("outputs") / "qxy_run" / "plots"
+
+def _resolve_plot_dir(adata, output_dir: str | Path | None) -> Path:
+    if output_dir is not None:
+        return Path(output_dir).expanduser().resolve()
+    return resolve_output_dir(adata=adata) / "plots"
 
 
 def _require_plotting():
@@ -141,7 +146,7 @@ def plot_stacked_bar(
     group_col: str | None = None,
     subset_col: str | None = None,
     subset_value: str | None = None,
-    output_dir: str | Path = DEFAULT_PLOT_DIR,
+    output_dir: str | Path | None = None,
     filename_prefix: str | None = None,
     colors: dict[str, str] | None = None,
     denominator: str = "all_cells",
@@ -160,7 +165,7 @@ def plot_stacked_bar(
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
-    output_dir = Path(output_dir).expanduser().resolve() / "stacked_bar"
+    output_dir = _resolve_plot_dir(adata, output_dir) / "stacked_bar"
     output_dir.mkdir(parents=True, exist_ok=True)
     table_dir = output_dir / "tables"
     table_dir.mkdir(parents=True, exist_ok=True)
@@ -266,7 +271,7 @@ def plot_stacked_bar(
         plt.show()
     plt.close(fig)
 
-    table_path = table_dir / f"{prefix}_frequency.csv"
+    table_path = table_dir / f"{prefix}_by_group_frequency.csv"
     freq_plot.to_csv(table_path)
     per_image_path = table_dir / f"{prefix}_per_image_frequency.csv"
     freq_sample.to_csv(per_image_path)
@@ -292,7 +297,7 @@ def plot_spatial_celltypes(
     subset_value: str | None = None,
     images: Iterable[str] | None = None,
     spatial_key: str | None = None,
-    output_dir: str | Path = DEFAULT_PLOT_DIR,
+    output_dir: str | Path | None = None,
     filename_prefix: str | None = None,
     colors: dict[str, str] | None = None,
     fixed_window_um: float | None = None,
@@ -319,7 +324,7 @@ def plot_spatial_celltypes(
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
     spatial_key = _resolve_spatial_key(adata, spatial_key)
-    output_dir = Path(output_dir).expanduser().resolve() / "spatial_celltypes"
+    output_dir = _resolve_plot_dir(adata, output_dir) / "spatial_celltypes"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     obs_plot = _prepare_obs(

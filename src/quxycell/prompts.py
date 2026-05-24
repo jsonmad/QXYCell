@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
+from quxycell.paths import resolve_output_dir
+
 
 def _available_markers_from_adata(adata) -> list[str]:
     markers = []
@@ -109,8 +111,7 @@ def celltype_prompt(
     if save and output_path is None:
         timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
         output_path = (
-            Path("outputs")
-            / "qxy_run"
+            resolve_output_dir(adata=adata)
             / "celltype"
             / f"celltype_prompt_{timestamp}.txt"
         )
@@ -129,7 +130,7 @@ def celltype_prompt(
                 "Save the returned YAML to a file such as:\n"
                 f"{saved_path.parent / 'celltype_logic.yaml'}\n"
                 "Then apply it with:\n"
-                "qxy.celltype(adata, \"outputs/qxy_run/celltype/celltype_logic.yaml\")\n"
+                f"qxy.celltype(adata, {str(saved_path.parent / 'celltype_logic.yaml')!r})\n"
             )
         print(prompt)
 
