@@ -33,10 +33,11 @@ Required QuPath products:
   images.
 - Object classifier JSON files: QuPath single-measurement object classifiers,
   usually saved under `classifiers/object_classifiers/*.json` in the QuPath
-  project/export folder. These classifiers should be created in QuPath by the
+  project folder. These classifiers should be created in QuPath by the
   user, with marker-specific positivity thresholds set and saved for each
-  single measurement classifier. QuXYCell reads those saved thresholds and
-  creates marker positivity columns in `adata.obs` named `<marker>_pos`.
+  single-measurement classifier. QuXYCell reads the thresholds and marker name
+  from the saved `*.json` file and creates marker positivity columns in
+  `adata.obs` named `<marker>_pos`.
 - Annotation GeoJSON files: exported QuPath annotation polygons. Each
   annotation should have a QuPath class set, or a `name` if no class is set.
   QuXYCell uses that class/name label to create boolean annotation columns in
