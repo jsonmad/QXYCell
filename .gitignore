@@ -9,7 +9,7 @@ dist/
 build/
 *.egg-info/
 
-# Local QUXYCell outputs
+# Local QuXYCell outputs
 quxycell_output*/
 quxycell_run*/
 qxy?run/
