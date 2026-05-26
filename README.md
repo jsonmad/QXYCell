@@ -6,6 +6,12 @@
 
 QuXYCell is a Python package for processing manually exported QuPath single-cell projects.
 
+## Documentation
+
+The GitHub Pages documentation site is available at:
+
+https://jsonmad.github.io/QuXYCell/
+
 The first user-facing workflow is Python-first:
 
 ```python
