@@ -21,20 +21,41 @@ report = qxy.check("/path/to/qupath_export")
 adata = qxy.run("/path/to/qupath_export")
 ```
 
-Version 1 assumes the user has already exported files from QuPath:
+## QuPath Inputs
 
-- `measurements.csv` or `measurements.tsv`
-- `classifiers/object_classifiers/*.json`
-- exported annotation GeoJSON files
+QuXYCell v1 is built around manual QuPath exports. It does not parse QuPath
+`.qpdata` files directly.
+
+Required QuPath products:
+
+- Cell measurement table: one or more `measurements.csv` or `measurements.tsv`
+  files exported from QuPath. A single table may contain cells from multiple
+  images.
+- Object classifier JSON files: QuPath classifier definitions, usually under
+  `classifiers/object_classifiers/*.json`. QuXYCell reads threshold rules from
+  these files and creates marker positivity columns in `adata.obs` named
+  `<marker>_pos`.
+- Annotation GeoJSON files: exported QuPath annotations containing polygon
+  boundaries and annotation names/classes. QuXYCell assigns cells inside these
+  polygons to annotation columns in `adata.obs`.
 
 Required measurement columns:
 
-- `Image`
-- `Object ID`
-- `Centroid X µm`
-- `Centroid Y µm`
+- `Image`: the QuPath image name. QuXYCell uses this to keep cells associated
+  with the correct image/sample.
+- `Object ID`: the QuPath cell/object identifier.
+- `Centroid X µm`: cell centroid x-coordinate in microns.
+- `Centroid Y µm`: cell centroid y-coordinate in microns.
 
-QuXYCell does not parse QuPath `.qpdata` directly in v1.
+Optional QuPath products:
+
+- Cell segmentation GeoJSON files: if exported, these can be used to preserve
+  cell/object geometries where available.
+- TMA core GeoJSON files: if exported, QuXYCell can assign cells to
+  non-overlapping TMA core boundaries and preserve core metadata.
+
+QuXYCell assumes the standard QuPath `Image` column name. Alternative aliases
+are not used in v1.
 
 If `output_dir` is omitted:
 
