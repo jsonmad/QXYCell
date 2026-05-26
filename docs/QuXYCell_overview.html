@@ -24,50 +24,6 @@
       line-height: 1.55;
     }
 
-    .site-nav {
-      border-bottom: 1px solid var(--line);
-      background: #ffffff;
-    }
-
-    .site-nav-inner {
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 12px 28px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .site-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 700;
-    }
-
-    .site-brand img {
-      width: 34px;
-      height: 34px;
-      object-fit: contain;
-      border-radius: 8px;
-    }
-
-    .site-links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      font-size: 0.9rem;
-    }
-
-    .site-links a {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 650;
-    }
-
     main {
       max-width: 920px;
       margin: 0 auto;
@@ -92,14 +48,6 @@
       align-items: center;
       gap: 14px;
       margin-bottom: 8px;
-    }
-
-    .title-icon {
-      width: 54px;
-      height: 54px;
-      object-fit: contain;
-      flex: 0 0 auto;
-      border-radius: 10px;
     }
 
     .subtitle {
@@ -186,23 +134,12 @@
     }
 
     @media (max-width: 720px) {
-      .site-nav-inner {
-        align-items: flex-start;
-        flex-direction: column;
-        padding: 12px 18px;
-      }
-
       main {
         padding: 32px 18px 48px;
       }
 
       h1 {
         font-size: 2rem;
-      }
-
-      .title-icon {
-        width: 44px;
-        height: 44px;
       }
 
       .two-col {
@@ -212,24 +149,9 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav" aria-label="Documentation">
-    <div class="site-nav-inner">
-      <a class="site-brand" href="index.html">
-        <img src="assets/quxycell-icon.png" alt="QuXYCell icon">
-        <span>QuXYCell</span>
-      </a>
-      <div class="site-links">
-        <a href="index.html">Docs Home</a>
-        <a href="QuXYCell_overview.html">Overview</a>
-        <a href="QuXYCell_function_reference.html">Function Reference</a>
-        <a href="https://github.com/jsonmad/QuXYCell">GitHub</a>
-      </div>
-    </div>
-  </nav>
   <main>
     <header>
       <div class="title-row">
-        <img class="title-icon" src="assets/quxycell-icon.png" alt="QuXYCell icon">
         <h1>QuXYCell Overview</h1>
       </div>
       <p class="subtitle">A Python bridge from manually exported QuPath single-cell data to AnnData.</p>

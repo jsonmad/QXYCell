@@ -24,62 +24,13 @@
       line-height: 1.5;
       background: #fbfcfd;
     }
-    header {
-      border-bottom: 1px solid var(--line);
-      background: white;
-    }
-    .nav {
-      max-width: 1040px;
-      margin: 0 auto;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 700;
-    }
-    .brand img {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      object-fit: contain;
-    }
-    .links {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
-      font-size: 14px;
-    }
-    .links a {
-      color: var(--accent-dark);
-      text-decoration: none;
-      font-weight: 600;
-    }
     main {
       max-width: 1040px;
       margin: 0 auto;
       padding: 48px 24px 64px;
     }
     .hero {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr);
-      gap: 24px;
-      align-items: center;
       margin-bottom: 34px;
-    }
-    .hero img {
-      width: 96px;
-      height: 96px;
-      object-fit: contain;
-      border-radius: 18px;
     }
     h1 {
       margin: 0 0 8px;
@@ -150,12 +101,8 @@
       font-size: 13px;
     }
     @media (max-width: 720px) {
-      .nav {
-        align-items: flex-start;
-        flex-direction: column;
-      }
       .hero {
-        grid-template-columns: 1fr;
+        margin-bottom: 28px;
       }
       h1 {
         font-size: 32px;
@@ -167,23 +114,8 @@
   </style>
 </head>
 <body>
-  <header>
-    <nav class="nav" aria-label="Documentation">
-      <a class="brand" href="index.html">
-        <img src="assets/quxycell-icon.png" alt="QuXYCell icon">
-        <span>QuXYCell</span>
-      </a>
-      <div class="links">
-        <a href="QuXYCell_overview.html">Overview</a>
-        <a href="QuXYCell_function_reference.html">Function Reference</a>
-        <a href="https://github.com/jsonmad/QuXYCell">GitHub</a>
-      </div>
-    </nav>
-  </header>
-
   <main>
     <section class="hero">
-      <img src="assets/quxycell-icon.png" alt="QuXYCell icon">
       <div>
         <h1>QuXYCell Documentation</h1>
         <p class="subtitle">
