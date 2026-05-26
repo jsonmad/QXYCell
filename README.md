@@ -1,5 +1,9 @@
 # QuXYCell
 
+<p align="center">
+  <img src="assets/quxycell-icon.png" alt="QuXYCell icon" width="180">
+</p>
+
 QuXYCell is a Python package for processing manually exported QuPath single-cell projects.
 
 The first user-facing workflow is Python-first:
