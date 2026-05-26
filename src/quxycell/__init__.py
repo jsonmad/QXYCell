@@ -4,6 +4,7 @@ from quxycell.celltyping import apply_celltypes as _apply_celltypes
 from quxycell.celltyping import find_latest_celltype_yaml
 from quxycell.celltyping import load_celltype_logic
 from quxycell.checks import CheckReport, check
+from quxycell.filtering import assign_samples
 from quxycell.filtering import remove_ignore
 from quxycell.io_utils import load, load_latest, save
 from quxycell.metadata import add_metadata
@@ -21,6 +22,7 @@ del _apply_celltypes
 __all__ = [
     "CheckReport",
     "add_metadata",
+    "assign_samples",
     "assign_tma_cores",
     "celltype",
     "celltype_prompt",

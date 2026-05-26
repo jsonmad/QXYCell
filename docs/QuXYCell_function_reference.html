@@ -166,6 +166,12 @@
         <td>Filters <code>adata</code> in place by default.</td>
       </tr>
       <tr>
+        <td><code>qxy.assign_samples</code></td>
+        <td>Assign one sample label per cell from annotation columns containing <code>sample</code>.</td>
+        <td><code>sample_summary = qxy.assign_samples(adata)</code></td>
+        <td>Adds <code>adata.obs["Sample"]</code> and warns on overlapping sample annotations.</td>
+      </tr>
+      <tr>
         <td><code>qxy.add_metadata</code></td>
         <td>Add sample-level metadata from CSV, TSV, or DataFrame to <code>adata.obs</code>.</td>
         <td><code>qxy.add_metadata(adata, "metadata.tsv", sample_col="ImageID")</code></td>

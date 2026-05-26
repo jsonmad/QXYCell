@@ -133,6 +133,13 @@ Remove cells inside annotation columns containing `Ignore`:
 adata = qxy.remove_ignore(adata)
 ```
 
+Assign sample labels from annotation columns containing `Sample`:
+
+```python
+sample_summary = qxy.assign_samples(adata)
+adata.obs["Sample"].value_counts()
+```
+
 Save and reload:
 
 ```python

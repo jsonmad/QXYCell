@@ -156,6 +156,12 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
     annotation_columns = sorted(
         {feature["column"] for features in features_by_image.values() for feature in features}
     )
+    annotation_label_map = {
+        feature["column"]: feature["label"]
+        for features in features_by_image.values()
+        for feature in features
+    }
+    adata.uns["quxycell_annotation_labels"] = annotation_label_map
     for column in annotation_columns:
         obs[column] = False
 
@@ -248,7 +254,9 @@ def run(
 
     marker_names = _unique_marker_names(simple_classifiers)
     marker_columns = [classifier.measurement_column for classifier in simple_classifiers]
-    missing_marker_columns = [column for column in marker_columns if column not in measurements.columns]
+    missing_marker_columns = [
+        column for column in marker_columns if column not in measurements.columns
+    ]
     if missing_marker_columns:
         raise ValueError(
             "Classifier-referenced measurement columns are missing: "
@@ -292,7 +300,10 @@ def run(
         report.geojson_files,
         pixel_size_um=pixel_size_um,
     )
-    annotation_cols = [column for column in adata.obs.columns if str(column).startswith("annotation__")]
+    annotation_cols = [
+        column for column in adata.obs.columns if str(column).startswith("annotation__")
+    ]
+    annotation_label_map = adata.uns.get("quxycell_annotation_labels", {})
     log(f"Annotation columns: {len(annotation_cols)}")
     log(f"Annotation conflicts: {len(annotation_conflicts)}")
 
@@ -335,6 +346,7 @@ def run(
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),
         "n_geojson_files": int(len(report.geojson_files)),
         "n_annotation_conflicts": int(len(annotation_conflicts)),
+        "annotation_labels": dict(annotation_label_map),
         "celltyping_applied": bool(celltyping_summary is not None),
     }
     log(f"Writing H5AD: {h5ad_path}")
