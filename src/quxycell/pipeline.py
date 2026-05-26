@@ -111,6 +111,8 @@ def _load_annotation_features(geojson_files, pixel_size_um: float):
         image_key = _geojson_image_key(geojson_file.path)
         for feature in features:
             properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
+            if str(properties.get("objectType") or "").lower() != "annotation":
+                continue
             geometry_data = feature.get("geometry") if isinstance(feature, dict) else None
             if not geometry_data:
                 continue

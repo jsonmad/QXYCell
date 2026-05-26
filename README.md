@@ -49,6 +49,10 @@ Required QuPath products:
   used to segment multiple samples within an image. Annotations labelled
   `Ignore` can be removed from downstream analyses. For TMAs, use QuPath's
   built-in TMA segmentation tools.
+- Cell segmentation GeoJSON file: exported QuPath cell objects for all cells.
+  Export this file with measurements excluded. QuXYCell uses the measurement
+  table for cell measurements; the segmentation GeoJSON should provide cell
+  geometry/object boundaries without duplicating measurement values.
 
 Required measurement columns:
 
@@ -60,8 +64,6 @@ Required measurement columns:
 
 Optional QuPath products:
 
-- Cell segmentation GeoJSON files: if exported, these can be used to preserve
-  cell/object geometries where available.
 - TMA core GeoJSON files: if exported, QuXYCell can assign cells to
   non-overlapping TMA core boundaries and preserve core metadata.
 
