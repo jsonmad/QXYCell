@@ -39,13 +39,16 @@ Required QuPath products:
   from the saved `*.json` file and creates marker positivity columns in
   `adata.obs` named `<marker>_pos`.
 - Annotation GeoJSON files: exported QuPath annotation polygons. Each
-  annotation should have a QuPath class set, or a `name` if no class is set.
-  QuXYCell uses that class/name label to create boolean annotation columns in
-  `adata.obs` named `annotation__<label>`. Cells falling inside the polygon are
-  marked `True` for that annotation column. Export annotation GeoJSON files with
-  measurements excluded; QuXYCell only needs the annotation geometry and
-  class/name label. One GeoJSON file can contain many annotations as long as
-  each annotation is labelled.
+  annotation should have a QuPath class assigned (annotation label). QuXYCell
+  uses this label to create boolean annotation columns in `adata.obs` named
+  `annotation__<label>`. Cells falling inside a polygon are marked `True` for
+  that annotation column. Export annotation GeoJSON files with measurements
+  excluded; QuXYCell only requires the annotation geometry and class/name label.
+  A single GeoJSON file can contain multiple annotations, provided each
+  annotation is labelled. Annotations labelled with the string `Sample-` are
+  used to segment multiple samples within an image. Annotations labelled
+  `Ignore` can be removed from downstream analyses. For TMAs, use QuPath's
+  built-in TMA segmentation tools.
 
 Required measurement columns:
 
