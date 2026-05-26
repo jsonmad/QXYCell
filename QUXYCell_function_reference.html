@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuXYCell Function and Command Reference</title>
+  <style>
+    :root {
+      --ink: #172026;
+      --muted: #5a6772;
+      --line: #d8dee4;
+      --soft: #f6f8fa;
+      --accent: #0f766e;
+      --code: #102a43;
+    }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.45;
+      background: white;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 24px 56px;
+    }
+    h1 {
+      margin: 0 0 6px;
+      font-size: 32px;
+      letter-spacing: 0;
+    }
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 6px;
+    }
+    .title-icon {
+      width: 54px;
+      height: 54px;
+      object-fit: contain;
+      flex: 0 0 auto;
+      border-radius: 10px;
+    }
+    h2 {
+      margin: 34px 0 10px;
+      padding-top: 8px;
+      border-top: 2px solid var(--line);
+      font-size: 22px;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 24px 0 8px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 8px 0 14px;
+    }
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+    .note {
+      border-left: 4px solid var(--accent);
+      background: #eef8f6;
+      padding: 10px 14px;
+      margin: 16px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 24px;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: var(--soft);
+      font-weight: 650;
+    }
+    tr:nth-child(even) td {
+      background: #fbfcfd;
+    }
+    code {
+      color: var(--code);
+      background: #eef2f5;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.94em;
+    }
+    pre {
+      background: #0b1220;
+      color: #e5edf5;
+      overflow-x: auto;
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    pre code {
+      color: inherit;
+      background: transparent;
+      padding: 0;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+    @media (max-width: 720px) {
+      .title-icon {
+        width: 44px;
+        height: 44px;
+      }
+      h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="title-row">
+    <img class="title-icon" src="ChatGPT%20Image%20May%2025,%202026,%2010_29_04%20AM%20%282%29%20copy.png" alt="QuXYCell icon">
+    <h1>QuXYCell Function and Command Reference</h1>
+  </div>
+  <p class="subtitle">Notebook and CLI reference for QuPath export to AnnData workflows.</p>
+
+  <div class="note">
+    <strong>Standard import:</strong>
+    <code>import quxycell as qxy</code>
+  </div>
+
+  <h2>Core QuXYCell Functions</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Function</th>
+        <th>Purpose</th>
+        <th>Typical command</th>
+        <th>Key output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>qxy.check</code></td>
+        <td>Inspect and validate a manually exported QuPath project.</td>
+        <td><code>report = qxy.check(qupath_project)</code></td>
+        <td><code>CheckReport</code> plus check report files in <code>qxy_outputs_YYMMDD-HHMM/</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.run</code></td>
+        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, and GeoJSON annotations into AnnData.</td>
+        <td><code>adata = qxy.run(qupath_project)</code></td>
+        <td><code>AnnData</code> plus saved H5AD and tables.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.celltype_prompt</code></td>
+        <td>Create a copy-paste LLM prompt from markers found in the AnnData object.</td>
+        <td><code>prompt = qxy.celltype_prompt(adata)</code></td>
+        <td>Prompt text and a saved prompt file in the run <code>celltype/</code> folder.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.celltype</code></td>
+        <td>Apply ordered first-match cell type YAML logic.</td>
+        <td><code>summary = qxy.celltype(adata)</code></td>
+        <td>Adds <code>adata.obs["celltype"]</code> and saves a rule summary TSV.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.remove_ignore</code></td>
+        <td>Remove cells inside annotation columns containing <code>Ignore</code>.</td>
+        <td><code>qxy.remove_ignore(adata)</code></td>
+        <td>Filters <code>adata</code> in place by default.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.add_metadata</code></td>
+        <td>Add sample-level metadata from CSV, TSV, or DataFrame to <code>adata.obs</code>.</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv", sample_col="ImageID")</code></td>
+        <td>Adds metadata columns to every cell by sample.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.qc</code></td>
+        <td>Create QC tables and an HTML QC report.</td>
+        <td><code>qc = qxy.qc(adata, sample_col="ImageID")</code></td>
+        <td>QC TSV tables and <code>qc_report.html</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.assign_tma_cores</code></td>
+        <td>Assign cells to non-overlapping TMA cores from GeoJSON boundaries.</td>
+        <td><code>tma = qxy.assign_tma_cores(adata, "tma.geojson")</code></td>
+        <td>Adds <code>tma_core</code> and TMA metadata columns to <code>adata.obs</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.plot_stacked_bar</code></td>
+        <td>Plot stacked cell type frequencies per sample or group.</td>
+        <td><code>qxy.plot_stacked_bar(adata, sample_col="ImageID")</code></td>
+        <td>PNG, PDF, and frequency tables.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.plot_spatial_celltypes</code></td>
+        <td>Plot spatial cell type maps with shared scale, centered samples, legend, and scale bar.</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID")</code></td>
+        <td>PNG/PDF spatial plots and optional combined plot.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.save</code></td>
+        <td>Save the current AnnData object to the run H5AD path.</td>
+        <td><code>qxy.save(adata)</code></td>
+        <td>Saved <code>quxycell.h5ad</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.load</code></td>
+        <td>Load a saved QuXYCell H5AD from an H5AD path or output folder.</td>
+        <td><code>adata = qxy.load("qxy_outputs_YYMMDD-HHMM")</code></td>
+        <td><code>AnnData</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.load_latest</code></td>
+        <td>Load the latest timestamped QuXYCell run in a folder.</td>
+        <td><code>adata = qxy.load_latest()</code></td>
+        <td><code>AnnData</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.workflow</code></td>
+        <td>Convenience wrapper for run, metadata, ignore removal, celltyping, QC, plots, and save.</td>
+        <td><code>adata = qxy.workflow(qupath_project)</code></td>
+        <td>Completed AnnData workflow.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Helper Functions</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Function</th>
+        <th>Purpose</th>
+        <th>Command</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>qxy.find_latest_celltype_yaml</code></td>
+        <td>Find the newest YAML file in a celltype folder.</td>
+        <td><code>yaml_path = qxy.find_latest_celltype_yaml()</code></td>
+      </tr>
+      <tr>
+        <td><code>qxy.load_celltype_logic</code></td>
+        <td>Load a celltype YAML file as a Python dictionary.</td>
+        <td><code>logic = qxy.load_celltype_logic("celltype_logic.yaml")</code></td>
+      </tr>
+      <tr>
+        <td><code>qxy.CheckReport</code></td>
+        <td>Dataclass returned by <code>qxy.check()</code>.</td>
+        <td><code>report.n_errors</code>, <code>report.n_warnings</code>, <code>report.messages</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Common Notebook Workflow</h2>
+  <pre><code>import quxycell as qxy
+
+qupath_project = "/path/to/qupath_project"
+
+adata = qxy.run(qupath_project)
+qxy.remove_ignore(adata)
+
+prompt = qxy.celltype_prompt(
+    adata,
+    context="Add biological/project context here."
+)
+
+# Save YAML returned by an LLM into the run celltype folder, then:
+summary = qxy.celltype(adata)
+
+qxy.add_metadata(
+    adata,
+    "sample_metadata.tsv",
+    sample_col="ImageID",
+)
+
+qxy.qc(adata, sample_col="ImageID")
+
+qxy.plot_spatial_celltypes(
+    adata,
+    sample_col="ImageID",
+    combined=True,
+    max_cols=2,
+)
+
+qxy.plot_stacked_bar(
+    adata,
+    sample_col="ImageID",
+    group_col="group",
+)
+
+qxy.save(adata)</code></pre>
+
+  <h2>Metadata Commands</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Goal</th>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Add metadata matched on QuPath image names</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv")</code></td>
+        <td>Default <code>sample_col="Image"</code>.</td>
+      </tr>
+      <tr>
+        <td>Add metadata matched on short sample names</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv", sample_col="ImageID")</code></td>
+        <td><code>ImageID</code> must already exist in <code>adata.obs</code>.</td>
+      </tr>
+      <tr>
+        <td>Metadata file uses a different key column</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv", sample_col="ImageID", metadata_sample_col="sample_id")</code></td>
+        <td>Use when metadata has <code>sample_id</code> but AnnData has <code>ImageID</code>.</td>
+      </tr>
+      <tr>
+        <td>Add only selected metadata columns</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv", columns=["group", "mouse_id"])</code></td>
+        <td>Prevents importing unused metadata columns.</td>
+      </tr>
+      <tr>
+        <td>Overwrite existing metadata columns</td>
+        <td><code>qxy.add_metadata(adata, "metadata.tsv", overwrite=True)</code></td>
+        <td>Use deliberately.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>TMA Commands</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Goal</th>
+        <th>Command</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Assign TMA cores using default QuPath image matching</td>
+        <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores.geojson")</code></td>
+        <td>Default <code>sample_col="Image"</code>.</td>
+      </tr>
+      <tr>
+        <td>Assign TMA cores using short sample IDs</td>
+        <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores/", sample_col="ImageID")</code></td>
+        <td>GeoJSON filename stems should match <code>ImageID</code> values.</td>
+      </tr>
+      <tr>
+        <td>Use a custom output column</td>
+        <td><code>qxy.assign_tma_cores(adata, "tma.geojson", core_col="core_id")</code></td>
+        <td>Stores core assignment in <code>adata.obs["core_id"]</code>.</td>
+      </tr>
+      <tr>
+        <td>Change metadata prefix</td>
+        <td><code>qxy.assign_tma_cores(adata, "tma.geojson", metadata_prefix="core_")</code></td>
+        <td>Core metadata columns become <code>core_...</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>TMA matching rule:</strong> TMA GeoJSON files are matched to <code>adata.obs[sample_col]</code> using the GeoJSON filename stem. With the default <code>sample_col="Image"</code>, this matches QuPath image names. For example, <code>slideA.ome.geojson</code> matches <code>slideA.ome.tiff</code>. TMA core overlap is not allowed.
+  </div>
+
+  <h2>Plotting Commands</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Goal</th>
+        <th>Command</th>
+        <th>Output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Stacked bar by sample</td>
+        <td><code>qxy.plot_stacked_bar(adata, sample_col="ImageID")</code></td>
+        <td>PNG, PDF, and CSV frequency tables.</td>
+      </tr>
+      <tr>
+        <td>Stacked bar by group</td>
+        <td><code>qxy.plot_stacked_bar(adata, sample_col="ImageID", group_col="group")</code></td>
+        <td>Group-level mean frequencies.</td>
+      </tr>
+      <tr>
+        <td>Limit to selected celltypes</td>
+        <td><code>qxy.plot_stacked_bar(adata, celltypes=["T_cell", "Macrophage"])</code></td>
+        <td>Only selected categories plotted.</td>
+      </tr>
+      <tr>
+        <td>Spatial plot by sample</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID")</code></td>
+        <td>One spatial figure per sample.</td>
+      </tr>
+      <tr>
+        <td>Combined spatial panel</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID", combined=True, max_cols=2)</code></td>
+        <td>Individual plots plus combined PNG/PDF.</td>
+      </tr>
+      <tr>
+        <td>Selected samples</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID", samples=["beat-2", "beat-5"])</code></td>
+        <td>Restricts plots to listed samples.</td>
+      </tr>
+      <tr>
+        <td>Smaller points</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, point_size=0.3, underlay_size=0.1)</code></td>
+        <td>Better for dense cell maps.</td>
+      </tr>
+      <tr>
+        <td>Palette control</td>
+        <td><code>qxy.plot_spatial_celltypes(adata, palette="tab20")</code></td>
+        <td>Uses a matplotlib palette.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Useful AnnData Commands</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>adata</code></td><td>Display AnnData summary.</td></tr>
+      <tr><td><code>adata.n_obs</code></td><td>Number of cells.</td></tr>
+      <tr><td><code>adata.n_vars</code></td><td>Number of marker features in <code>adata.X</code>.</td></tr>
+      <tr><td><code>adata.obs.head()</code></td><td>Preview cell metadata.</td></tr>
+      <tr><td><code>adata.obs.columns.tolist()</code></td><td>List all cell metadata columns.</td></tr>
+      <tr><td><code>adata.var</code></td><td>View marker metadata.</td></tr>
+      <tr><td><code>adata.var_names.tolist()</code></td><td>List imported markers.</td></tr>
+      <tr><td><code>adata.X</code></td><td>Marker measurement matrix.</td></tr>
+      <tr><td><code>adata.obsm["spatial"]</code></td><td>Spatial coordinates.</td></tr>
+      <tr><td><code>adata.uns</code></td><td>Run metadata and QuXYCell summaries.</td></tr>
+      <tr><td><code>adata.uns["quxycell"]["output_dir"]</code></td><td>Current QuXYCell output folder.</td></tr>
+      <tr><td><code>adata.uns["quxycell"]["h5ad_path"]</code></td><td>Current H5AD save path.</td></tr>
+      <tr><td><code>adata[adata.obs["celltype"] == "T_cell"].copy()</code></td><td>Subset to one cell type.</td></tr>
+      <tr><td><code>adata.write_h5ad("file.h5ad")</code></td><td>Manual H5AD save.</td></tr>
+      <tr><td><code>import anndata as ad; adata = ad.read_h5ad("file.h5ad")</code></td><td>Manual H5AD load.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Useful Pandas Commands For <code>adata.obs</code></h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>adata.obs["Image"].value_counts()</code></td><td>Cells per QuPath image.</td></tr>
+      <tr><td><code>adata.obs["ImageID"].value_counts()</code></td><td>Cells per short sample ID.</td></tr>
+      <tr><td><code>adata.obs["celltype"].value_counts()</code></td><td>Cell type counts.</td></tr>
+      <tr><td><code>adata.obs.filter(regex="_pos$").mean()</code></td><td>Marker positivity fractions.</td></tr>
+      <tr><td><code>adata.obs.filter(regex="^annotation__").sum()</code></td><td>Annotation cell counts.</td></tr>
+      <tr><td><code>adata.obs[["Image", "ImageID"]].drop_duplicates()</code></td><td>Check image-to-sample mapping.</td></tr>
+      <tr><td><code>adata.obs.groupby("ImageID").size()</code></td><td>Cells per sample.</td></tr>
+      <tr><td><code>adata.obs.groupby(["ImageID", "celltype"]).size()</code></td><td>Cell types per sample.</td></tr>
+      <tr><td><code>pd.read_csv("metadata.tsv", sep="\t")</code></td><td>Load metadata table.</td></tr>
+      <tr><td><code>adata.obs.to_csv("cells_obs.tsv", sep="\t")</code></td><td>Export cell metadata.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Image Name Mapping</h2>
+  <pre><code>image_name_map = {
+    "long_original_image_name_1.ome.tiff": "sample-1",
+    "long_original_image_name_2.ome.tiff": "sample-2",
+}
+
+image = adata.obs["Image"].astype(str)
+adata.obs["ImageID"] = image.map(image_name_map).fillna(image)</code></pre>
+
+  <h2>CLI Commands</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Command</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>quxycell check /path/to/qupath_project</code></td><td>Validate a QuPath export from terminal.</td></tr>
+      <tr><td><code>quxycell run /path/to/qupath_project</code></td><td>Run QuXYCell import from terminal.</td></tr>
+      <tr><td><code>quxycell run /path/to/qupath_project --out my_output</code></td><td>Run import to an explicit output folder.</td></tr>
+      <tr><td><code>quxycell run /path/to/qupath_project --celltype-logic logic.yaml</code></td><td>Run import and apply cell type logic.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Output Locations</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Output</th>
+        <th>Default location</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Run folder</td><td><code>qxy_outputs_YYMMDD-HHMM/</code></td></tr>
+      <tr><td>H5AD</td><td><code>qxy_outputs_YYMMDD-HHMM/run/h5ad/quxycell.h5ad</code></td></tr>
+      <tr><td>Cell metadata table</td><td><code>qxy_outputs_YYMMDD-HHMM/run/tables/cells_obs.csv</code></td></tr>
+      <tr><td>Marker metadata table</td><td><code>qxy_outputs_YYMMDD-HHMM/run/tables/markers_var.csv</code></td></tr>
+      <tr><td>Celltype prompt and summaries</td><td><code>qxy_outputs_YYMMDD-HHMM/celltype/</code></td></tr>
+      <tr><td>QC report</td><td><code>qxy_outputs_YYMMDD-HHMM/qc/qc_report.html</code></td></tr>
+      <tr><td>Plots</td><td><code>qxy_outputs_YYMMDD-HHMM/plots/</code></td></tr>
+      <tr><td>TMA summaries</td><td><code>qxy_outputs_YYMMDD-HHMM/tma/</code></td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

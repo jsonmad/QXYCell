@@ -29,7 +29,7 @@ def discover_measurement_files(project_dir: str | Path) -> list[Path]:
 
 
 def required_columns() -> tuple[str, ...]:
-    """Return QUXYCell's required v1 QuPath measurement columns."""
+    """Return QuXYCell's required v1 QuPath measurement columns."""
 
     return REQUIRED_MEASUREMENT_COLUMNS
 

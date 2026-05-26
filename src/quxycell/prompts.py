@@ -34,7 +34,7 @@ def celltype_prompt(
 ) -> str:
     """Create a copy-pasteable LLM prompt for drafting cell type logic YAML.
 
-    The prompt asks an external LLM to create a first-pass QUXYCell
+    The prompt asks an external LLM to create a first-pass QuXYCell
     ``celltype_logic.yaml`` using only markers available in the loaded AnnData.
     """
 
@@ -48,9 +48,9 @@ def celltype_prompt(
     prompt = (
         dedent(
             """
-            You are helping draft a first-pass QUXYCell cell type logic YAML file for spatial single-cell data imported from QuPath.
+            You are helping draft a first-pass QuXYCell cell type logic YAML file for spatial single-cell data imported from QuPath.
 
-            QUXYCell has already loaded the project into an AnnData object. Marker positivity columns exist in `adata.obs` as `<MARKER>_pos`. Use only the marker names provided below exactly as written.
+            QuXYCell has already loaded the project into an AnnData object. Marker positivity columns exist in `adata.obs` as `<MARKER>_pos`. Use only the marker names provided below exactly as written.
 
             Available markers:
             """
@@ -124,7 +124,7 @@ def celltype_prompt(
 
     if print_prompt:
         if saved_path is not None:
-            print(f"Saved QUXYCell cell type prompt to:\n{saved_path}\n")
+            print(f"Saved QuXYCell cell type prompt to:\n{saved_path}\n")
             print(
                 "Copy the prompt below into an LLM and ask it to return YAML only. "
                 "Save the returned YAML to a file such as:\n"

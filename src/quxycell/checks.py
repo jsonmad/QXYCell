@@ -83,7 +83,7 @@ def _write_report(report: CheckReport) -> None:
     )
 
     lines = [
-        "QUXYCell check report",
+        "QuXYCell check report",
         f"Project: {report.project_dir}",
         f"Output: {report.output_dir}",
         f"Status: {'PASS' if report.ok else 'FAIL'}",

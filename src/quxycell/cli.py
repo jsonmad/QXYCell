@@ -27,14 +27,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Count measurement table rows during check. Slower for large exports.",
     )
 
-    run_parser = subparsers.add_parser("run", help="Run QUXYCell on a QuPath export.")
+    run_parser = subparsers.add_parser("run", help="Run QuXYCell on a QuPath export.")
     run_parser.add_argument("project_dir", help="Path to a manually exported QuPath project folder.")
     run_parser.add_argument(
         "--out",
         "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output folder for QUXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
+        help="Output folder for QuXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
     )
     run_parser.add_argument(
         "--pixel-size-um",
@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         report = check(args.project_dir, output_dir=args.output_dir, count_rows=args.count_rows)
         status = "PASS" if report.ok else "FAIL"
-        print(f"QUXYCell check {status}")
+        print(f"QuXYCell check {status}")
         print(f"Report: {report.output_dir / 'check_report.txt'}")
         print(f"Measurement files: {len(report.measurement_files)}")
         print(f"Classifier JSON files: {len(report.classifiers)}")
@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
             pixel_size_um=args.pixel_size_um,
             celltype_logic=args.celltype_logic,
         )
-        print("QUXYCell run complete")
+        print("QuXYCell run complete")
         print(f"H5AD: {adata.uns['quxycell']['h5ad_path']}")
         print(f"Output: {adata.uns['quxycell']['run_dir']}")
         return 0

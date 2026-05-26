@@ -1,4 +1,4 @@
-"""Main QUXYCell pipeline entry point."""
+"""Main QuXYCell pipeline entry point."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def _import_runtime_dependencies():
         import pandas as pd
     except ImportError as exc:
         raise ImportError(
-            "QUXYCell run() requires the package runtime dependencies. "
+            "QuXYCell run() requires the package runtime dependencies. "
             "Install with `pip install -e .` from this repo, or `pip install quxycell` "
             "once the package is published."
         ) from exc
@@ -99,7 +99,7 @@ def _load_annotation_features(geojson_files, pixel_size_um: float):
         from shapely.prepared import prep
     except ImportError as exc:
         raise ImportError(
-            "GeoJSON annotation mapping requires shapely. Install QUXYCell runtime dependencies."
+            "GeoJSON annotation mapping requires shapely. Install QuXYCell runtime dependencies."
         ) from exc
 
     by_image: dict[str, list[dict[str, Any]]] = {}
@@ -194,7 +194,7 @@ def run(
     celltype_logic: str | Path | dict[str, Any] | None = None,
     verbose: bool = True,
 ) -> Any:
-    """Run QUXYCell on a manually exported QuPath project.
+    """Run QuXYCell on a manually exported QuPath project.
 
     The v1 pipeline imports one ``adata.X`` column per usable simple measurement
     classifier JSON, stores only required QuPath identity/spatial columns in
@@ -212,7 +212,7 @@ def run(
         if verbose:
             print(message)
 
-    log("QUXYCell run started")
+    log("QuXYCell run started")
     log(f"Project: {Path(project_dir).expanduser().resolve()}")
     log(f"Output: {output_path}")
 
@@ -229,7 +229,7 @@ def run(
 
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
-            "QUXYCell check failed. See "
+            "QuXYCell check failed. See "
             f"{output_path / 'check_report.txt'}"
         )
 
@@ -351,7 +351,7 @@ def run(
             tables_dir / "celltype_counts.csv",
             index=False,
         )
-    log("QUXYCell run complete")
+    log("QuXYCell run complete")
     (run_dir / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 
     return adata

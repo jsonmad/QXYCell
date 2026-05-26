@@ -1,4 +1,4 @@
-"""Generic plotting helpers for QUXYCell AnnData objects."""
+"""Generic plotting helpers for QuXYCell AnnData objects."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _require_plotting():
         from matplotlib.colors import hsv_to_rgb, to_hex
     except ImportError as exc:
         raise ImportError(
-            "QUXYCell plotting requires plot dependencies. Install with "
+            "QuXYCell plotting requires plot dependencies. Install with "
             "`pip install -e '.[plot]'` or `pip install quxycell[plot]`."
         ) from exc
     return plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex
@@ -43,12 +43,40 @@ def _fallback_color(label: object, hsv_to_rgb, to_hex) -> str:
     return to_hex(hsv_to_rgb((hue, 0.72, 0.90)))
 
 
-def _color_map(labels: Iterable[object], hsv_to_rgb, to_hex, colors: dict[str, str] | None = None):
+def _color_map(
+    labels: Iterable[object],
+    hsv_to_rgb,
+    to_hex,
+    colors: dict[str, str] | None = None,
+    palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
+):
     colors = colors or {}
+    if isinstance(palette, dict):
+        colors = {**palette, **colors}
+    palette_values = None
+    if isinstance(palette, (list, tuple)):
+        palette_values = list(palette)
+    elif isinstance(palette, str):
+        try:
+            import matplotlib.pyplot as plt
+
+            cmap = plt.get_cmap(palette)
+            labels_list = list(labels)
+            denominator = max(len(labels_list) - 1, 1)
+            palette_values = [to_hex(cmap(index / denominator)) for index in range(len(labels_list))]
+            labels = labels_list
+        except Exception:
+            palette_values = None
+
     out = {}
-    for label in labels:
+    for index, label in enumerate(labels):
         key = str(label)
-        out[key] = colors.get(key, _fallback_color(key, hsv_to_rgb, to_hex))
+        if key in colors:
+            out[key] = colors[key]
+        elif palette_values:
+            out[key] = palette_values[index % len(palette_values)]
+        else:
+            out[key] = _fallback_color(key, hsv_to_rgb, to_hex)
     return out
 
 
@@ -112,6 +140,8 @@ def _prepare_obs(
     group_col: str | None = None,
     subset_col: str | None = None,
     subset_value: str | None = None,
+    samples: Iterable[str] | None = None,
+    categories: Iterable[str] | None = None,
     exclude_categories: Iterable[str] = ("Unknown", "Negative"),
 ):
     obs = adata.obs.copy()
@@ -132,6 +162,14 @@ def _prepare_obs(
     if exclude:
         obs = obs[~obs[category_col].str.lower().isin(exclude)].copy()
 
+    if samples is not None:
+        sample_values = {str(sample) for sample in samples}
+        obs = obs[obs[sample_col].astype(str).isin(sample_values)].copy()
+
+    if categories is not None:
+        category_values = {str(category) for category in categories}
+        obs = obs[obs[category_col].astype(str).isin(category_values)].copy()
+
     if subset_col is not None and subset_value is not None:
         obs = obs[obs[subset_col].astype(str).str.strip() == str(subset_value)].copy()
 
@@ -146,9 +184,13 @@ def plot_stacked_bar(
     group_col: str | None = None,
     subset_col: str | None = None,
     subset_value: str | None = None,
+    samples: Iterable[str] | None = None,
+    celltypes: Iterable[str] | None = None,
     output_dir: str | Path | None = None,
     filename_prefix: str | None = None,
+    save_prefix: str | None = None,
     colors: dict[str, str] | None = None,
+    palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     denominator: str = "all_cells",
     figsize: tuple[float, float] = (8.0, 4.0),
     dpi: int = 300,
@@ -177,12 +219,17 @@ def plot_stacked_bar(
         group_col=group_col,
         subset_col=subset_col,
         subset_value=subset_value,
+        samples=samples,
+        categories=celltypes,
     )
     if obs_plot.empty:
         raise ValueError("No cells available for stacked bar plotting after filtering.")
 
     obs_all = adata.obs.copy()
     obs_all[sample_col] = obs_all[sample_col].astype(str).str.strip()
+    if samples is not None:
+        sample_values = {str(sample) for sample in samples}
+        obs_all = obs_all[obs_all[sample_col].isin(sample_values)].copy()
     if denominator == "all_cells":
         sample_totals = obs_all.groupby(sample_col, observed=True).size()
     elif denominator == "plotted_cells":
@@ -201,7 +248,10 @@ def plot_stacked_bar(
         counts.pivot(index=sample_col, columns=category_col, values="frequency")
         .fillna(0.0)
     )
-    category_order = freq_sample.mean(axis=0).sort_values(ascending=False).index.tolist()
+    if celltypes is not None:
+        category_order = [str(celltype) for celltype in celltypes if str(celltype) in freq_sample.columns]
+    else:
+        category_order = freq_sample.mean(axis=0).sort_values(ascending=False).index.tolist()
     freq_sample = freq_sample[category_order]
 
     if group_col is not None:
@@ -226,9 +276,9 @@ def plot_stacked_bar(
         safe_parts.append(_safe_name(subset_value))
     if group_col:
         safe_parts.append(f"by_{_safe_name(group_col)}")
-    prefix = filename_prefix or "_".join(safe_parts)
+    prefix = save_prefix or filename_prefix or "_".join(safe_parts)
 
-    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors)
+    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors, palette)
     stack_colors = [color_lookup[str(label)] for label in category_order]
 
     fig = plt.figure(figsize=(figsize[0] + legend_width, figsize[1]), constrained_layout=True)
@@ -295,11 +345,15 @@ def plot_spatial_celltypes(
     sample_col: str = "Image",
     subset_col: str | None = None,
     subset_value: str | None = None,
+    samples: Iterable[str] | None = None,
+    celltypes: Iterable[str] | None = None,
     images: Iterable[str] | None = None,
     spatial_key: str | None = None,
     output_dir: str | Path | None = None,
     filename_prefix: str | None = None,
+    save_prefix: str | None = None,
     colors: dict[str, str] | None = None,
+    palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     fixed_window_um: float | None = None,
     center_method: str = "median",
     point_size: float = 4.0,
@@ -310,9 +364,12 @@ def plot_spatial_celltypes(
     scale_bar_label: str = "1 mm",
     dpi: int = 300,
     legend_width: float = 2.2,
+    combined: bool = False,
+    save_individual: bool = True,
+    max_cols: int = 3,
     show: bool = True,
     verbose: bool = True,
-) -> dict[str, list[Path]]:
+) -> dict[str, object]:
     """Create spatial cell type plots with a grey all-cell underlay.
 
     Set ``sample_col`` to use a shortened image label column such as ``ImageID``
@@ -333,15 +390,25 @@ def plot_spatial_celltypes(
         sample_col=sample_col,
         subset_col=subset_col,
         subset_value=subset_value,
+        samples=samples if samples is not None else images,
+        categories=celltypes,
     )
     if obs_plot.empty:
         raise ValueError("No cells available for spatial plotting after filtering.")
 
     all_samples = sorted(adata.obs[sample_col].astype(str).unique().tolist())
-    selected_samples = list(images) if images is not None else all_samples
+    if samples is not None:
+        selected_samples = list(samples)
+    elif images is not None:
+        selected_samples = list(images)
+    else:
+        selected_samples = all_samples
     selected_samples = [str(sample) for sample in selected_samples]
-    category_order = sorted(obs_plot[category_col].astype(str).unique().tolist())
-    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors)
+    if celltypes is not None:
+        category_order = [str(celltype) for celltype in celltypes]
+    else:
+        category_order = sorted(obs_plot[category_col].astype(str).unique().tolist())
+    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors, palette)
     center_method = str(center_method).lower()
     if center_method not in {"median", "mean", "bbox"}:
         raise ValueError("center_method must be 'median', 'mean', or 'bbox'.")
@@ -393,18 +460,31 @@ def plot_spatial_celltypes(
         shared_width *= 1.04
         shared_height *= 1.04
 
-    fig_paths: list[Path] = []
-    for image in selected_samples:
+    def _legend_handles():
+        return [
+            Line2D(
+                [0],
+                [0],
+                marker="o",
+                linestyle="",
+                color=color_lookup[category],
+                markersize=8,
+                label=category,
+            )
+            for category in category_order
+        ]
+
+    def _draw_sample(ax, image: str) -> bool:
         image_mask = adata.obs[sample_col].astype(str) == image
         if not image_mask.any():
-            continue
+            return False
         image_positions = np.flatnonzero(image_mask.to_numpy())
         sub_obs = adata.obs.iloc[image_positions]
         coords = adata.obsm[spatial_key][image_positions, :]
 
         plot_mask = sub_obs.index.isin(obs_plot.index)
         if not plot_mask.any():
-            continue
+            return False
         plot_obs = sub_obs.loc[plot_mask]
 
         bounds = sample_bounds[image]
@@ -417,20 +497,6 @@ def plot_spatial_celltypes(
         centered_coords[:, 1] = centered_coords[:, 1] - bounds["y_center"]
         plot_coords = centered_coords[plot_mask, :]
 
-        fig = plt.figure(figsize=(10 + legend_width, 10), constrained_layout=False)
-        gs = fig.add_gridspec(
-            1,
-            2,
-            left=0.02,
-            right=0.98,
-            bottom=0.04,
-            top=0.94,
-            width_ratios=[10, legend_width],
-            wspace=0.02,
-        )
-        ax = fig.add_subplot(gs[0, 0])
-        legend_ax = fig.add_subplot(gs[0, 1])
-        legend_ax.axis("off")
         ax.scatter(
             centered_coords[:, 0],
             centered_coords[:, 1],
@@ -466,47 +532,121 @@ def plot_spatial_celltypes(
         _add_scale_bar(ax, x_lim, y_lim, length_um=scale_bar_um, label=scale_bar_label)
         title = f"{subset_value} | {image}" if subset_value else image
         ax.set_title(title, fontsize=10)
+        return True
 
-        handles = [
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                linestyle="",
-                color=color_lookup[category],
-                markersize=8,
-                label=category,
+    fig_paths: list[Path] = []
+    handles = _legend_handles()
+
+    if save_individual:
+        for image in selected_samples:
+            fig = plt.figure(figsize=(10 + legend_width, 10), constrained_layout=False)
+            gs = fig.add_gridspec(
+                1,
+                2,
+                left=0.02,
+                right=0.98,
+                bottom=0.04,
+                top=0.94,
+                width_ratios=[10, legend_width],
+                wspace=0.02,
             )
-            for category in category_order
-        ]
-        if handles:
-            legend_ax.legend(
-                handles=handles,
-                loc="center left",
-                frameon=False,
-                fontsize=8,
-                borderaxespad=0.0,
+            ax = fig.add_subplot(gs[0, 0])
+            legend_ax = fig.add_subplot(gs[0, 1])
+            legend_ax.axis("off")
+            plotted = _draw_sample(ax, image)
+            if not plotted:
+                plt.close(fig)
+                continue
+            if handles:
+                legend_ax.legend(
+                    handles=handles,
+                    loc="center left",
+                    frameon=False,
+                    fontsize=8,
+                    borderaxespad=0.0,
+                )
+
+            prefix_parts = ["spatial"]
+            if subset_value:
+                prefix_parts.append(_safe_name(subset_value))
+            prefix_parts.append(_safe_name(image))
+            if save_prefix:
+                prefix = f"{save_prefix}_{_safe_name(image)}"
+            else:
+                prefix = filename_prefix or "_".join(prefix_parts)
+            fig_path = output_dir / f"{prefix}.png"
+            pdf_path = output_dir / f"{prefix}.pdf"
+            fig.savefig(fig_path, dpi=dpi)
+            fig.savefig(pdf_path, dpi=dpi)
+            if show:
+                plt.show()
+            plt.close(fig)
+            fig_paths.extend([fig_path, pdf_path])
+
+            if verbose:
+                print(f"Saved spatial plot: {fig_path}")
+
+    combined_paths: list[Path] = []
+    if combined:
+        plotted_samples = [sample for sample in selected_samples if sample in sample_bounds]
+        n_plots = len(plotted_samples)
+        if n_plots:
+            n_cols = max(1, min(int(max_cols), n_plots))
+            n_rows = int(np.ceil(n_plots / n_cols))
+            fig = plt.figure(
+                figsize=(5 * n_cols + legend_width, 5 * n_rows),
+                constrained_layout=False,
             )
-
-        prefix_parts = ["spatial"]
-        if subset_value:
-            prefix_parts.append(_safe_name(subset_value))
-        prefix_parts.append(_safe_name(image))
-        prefix = filename_prefix or "_".join(prefix_parts)
-        fig_path = output_dir / f"{prefix}.png"
-        pdf_path = output_dir / f"{prefix}.pdf"
-        fig.savefig(fig_path, dpi=dpi)
-        fig.savefig(pdf_path, dpi=dpi)
-        if show:
-            plt.show()
-        plt.close(fig)
-        fig_paths.extend([fig_path, pdf_path])
-
-        if verbose:
-            print(f"Saved spatial plot: {fig_path}")
+            gs = fig.add_gridspec(
+                n_rows,
+                n_cols + 1,
+                left=0.02,
+                right=0.98,
+                bottom=0.04,
+                top=0.94,
+                width_ratios=[*[1] * n_cols, legend_width / 5],
+                wspace=0.02,
+                hspace=0.08,
+            )
+            for index, sample in enumerate(plotted_samples):
+                row = index // n_cols
+                col = index % n_cols
+                ax = fig.add_subplot(gs[row, col])
+                if not _draw_sample(ax, sample):
+                    ax.axis("off")
+            for index in range(n_plots, n_rows * n_cols):
+                row = index // n_cols
+                col = index % n_cols
+                fig.add_subplot(gs[row, col]).axis("off")
+            legend_ax = fig.add_subplot(gs[:, -1])
+            legend_ax.axis("off")
+            if handles:
+                legend_ax.legend(
+                    handles=handles,
+                    loc="center left",
+                    frameon=False,
+                    fontsize=8,
+                    borderaxespad=0.0,
+                )
+            prefix_parts = ["spatial_combined"]
+            if subset_value:
+                prefix_parts.append(_safe_name(subset_value))
+            prefix = save_prefix or filename_prefix or "_".join(prefix_parts)
+            fig_path = output_dir / f"{prefix}.png"
+            pdf_path = output_dir / f"{prefix}.pdf"
+            fig.savefig(fig_path, dpi=dpi)
+            fig.savefig(pdf_path, dpi=dpi)
+            if show:
+                plt.show()
+            plt.close(fig)
+            combined_paths.extend([fig_path, pdf_path])
+            fig_paths.extend(combined_paths)
+            if verbose:
+                print(f"Saved combined spatial plot: {fig_path}")
 
     return {
         "figures": fig_paths,
+        "combined_figures": combined_paths,
         "shared_extent_um": {"width": shared_width, "height": shared_height},
         "center_method": center_method,
         "sample_bounds": sample_bounds,

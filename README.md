@@ -1,6 +1,6 @@
-# QUXYCell
+# QuXYCell
 
-QUXYCell is a Python package for processing manually exported QuPath single-cell projects.
+QuXYCell is a Python package for processing manually exported QuPath single-cell projects.
 
 The first user-facing workflow is Python-first:
 
@@ -24,7 +24,7 @@ Required measurement columns:
 - `Centroid X µm`
 - `Centroid Y µm`
 
-QUXYCell does not parse QuPath `.qpdata` directly in v1.
+QuXYCell does not parse QuPath `.qpdata` directly in v1.
 
 If `output_dir` is omitted:
 
@@ -51,7 +51,7 @@ To apply cell typing from the newest YAML in the current run's
 summary = qxy.celltype(adata)
 ```
 
-QUXYCell prints the YAML file path it used.
+QuXYCell prints the YAML file path it used.
 It also saves a cell type rule summary table to
 `qxy_outputs_YYMMDD-HHMM/celltype/celltype_rules_summary_<logic-name>.tsv`.
 
@@ -82,4 +82,77 @@ Remove cells inside annotation columns containing `Ignore`:
 
 ```python
 adata = qxy.remove_ignore(adata)
+```
+
+Save and reload:
+
+```python
+qxy.save(adata)
+adata = qxy.load_latest()
+adata = qxy.load("qxy_outputs_YYMMDD-HHMM")
+```
+
+Add sample metadata:
+
+```python
+qxy.add_metadata(
+    adata,
+    "sample_metadata.tsv",
+    sample_col="ImageID",
+)
+```
+
+`sample_col` can be any column in `adata.obs`; the default is QuPath `Image`.
+If the metadata table uses a different key column name, set
+`metadata_sample_col`.
+
+Generate QC tables and an HTML report:
+
+```python
+qc = qxy.qc(adata, sample_col="ImageID")
+```
+
+Assign non-overlapping TMA cores from GeoJSON:
+
+```python
+tma = qxy.assign_tma_cores(
+    adata,
+    "geojson/tma_cores.geojson",
+    sample_col="Image",
+)
+```
+
+TMA GeoJSON files are matched to `adata.obs[sample_col]` using the GeoJSON
+filename stem. The default `sample_col="Image"` matches QuPath image names.
+
+Use plot controls:
+
+```python
+qxy.plot_stacked_bar(
+    adata,
+    sample_col="ImageID",
+    celltypes=["T_cell", "Macrophage"],
+    palette="tab20",
+)
+
+qxy.plot_spatial_celltypes(
+    adata,
+    sample_col="ImageID",
+    celltypes=["T_cell", "Macrophage"],
+    samples=["beat-2", "beat-5"],
+    combined=True,
+    max_cols=2,
+    palette="tab20",
+)
+```
+
+Run the common notebook workflow in one command:
+
+```python
+adata = qxy.workflow(
+    "/path/to/qupath_export",
+    sample_metadata="sample_metadata.tsv",
+    sample_col="Image",
+    celltype_logic="celltype_logic.yaml",
+)
 ```

@@ -224,13 +224,13 @@ def _rule_definition(rule: dict[str, Any]) -> str:
 
 
 def _write_rule_summary_table(
-    rules: list[dict[str, Any]],
-    assigned_counts: dict[str, int],
+    rule_diagnostics: list[dict[str, Any]],
     *,
     celltype_dir: str | Path,
     logic_source: Path | None,
     celltype_column: str,
     unknown_label: str,
+    n_cells: int,
 ) -> Path:
     import pandas as pd
 
@@ -241,7 +241,9 @@ def _write_rule_summary_table(
 
     known_keys = {"name", "positive", "negative", "any_positive"}
     rows = []
-    for index, rule in enumerate(rules, start=1):
+    for diagnostic in rule_diagnostics:
+        rule = diagnostic["rule"]
+        index = diagnostic["rule_order"]
         name = str(rule.get("name") or "").strip()
         extra = {key: value for key, value in rule.items() if key not in known_keys}
         rows.append(
@@ -252,7 +254,13 @@ def _write_rule_summary_table(
                 "negative": _stringify_definition_value(rule.get("negative")),
                 "any_positive": _stringify_definition_value(rule.get("any_positive")),
                 "definition": _rule_definition(rule),
-                "assigned_cells": int(assigned_counts.get(name, 0)) if name else 0,
+                "raw_matching_cells": int(diagnostic["raw_matching_cells"]),
+                "assigned_cells": int(diagnostic["assigned_cells"]),
+                "blocked_by_prior_rules": int(diagnostic["blocked_by_prior_rules"]),
+                "overlap_with_other_rules_cells": int(diagnostic["overlap_with_other_rules_cells"]),
+                "raw_fraction": int(diagnostic["raw_matching_cells"]) / max(n_cells, 1),
+                "assigned_fraction": int(diagnostic["assigned_cells"]) / max(n_cells, 1),
+                "missing_references": ", ".join(diagnostic["missing_references"]),
                 "celltype_column": celltype_column,
                 "extra_definition": json.dumps(extra, sort_keys=True) if extra else "",
             }
@@ -267,7 +275,13 @@ def _write_rule_summary_table(
             "negative",
             "any_positive",
             "definition",
+            "raw_matching_cells",
             "assigned_cells",
+            "blocked_by_prior_rules",
+            "overlap_with_other_rules_cells",
+            "raw_fraction",
+            "assigned_fraction",
+            "missing_references",
             "celltype_column",
             "extra_definition",
         ],
@@ -306,7 +320,7 @@ def apply_celltypes(
         logic = logic_source
 
     if verbose and logic_source is not None:
-        print(f"Using QUXYCell cell type logic YAML:\n{logic_source}")
+        print(f"Using QuXYCell cell type logic YAML:\n{logic_source}")
 
     bundle = load_celltype_logic(logic)
     obs = adata.obs
@@ -326,14 +340,46 @@ def apply_celltypes(
     unassigned = np.ones(len(obs), dtype=bool)
     missing_references: set[str] = set()
     assigned_counts: dict[str, int] = {}
+    rule_diagnostics: list[dict[str, Any]] = []
+    rule_masks = []
 
-    for rule in rules:
+    for rule_order, rule in enumerate(rules, start=1):
         name = str(rule.get("name") or "").strip()
         if not name:
             continue
-        mask = _rule_mask(obs, rule, missing_references)
+        rule_missing: set[str] = set()
+        mask = _rule_mask(obs, rule, rule_missing)
+        missing_references.update(rule_missing)
+        rule_masks.append(mask)
+        rule_diagnostics.append(
+            {
+                "rule_order": rule_order,
+                "rule": rule,
+                "name": name,
+                "mask": mask,
+                "raw_matching_cells": int(mask.sum()),
+                "assigned_cells": 0,
+                "blocked_by_prior_rules": 0,
+                "overlap_with_other_rules_cells": 0,
+                "missing_references": sorted(rule_missing),
+            }
+        )
+
+    if rule_masks:
+        match_counts = np.vstack(rule_masks).sum(axis=0)
+        multi_rule_match_count = int((match_counts > 1).sum())
+    else:
+        match_counts = np.zeros(len(obs), dtype=int)
+        multi_rule_match_count = 0
+
+    for diagnostic in rule_diagnostics:
+        name = diagnostic["name"]
+        mask = diagnostic["mask"]
         assign_mask = mask & unassigned
         n_assigned = int(assign_mask.sum())
+        diagnostic["assigned_cells"] = n_assigned
+        diagnostic["blocked_by_prior_rules"] = int(mask.sum()) - n_assigned
+        diagnostic["overlap_with_other_rules_cells"] = int((mask & (match_counts > 1)).sum())
         if n_assigned:
             celltypes[assign_mask] = name
             unassigned[assign_mask] = False
@@ -365,14 +411,21 @@ def apply_celltypes(
         "missing_references": sorted(missing_references),
         "assigned_counts": assigned_counts,
         "unknown_count": int((obs[celltype_column] == unknown_label).sum()),
+        "zero_raw_match_rules": [
+            item["name"] for item in rule_diagnostics if item["raw_matching_cells"] == 0
+        ],
+        "zero_assigned_rules": [
+            item["name"] for item in rule_diagnostics if item["assigned_cells"] == 0
+        ],
+        "multi_rule_match_count": multi_rule_match_count,
     }
     rule_summary_tsv = _write_rule_summary_table(
-        rules,
-        assigned_counts,
+        rule_diagnostics,
         celltype_dir=resolved_celltype_dir,
         logic_source=logic_source,
         celltype_column=celltype_column,
         unknown_label=unknown_label,
+        n_cells=len(obs),
     )
     summary["rule_summary_tsv"] = str(rule_summary_tsv)
     adata.uns["quxycell_celltyping"] = summary

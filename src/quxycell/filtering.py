@@ -1,4 +1,4 @@
-"""Filtering helpers for QUXYCell AnnData objects."""
+"""Filtering helpers for QuXYCell AnnData objects."""
 
 from __future__ import annotations
 
