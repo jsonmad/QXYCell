@@ -21,10 +21,16 @@ def discover_geojson_files(project_dir: str | Path) -> list[Path]:
 def _classification_name(properties: dict[str, Any]) -> str:
     classification = properties.get("classification")
     if isinstance(classification, dict):
-        return str(classification.get("name") or "Unclassified")
-    if classification is None:
-        return "Unclassified"
-    return str(classification)
+        label = classification.get("name")
+        if label:
+            return str(label)
+    elif classification is not None:
+        return str(classification)
+
+    name = properties.get("name")
+    if name:
+        return str(name)
+    return "Unclassified"
 
 
 def summarize_geojson_file(path: str | Path) -> GeoJsonFile:
@@ -84,4 +90,3 @@ def validate_geojson_files(files: list[GeoJsonFile]) -> list[Message]:
                 )
             )
     return messages
-

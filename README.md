@@ -31,13 +31,20 @@ Required QuPath products:
 - Cell measurement table: one or more `measurements.csv` or `measurements.tsv`
   files exported from QuPath. A single table may contain cells from multiple
   images.
-- Object classifier JSON files: QuPath classifier definitions, usually under
-  `classifiers/object_classifiers/*.json`. QuXYCell reads threshold rules from
-  these files and creates marker positivity columns in `adata.obs` named
-  `<marker>_pos`.
-- Annotation GeoJSON files: exported QuPath annotations containing polygon
-  boundaries and annotation names/classes. QuXYCell assigns cells inside these
-  polygons to annotation columns in `adata.obs`.
+- Object classifier JSON files: QuPath single-measurement object classifiers,
+  usually saved under `classifiers/object_classifiers/*.json` in the QuPath
+  project/export folder. These classifiers should be created in QuPath by the
+  user, with marker-specific positivity thresholds set and saved for each
+  single measurement classifier. QuXYCell reads those saved thresholds and
+  creates marker positivity columns in `adata.obs` named `<marker>_pos`.
+- Annotation GeoJSON files: exported QuPath annotation polygons. Each
+  annotation should have a QuPath class set, or a `name` if no class is set.
+  QuXYCell uses that class/name label to create boolean annotation columns in
+  `adata.obs` named `annotation__<label>`. Cells falling inside the polygon are
+  marked `True` for that annotation column. Export annotation GeoJSON files with
+  measurements excluded; QuXYCell only needs the annotation geometry and
+  class/name label. One GeoJSON file can contain many annotations as long as
+  each annotation is labelled.
 
 Required measurement columns:
 
@@ -56,6 +63,11 @@ Optional QuPath products:
 
 QuXYCell assumes the standard QuPath `Image` column name. Alternative aliases
 are not used in v1.
+
+Annotations whose class/name contains `Ignore` can be used to remove unwanted
+regions, such as tissue folds, damaged tissue, debris, or imaging artifacts.
+After import, run `qxy.remove_ignore(adata)` to delete cells inside those
+regions before downstream analysis.
 
 If `output_dir` is omitted:
 
