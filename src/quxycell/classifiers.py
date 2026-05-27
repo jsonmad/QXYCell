@@ -10,17 +10,14 @@ from quxycell.types import ClassifierDefinition, Message, MeasurementFile
 
 
 def discover_classifier_files(project_dir: str | Path) -> list[Path]:
-    """Find QuPath classifier JSON files."""
+    """Find QuPath classifier JSON files anywhere within the project directory."""
 
     root = Path(project_dir).expanduser().resolve()
-    search_roots = [
-        root / "classifiers" / "object_classifiers",
-        root / "classifiers",
+    files = [
+        path
+        for path in root.rglob("*.json")
+        if path.name != "classes.json" and not path.name.startswith(".")
     ]
-    files: list[Path] = []
-    for search_root in search_roots:
-        if search_root.exists():
-            files.extend(path for path in search_root.glob("*.json") if path.name != "classes.json")
     return sorted(dict.fromkeys(files))
 
 
