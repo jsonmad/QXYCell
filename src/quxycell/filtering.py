@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import warnings
 
+import pandas as pd
+
 
 def _annotation_label_for_column(adata, column: str, annotation_prefix: str) -> str:
     label_maps = [
@@ -27,7 +29,7 @@ def assign_samples(
     annotation_prefix: str = "annotation__",
     sample_text: str = "sample",
     sample_col: str = "Sample",
-    unassigned_label: str | None = "Unassigned",
+    unassigned_label: str | None = None,
     conflict_label: str = "Ambiguous",
     overwrite: bool = True,
     verbose: bool = True,
@@ -57,7 +59,7 @@ def assign_samples(
     sample_columns = sorted(sample_columns)
 
     if not sample_columns:
-        adata.obs[sample_col] = unassigned_label
+        adata.obs[sample_col] = pd.Categorical([unassigned_label] * adata.n_obs)
         summary = {
             "sample_col": sample_col,
             "sample_text": sample_text,
@@ -96,7 +98,9 @@ def assign_samples(
     if bool(conflict_mask.any()):
         assigned.loc[conflict_mask] = conflict_label
 
-    adata.obs[sample_col] = assigned
+    # Convert to Categorical so unassigned cells (NaN) are proper missing data
+    # and do not appear in value_counts, groupby, or cat.categories.
+    adata.obs[sample_col] = pd.Categorical(assigned)
 
     conflict_examples = []
     if bool(conflict_mask.any()):
@@ -134,8 +138,8 @@ def assign_samples(
         print(f"Assigned sample labels to adata.obs[{sample_col!r}]")
         print(f"Sample annotation columns: {len(sample_columns)}")
         print(f"Assigned cells: {summary['n_assigned_cells']:,}")
-        print(f"Unassigned cells: {summary['n_unassigned_cells']:,}")
-        print(f"Conflicting cells: {summary['n_conflicting_cells']:,}")
+        print(f"Unassigned cells (NaN): {summary['n_unassigned_cells']:,}")
+        print(f"Conflicting cells ({conflict_label!r}): {summary['n_conflicting_cells']:,}")
 
     return summary
 
