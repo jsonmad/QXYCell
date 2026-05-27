@@ -143,7 +143,7 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, and GeoJSON annotations into AnnData.</td>
+        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, and TMA core boundaries into AnnData. Classifier JSONs are searched across the entire project folder. TMA cores (<code>tmaCore</code> features) in GeoJSON files are extracted automatically alongside annotation polygons and stored as <code>adata.obs["tma_core"]</code> (Categorical, NaN outside all cores).</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
@@ -167,7 +167,7 @@
       </tr>
       <tr>
         <td><code>qxy.assign_samples</code></td>
-        <td>Assign one sample label per cell from annotation columns containing <code>sample</code>.</td>
+        <td>Assign one sample label per cell from annotation columns containing <code>sample</code>. The result is a <code>pd.Categorical</code>: cells in exactly one sample annotation receive that label; cells in multiple annotations receive <code>"Ambiguous"</code>; cells outside all sample annotations receive <code>NaN</code> and are excluded from <code>value_counts()</code> and <code>groupby()</code>.</td>
         <td><code>sample_summary = qxy.assign_samples(adata)</code></td>
         <td>Adds <code>adata.obs["Sample"]</code> and warns on overlapping sample annotations.</td>
       </tr>
@@ -185,7 +185,7 @@
       </tr>
       <tr>
         <td><code>qxy.assign_tma_cores</code></td>
-        <td>Assign cells to non-overlapping TMA cores from GeoJSON boundaries.</td>
+        <td>Assign cells to TMA cores from an explicit GeoJSON file or folder. Use this when TMA cores are in a separate GeoJSON not co-located with the QuPath project, or when finer control is needed. For TMA cores stored alongside annotations in the project GeoJSON files, <code>qxy.run()</code> assigns <code>tma_core</code> automatically.</td>
         <td><code>tma = qxy.assign_tma_cores(adata, "tma.geojson")</code></td>
         <td>Adds <code>tma_core</code> and TMA metadata columns to <code>adata.obs</code>.</td>
       </tr>
@@ -334,6 +334,11 @@ qxy.save(adata)</code></pre>
   </table>
 
   <h2>TMA Commands</h2>
+
+  <div class="note">
+    <strong>Automatic TMA core assignment:</strong> When QuPath GeoJSON files contain <code>tmaCore</code> features alongside annotations, <code>qxy.run()</code> assigns them automatically. Each cell centroid is tested against core boundaries; the result is stored as <code>adata.obs["tma_core"]</code> — a <code>pd.Categorical</code> where cells outside all cores are <code>NaN</code>. Use <code>qxy.assign_tma_cores()</code> only when core boundaries are in a separate GeoJSON file not covered by the project folder.
+  </div>
+
   <table>
     <thead>
       <tr>
@@ -344,7 +349,17 @@ qxy.save(adata)</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td>Assign TMA cores using default QuPath image matching</td>
+        <td>Check automatic tma_core assignment from run</td>
+        <td><code>adata.obs["tma_core"].value_counts()</code></td>
+        <td>NaN cells (outside all cores) are excluded automatically.</td>
+      </tr>
+      <tr>
+        <td>Filter to TMA core cells only</td>
+        <td><code>adata[adata.obs["tma_core"].notna()]</code></td>
+        <td>Excludes cells outside all core boundaries.</td>
+      </tr>
+      <tr>
+        <td>Assign TMA cores from an explicit GeoJSON (default image matching)</td>
         <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores.geojson")</code></td>
         <td>Default <code>sample_col="Image"</code>.</td>
       </tr>
@@ -358,16 +373,11 @@ qxy.save(adata)</code></pre>
         <td><code>qxy.assign_tma_cores(adata, "tma.geojson", core_col="core_id")</code></td>
         <td>Stores core assignment in <code>adata.obs["core_id"]</code>.</td>
       </tr>
-      <tr>
-        <td>Change metadata prefix</td>
-        <td><code>qxy.assign_tma_cores(adata, "tma.geojson", metadata_prefix="core_")</code></td>
-        <td>Core metadata columns become <code>core_...</code>.</td>
-      </tr>
     </tbody>
   </table>
 
   <div class="note">
-    <strong>TMA matching rule:</strong> TMA GeoJSON files are matched to <code>adata.obs[sample_col]</code> using the GeoJSON filename stem. With the default <code>sample_col="Image"</code>, this matches QuPath image names. For example, <code>slideA.ome.geojson</code> matches <code>slideA.ome.tiff</code>. TMA core overlap is not allowed.
+    <strong>GeoJSON matching rule:</strong> GeoJSON files are matched to images by comparing the filename stem (stripped of <code>.ome</code> and extension) against the <code>Image</code> column value stem. Only files whose stem matches a loaded image contribute annotations or core assignments to cells.
   </div>
 
   <h2>Plotting Commands</h2>
@@ -444,6 +454,10 @@ qxy.save(adata)</code></pre>
       <tr><td><code>adata.uns</code></td><td>Run metadata and QuXYCell summaries.</td></tr>
       <tr><td><code>adata.uns["quxycell"]["output_dir"]</code></td><td>Current QuXYCell output folder.</td></tr>
       <tr><td><code>adata.uns["quxycell"]["h5ad_path"]</code></td><td>Current H5AD save path.</td></tr>
+      <tr><td><code>adata.obs["tma_core"].value_counts()</code></td><td>Cells per TMA core (NaN cells excluded automatically).</td></tr>
+      <tr><td><code>adata.obs["tma_core"].cat.categories</code></td><td>List all assigned TMA core names.</td></tr>
+      <tr><td><code>adata[adata.obs["tma_core"].notna()]</code></td><td>Subset to cells inside a TMA core.</td></tr>
+      <tr><td><code>adata.obs["Sample"].value_counts()</code></td><td>Cells per sample (NaN unassigned cells excluded automatically).</td></tr>
       <tr><td><code>adata[adata.obs["celltype"] == "T_cell"].copy()</code></td><td>Subset to one cell type.</td></tr>
       <tr><td><code>adata.write_h5ad("file.h5ad")</code></td><td>Manual H5AD save.</td></tr>
       <tr><td><code>import anndata as ad; adata = ad.read_h5ad("file.h5ad")</code></td><td>Manual H5AD load.</td></tr>

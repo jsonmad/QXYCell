@@ -183,7 +183,7 @@ adata = qxy.run(qupath_project)</code></pre>
     <h2>Inputs</h2>
     <p>QuXYCell currently expects a manually exported QuPath project/export folder containing:</p>
     <pre><code>measurements.csv or measurements.tsv
-classifiers/object_classifiers/*.json
+*.json  (classifier JSONs — searched anywhere in the project folder)
 GeoJSON annotation files</code></pre>
 
     <p>The measurement table must contain standard QuPath columns:</p>
@@ -236,7 +236,8 @@ quxy_source_file
 quxy_source_row
 quxy_cell_id
 &lt;marker&gt;_pos
-annotation__&lt;label&gt;</code></pre>
+annotation__&lt;label&gt;
+tma_core          # Categorical — NaN if outside all TMA cores (only present when tmaCore features exist in GeoJSON)</code></pre>
 
     <p>Example marker positivity columns:</p>
     <pre><code>CD3_pos
@@ -266,7 +267,7 @@ Centroid Y µm</code></pre>
     <h2>Classifier Handling</h2>
     <p>In v1, QuXYCell imports one marker column for each simple QuPath classifier JSON of the form:</p>
     <pre><code>measurement column &gt;= threshold</code></pre>
-    <p>Composite classifiers are detected and skipped with warnings. They are reported in:</p>
+    <p>Classifier JSON files are discovered by searching the entire project folder recursively, so files do not need to be in the standard <code>classifiers/object_classifiers/</code> subfolder. Composite classifiers are detected and skipped with warnings. All classifiers are reported in:</p>
     <pre><code>tables/classifier_report.csv</code></pre>
 
     <h2>Cell Type Logic Prompt</h2>
@@ -279,9 +280,14 @@ Centroid Y µm</code></pre>
     <p>and applied with:</p>
     <pre><code>qxy.celltype(adata, "qxy_outputs_YYMMDD-HHMM/celltype/celltype_logic.yaml")</code></pre>
 
-    <h2>Annotation Handling</h2>
-    <p>GeoJSON annotation polygons are mapped to cells by testing each cell centroid against annotation boundaries. Each annotation class/name becomes a boolean column in <code>adata.obs</code>.</p>
-    <p>If the same cell is hit by overlapping polygons with the same annotation label, QuXYCell reports that in:</p>
+    <h2>Annotation and TMA Core Handling</h2>
+    <p>GeoJSON files are parsed in the same pass for two feature types:</p>
+    <ul>
+      <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — each class/name becomes a boolean column in <code>adata.obs</code> (e.g. <code>annotation__Ignore</code>, <code>annotation__Region</code>). Cells outside all polygons of a given label get <code>False</code>.</li>
+      <li><strong>TMA cores</strong> (<code>objectType: tmaCore</code>) — when present in the same GeoJSON, core boundaries are extracted and tested against cell centroids. The result is stored as a single <code>adata.obs["tma_core"]</code> column. The column is a <code>pd.Categorical</code>: cells inside a core receive the core name; cells outside all cores receive <code>NaN</code> and are automatically excluded from <code>value_counts()</code>, <code>groupby()</code>, and <code>cat.categories</code>. First-match wins if cores overlap.</li>
+    </ul>
+    <p>GeoJSON files are matched to images by comparing the GeoJSON filename stem against the <code>Image</code> column value stem (both stripped of <code>.ome</code> and their file extension). Only files whose stem matches a loaded image are mapped to cells.</p>
+    <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels or between annotations and TMA cores are expected geometry and are not flagged. Conflicts are written to:</p>
     <pre><code>run/tables/annotation_conflicts.csv</code></pre>
 
     <h2>Current Status</h2>
