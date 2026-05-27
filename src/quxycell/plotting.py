@@ -360,6 +360,7 @@ def plot_spatial_celltypes(
     underlay_size: float = 2.0,
     underlay_color: str = "#bdbdbd",
     underlay_alpha: float = 0.08,
+    scale_bar: bool = True,
     scale_bar_um: float = 1000.0,
     scale_bar_label: str = "1 mm",
     dpi: int = 300,
@@ -529,7 +530,8 @@ def plot_spatial_celltypes(
         ax.set_aspect("equal")
         ax.set_anchor("C")
         ax.axis("off")
-        _add_scale_bar(ax, x_lim, y_lim, length_um=scale_bar_um, label=scale_bar_label)
+        if scale_bar:
+            _add_scale_bar(ax, x_lim, y_lim, length_um=scale_bar_um, label=scale_bar_label)
         title = f"{subset_value} | {image}" if subset_value else image
         ax.set_title(title, fontsize=10)
         return True
