@@ -9,9 +9,10 @@ from quxycell.filtering import remove_ignore
 from quxycell.io_utils import load, load_latest, save
 from quxycell.metadata import add_metadata
 from quxycell.pipeline import run
-from quxycell.plotting import plot_spatial_celltypes, plot_stacked_bar
+from quxycell.plotting import plot_spatial, plot_stacked_bar
 from quxycell.prompts import celltype_prompt
 from quxycell.qc import qc
+from quxycell.neighbourhoods import cn_knn, cn_kmeans, cn_name
 from quxycell.tma import assign_tma_cores
 from quxycell.workflow import workflow
 
@@ -25,13 +26,16 @@ __all__ = [
     "assign_samples",
     "assign_tma_cores",
     "celltype",
+    "cn_knn",
+    "cn_kmeans",
+    "cn_name",
     "celltype_prompt",
     "check",
     "find_latest_celltype_yaml",
     "load",
     "load_latest",
     "load_celltype_logic",
-    "plot_spatial_celltypes",
+    "plot_spatial",
     "plot_stacked_bar",
     "qc",
     "remove_ignore",

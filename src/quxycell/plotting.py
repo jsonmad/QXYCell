@@ -338,7 +338,7 @@ def plot_stacked_bar(
     }
 
 
-def plot_spatial_celltypes(
+def plot_spatial(
     adata,
     *,
     category_col: str = "celltype",

@@ -27,7 +27,7 @@ def workflow(
     from quxycell.io_utils import save
     from quxycell.metadata import add_metadata
     from quxycell.pipeline import run
-    from quxycell.plotting import plot_spatial_celltypes, plot_stacked_bar
+    from quxycell.plotting import plot_spatial, plot_stacked_bar
     from quxycell.qc import qc
 
     adata = run(project_dir, output_dir=output_dir, verbose=verbose)
@@ -53,7 +53,7 @@ def workflow(
     if make_plots and "celltype" in adata.obs.columns:
         plot_col = plot_sample_col or sample_col
         plot_stacked_bar(adata, sample_col=plot_col, show=False, verbose=verbose)
-        plot_spatial_celltypes(adata, sample_col=plot_col, show=False, verbose=verbose)
+        plot_spatial(adata, sample_col=plot_col, show=False, verbose=verbose)
 
     save(adata, verbose=verbose)
     adata.uns["quxycell_workflow"] = {

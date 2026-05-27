@@ -221,7 +221,7 @@ qxy.run(project_dir)</code></pre>
       </div>
       <div class="box">
         <h3><code>run()</code></h3>
-        <p class="small">Performs the conversion. It loads the measurement table, selects marker columns referenced by simple QuPath classifier JSONs, builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons to cells, and writes the final <code>.h5ad</code>.</p>
+        <p class="small">Performs the conversion. It loads the measurement table, selects marker columns referenced by simple QuPath classifier JSONs (searched across the entire project folder), builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons and TMA core boundaries to cells, and writes the final <code>.h5ad</code>.</p>
       </div>
     </div>
 
@@ -237,7 +237,10 @@ quxy_source_row
 quxy_cell_id
 &lt;marker&gt;_pos
 annotation__&lt;label&gt;
-tma_core          # Categorical — NaN if outside all TMA cores (only present when tmaCore features exist in GeoJSON)</code></pre>
+tma_core              # Categorical — NaN if outside all TMA cores (only present when tmaCore features exist in GeoJSON)
+Sample                # Categorical — NaN if unassigned; added by qxy.assign_samples()
+celltype              # added by qxy.celltype()
+cn    # Categorical — added by qxy.cn_kmeans()</code></pre>
 
     <p>Example marker positivity columns:</p>
     <pre><code>CD3_pos
@@ -279,6 +282,14 @@ Centroid Y µm</code></pre>
     <pre><code>qxy_outputs_YYMMDD-HHMM/celltype/celltype_logic.yaml</code></pre>
     <p>and applied with:</p>
     <pre><code>qxy.celltype(adata, "qxy_outputs_YYMMDD-HHMM/celltype/celltype_logic.yaml")</code></pre>
+
+    <h2>Cell Neighbourhood Analysis</h2>
+    <p>After cell types are assigned, QuXYCell can characterise each cell by the composition of its local spatial neighbourhood using <code>qxy.cn_knn</code> and <code>qxy.cn_kmeans</code>:</p>
+    <pre><code>qxy.cn_knn(adata, k=12)
+qxy.cn_kmeans(adata, n_clusters=12)</code></pre>
+    <p><code>cn_knn</code> builds a k-nearest-neighbour graph per image (to prevent neighbours bleeding across tissue sections), then computes a per-cell composition frequency vector stored as <code>adata.obsm["cn_profile"]</code>. <code>cn_kmeans</code> clusters those profiles into discrete CN types using MiniBatchKMeans, storing labels <code>"N0"</code>…<code>"N{n-1}"</code> as a <code>pd.Categorical</code> in <code>adata.obs["cn"]</code>.</p>
+    <p>Cell neighbourhoods can be visualised spatially with:</p>
+    <pre><code>qxy.plot_spatial(adata, sample_col="ImageID", category_col="cn")</code></pre>
 
     <h2>Annotation and TMA Core Handling</h2>
     <p>GeoJSON files are parsed in the same pass for two feature types:</p>

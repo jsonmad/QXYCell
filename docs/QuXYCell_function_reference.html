@@ -196,9 +196,9 @@
         <td>PNG, PDF, and frequency tables.</td>
       </tr>
       <tr>
-        <td><code>qxy.plot_spatial_celltypes</code></td>
+        <td><code>qxy.plot_spatial</code></td>
         <td>Plot spatial cell type maps with shared scale, centered samples, legend, and scale bar.</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID")</code></td>
+        <td><code>qxy.plot_spatial(adata, sample_col="ImageID")</code></td>
         <td>PNG/PDF spatial plots and optional combined plot.</td>
       </tr>
       <tr>
@@ -280,7 +280,7 @@ qxy.add_metadata(
 
 qxy.qc(adata, sample_col="ImageID")
 
-qxy.plot_spatial_celltypes(
+qxy.plot_spatial(
     adata,
     sample_col="ImageID",
     combined=True,
@@ -380,6 +380,131 @@ qxy.save(adata)</code></pre>
     <strong>GeoJSON matching rule:</strong> GeoJSON files are matched to images by comparing the filename stem (stripped of <code>.ome</code> and extension) against the <code>Image</code> column value stem. Only files whose stem matches a loaded image contribute annotations or core assignments to cells.
   </div>
 
+  <h2>CN Analysis</h2>
+
+  <p>CN analysis characterises each cell by the composition of its local spatial neighbourhood.
+  <code>qxy.cn_knn</code> builds a per-cell composition profile, <code>qxy.cn_kmeans</code> clusters those profiles
+  into discrete CNs, and <code>qxy.cn_name</code> assigns deterministic short labels from the composition.
+  All three require <strong>scikit-learn</strong>, which is included in the core dependencies.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Function</th>
+        <th>Purpose</th>
+        <th>Typical command</th>
+        <th>Key output</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>qxy.cn_knn</code></td>
+        <td>For each cell, finds its <em>k</em> nearest spatial neighbours within the same image and computes
+        the frequency of each cell type among those neighbours. KNN graphs are built independently per image
+        to prevent neighbours bleeding across tissue sections.</td>
+        <td><code>qxy.cn_knn(adata, k=12)</code></td>
+        <td>Adds <code>adata.obsm["cn_profile"]</code> (float32, shape <em>n_cells × n_cell_types</em>) and
+        <code>adata.uns["cn"]</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.cn_kmeans</code></td>
+        <td>Clusters <code>adata.obsm["cn_profile"]</code> into <em>n_clusters</em> CNs using
+        MiniBatchKMeans. Cluster IDs are assigned as <code>"N0"</code> … <code>"N{n-1}"</code>.</td>
+        <td><code>qxy.cn_kmeans(adata, n_clusters=12)</code></td>
+        <td>Adds <code>adata.obs["cn"]</code> as a <code>pd.Categorical</code> and updates
+        <code>adata.uns["cn"]</code>.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.cn_name</code></td>
+        <td>Replaces cluster IDs (<code>N0</code>, <code>N1</code>, …) with deterministic short labels derived
+        from the CN composition profile. Rules applied in order: top cell type ≥ 50 % → <code>&lt;top&gt; hi</code>;
+        ≥ 35 % → <code>&lt;top&gt; mix</code>; top two together ≥ 55 % → <code>&lt;top1&gt;/&lt;top2&gt;</code>;
+        otherwise → <code>&lt;top1&gt;/&lt;top2&gt; mix</code>. Duplicate labels are disambiguated automatically.
+        An optional <code>compaction</code> dict maps long cell type names to shorter display labels before naming.</td>
+        <td><code>qxy.cn_name(adata)</code></td>
+        <td>Updates <code>adata.obs["cn"]</code> in place. Saves <code>cn_labels.csv</code> and stores
+        <code>label_map</code> in <code>adata.uns["cn"]</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>CN Parameters</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Function</th>
+        <th>Default</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>k</code></td>
+        <td><code>cn_knn</code></td>
+        <td><code>12</code></td>
+        <td>Number of nearest neighbours per cell. Self is excluded.</td>
+      </tr>
+      <tr>
+        <td><code>cell_type_col</code></td>
+        <td><code>cn_knn</code></td>
+        <td><code>"celltype"</code></td>
+        <td>Column in <code>adata.obs</code> containing cell type labels, as assigned by <code>qxy.celltype()</code>.</td>
+      </tr>
+      <tr>
+        <td><code>image_col</code></td>
+        <td><code>cn_knn</code></td>
+        <td><code>"Image"</code></td>
+        <td>Column used to separate cells by tissue section for per-image KNN.</td>
+      </tr>
+      <tr>
+        <td><code>n_clusters</code></td>
+        <td><code>cn_kmeans</code></td>
+        <td><code>12</code></td>
+        <td>Number of CNs to cluster into.</td>
+      </tr>
+      <tr>
+        <td><code>key</code></td>
+        <td><code>cn_kmeans</code>, <code>cn_name</code></td>
+        <td><code>"cn"</code></td>
+        <td>Column in <code>adata.obs</code> to read/write CN labels.</td>
+      </tr>
+      <tr>
+        <td><code>random_state</code></td>
+        <td><code>cn_kmeans</code></td>
+        <td><code>0</code></td>
+        <td>Random seed for reproducibility.</td>
+      </tr>
+      <tr>
+        <td><code>compaction</code></td>
+        <td><code>cn_name</code></td>
+        <td><code>None</code></td>
+        <td>Optional dict mapping original cell type names to shorter display labels,
+        e.g. <code>{"CD8+PD1+LAG3+": "PD1 LAG3 CD8"}</code>. Applied before naming.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>CN Workflow</h3>
+  <pre><code># After qxy.celltype(adata) has assigned celltype labels:
+qxy.cn_knn(adata, k=12)
+qxy.cn_kmeans(adata, n_clusters=12)
+qxy.cn_name(adata)
+
+# Optional: compact long cell type names before naming
+compaction = {"CD8+PD1+LAG3+": "PD1 LAG3 CD8", "Mac_MHCII_CD11c-_LY6C-": "MHCII Mac"}
+qxy.cn_name(adata, compaction=compaction)
+
+# Inspect CN labels
+adata.obs["cn"].value_counts()
+
+# Spatial plot coloured by CN
+qxy.plot_spatial(adata, sample_col="ImageID", category_col="cn")
+
+# Cross-tabulate CNs with cell types
+import pandas as pd
+pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></pre>
+
   <h2>Plotting Commands</h2>
   <table>
     <thead>
@@ -407,27 +532,27 @@ qxy.save(adata)</code></pre>
       </tr>
       <tr>
         <td>Spatial plot by sample</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID")</code></td>
+        <td><code>qxy.plot_spatial(adata, sample_col="ImageID")</code></td>
         <td>One spatial figure per sample.</td>
       </tr>
       <tr>
         <td>Combined spatial panel</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID", combined=True, max_cols=2)</code></td>
+        <td><code>qxy.plot_spatial(adata, sample_col="ImageID", combined=True, max_cols=2)</code></td>
         <td>Individual plots plus combined PNG/PDF.</td>
       </tr>
       <tr>
         <td>Selected samples</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, sample_col="ImageID", samples=["beat-2", "beat-5"])</code></td>
+        <td><code>qxy.plot_spatial(adata, sample_col="ImageID", samples=["beat-2", "beat-5"])</code></td>
         <td>Restricts plots to listed samples.</td>
       </tr>
       <tr>
         <td>Smaller points</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, point_size=0.3, underlay_size=0.1)</code></td>
+        <td><code>qxy.plot_spatial(adata, point_size=0.3, underlay_size=0.1)</code></td>
         <td>Better for dense cell maps.</td>
       </tr>
       <tr>
         <td>Palette control</td>
-        <td><code>qxy.plot_spatial_celltypes(adata, palette="tab20")</code></td>
+        <td><code>qxy.plot_spatial(adata, palette="tab20")</code></td>
         <td>Uses a matplotlib palette.</td>
       </tr>
     </tbody>
@@ -458,7 +583,10 @@ qxy.save(adata)</code></pre>
       <tr><td><code>adata.obs["tma_core"].cat.categories</code></td><td>List all assigned TMA core names.</td></tr>
       <tr><td><code>adata[adata.obs["tma_core"].notna()]</code></td><td>Subset to cells inside a TMA core.</td></tr>
       <tr><td><code>adata.obs["Sample"].value_counts()</code></td><td>Cells per sample (NaN unassigned cells excluded automatically).</td></tr>
+      <tr><td><code>adata.obs["celltype"].value_counts()</code></td><td>Cell type counts (after <code>qxy.celltype()</code>).</td></tr>
       <tr><td><code>adata[adata.obs["celltype"] == "T_cell"].copy()</code></td><td>Subset to one cell type.</td></tr>
+      <tr><td><code>adata.obs["cn"].value_counts()</code></td><td>Cells per CN (after <code>qxy.cn_kmeans()</code>).</td></tr>
+      <tr><td><code>adata.obsm["cn_profile"]</code></td><td>CN composition profile matrix (after <code>qxy.cn_knn()</code>).</td></tr>
       <tr><td><code>adata.write_h5ad("file.h5ad")</code></td><td>Manual H5AD save.</td></tr>
       <tr><td><code>import anndata as ad; adata = ad.read_h5ad("file.h5ad")</code></td><td>Manual H5AD load.</td></tr>
     </tbody>

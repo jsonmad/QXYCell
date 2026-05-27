@@ -108,7 +108,7 @@ Generic plotting helpers:
 
 ```python
 qxy.plot_stacked_bar(adata, category_col="celltype", group_col="Group")
-qxy.plot_spatial_celltypes(adata, category_col="celltype")
+qxy.plot_spatial(adata, category_col="celltype")
 ```
 
 Use another image label column, such as a shortened `ImageID`, with
@@ -116,7 +116,7 @@ Use another image label column, such as a shortened `ImageID`, with
 
 ```python
 qxy.plot_stacked_bar(adata, category_col="celltype", sample_col="ImageID")
-qxy.plot_spatial_celltypes(adata, category_col="celltype", sample_col="ImageID")
+qxy.plot_spatial(adata, category_col="celltype", sample_col="ImageID")
 ```
 
 Spatial plots use a shared centered x/y range across all selected samples,
@@ -124,7 +124,7 @@ centered by median cell coordinate by default, and include a 1 mm scale bar.
 To force a fixed square window:
 
 ```python
-qxy.plot_spatial_celltypes(adata, sample_col="ImageID", fixed_window_um=11500)
+qxy.plot_spatial(adata, sample_col="ImageID", fixed_window_um=11500)
 ```
 
 Remove cells inside annotation columns containing `Ignore`:
@@ -191,7 +191,7 @@ qxy.plot_stacked_bar(
     palette="tab20",
 )
 
-qxy.plot_spatial_celltypes(
+qxy.plot_spatial(
     adata,
     sample_col="ImageID",
     celltypes=["T_cell", "Macrophage"],
