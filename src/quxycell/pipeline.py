@@ -249,6 +249,12 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
                 if matched:
                     obs.at[index, "tma_core"] = matched[0]
 
+    # Convert tma_core to Categorical so NaN (no core assigned) is proper missing
+    # data and does not appear in value_counts, groupby, or cat.categories.
+    if has_tmacores and "tma_core" in obs.columns:
+        import pandas as _pd
+        obs["tma_core"] = _pd.Categorical(obs["tma_core"])
+
     return conflict_rows
 
 
