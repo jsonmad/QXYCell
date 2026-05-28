@@ -12,6 +12,25 @@ Full function reference: https://jsonmad.github.io/QuXYCell/
 
 ## Installation
 
+### conda (recommended)
+
+Create and activate a dedicated conda environment using the provided `environment.yml`:
+
+```bash
+conda env create -f environment.yml
+conda activate quxycell
+```
+
+This installs all dependencies via conda-forge (better binary compatibility, especially for `geopandas` on macOS/Windows) and then installs `quxycell` itself via pip.
+
+To update an existing environment after pulling new changes:
+
+```bash
+conda env update -f environment.yml --prune
+```
+
+### pip
+
 ```bash
 pip install quxycell
 ```
