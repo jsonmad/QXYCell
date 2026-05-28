@@ -19,3 +19,22 @@ qxy?run/
 qxy_outputs_*/
 outputs/
 *.ipynb
+
+# Project-specific files that should not be committed
+# YAMLs in repo root (celltype logic, scratch files)
+/*.yaml
+/*.yml
+!environment.yml
+
+# Exported notebooks and scratch HTML in repo root
+/*.html
+
+# Images in repo root (keep assets/ folder only)
+/*.png
+/*.jpg
+/*.jpeg
+/*.tif
+/*.tiff
+
+# Test scripts referencing private data paths
+test_*.py
