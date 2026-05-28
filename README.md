@@ -16,32 +16,7 @@ Full function reference: https://jsonmad.github.io/QuXYCell/
 pip install quxycell
 ```
 
-This installs the core dependencies: `anndata`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, and `shapely`.
-
-For full functionality install the optional extras:
-
-```bash
-# Plotting (matplotlib, seaborn) — required for all plot_ functions
-pip install "quxycell[plot]"
-
-# GeoJSON support (geopandas) — required for annotation, segmentation, and TMA GeoJSON import
-pip install "quxycell[geo]"
-
-# Everything at once (recommended)
-pip install "quxycell[plot,geo]"
-```
-
-For Crameri scientific colormaps:
-
-```bash
-pip install cmcrameri
-```
-
-Full recommended install:
-
-```bash
-pip install "quxycell[plot,geo]" cmcrameri
-```
+This installs all required dependencies: `anndata`, `cmcrameri`, `geopandas`, `matplotlib`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, `seaborn`, and `shapely`.
 
 ## Quick start
 
@@ -284,7 +259,7 @@ Reads from `adata.obs["cn"]` and `adata.obs[sample_col]`. Rows and columns are r
 
 ## Colormaps
 
-QuXYCell resolves Crameri scientific colormap short names automatically. Install `cmcrameri` for the full colormaps; without it a comparable matplotlib colormap is substituted silently.
+QuXYCell resolves Crameri scientific colormap short names automatically. If `cmcrameri` is not installed a comparable matplotlib colormap is substituted silently.
 
 | Alias | Type | Good for |
 |---|---|---|
