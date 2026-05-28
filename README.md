@@ -16,10 +16,31 @@ Full function reference: https://jsonmad.github.io/QuXYCell/
 pip install quxycell
 ```
 
-For Crameri scientific colormaps (recommended):
+This installs the core dependencies: `anndata`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, and `shapely`.
+
+For full functionality install the optional extras:
 
 ```bash
-pip install quxycell cmcrameri
+# Plotting (matplotlib, seaborn) — required for all plot_ functions
+pip install "quxycell[plot]"
+
+# GeoJSON support (geopandas) — required for annotation, segmentation, and TMA GeoJSON import
+pip install "quxycell[geo]"
+
+# Everything at once (recommended)
+pip install "quxycell[plot,geo]"
+```
+
+For Crameri scientific colormaps:
+
+```bash
+pip install cmcrameri
+```
+
+Full recommended install:
+
+```bash
+pip install "quxycell[plot,geo]" cmcrameri
 ```
 
 ## Quick start
@@ -35,6 +56,17 @@ adata = qxy.run("/path/to/qupath_export")
 ```
 
 Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`.
+
+**`qxy.run()` populates the AnnData as follows:**
+
+| Location | Contents |
+|---|---|
+| `adata.obs` | Per-cell metadata: `Image`, `Object ID`, `Centroid X µm`, `Centroid Y µm`, `<marker>_pos` boolean columns, `annotation__<label>` boolean columns |
+| `adata.X` | Marker intensity matrix (cells × markers) |
+| `adata.var` | Marker names and metadata |
+| `adata.obsm["spatial"]` | Cell centroid coordinates in microns, shape `(n_cells, 2)` |
+| `adata.uns["quxycell"]` | Run metadata: output directory, timestamps, file paths |
+| `adata.uns["quxycell_annotation_labels"]` | Map of annotation class names to `annotation__<label>` column names |
 
 ## QuPath inputs
 
@@ -56,12 +88,16 @@ Remove cells inside `Ignore` regions (tissue folds, artefacts):
 adata = qxy.remove_ignore(adata)
 ```
 
+Removes rows from `adata.obs` in-place. Cells inside any `annotation__Ignore` polygon are dropped.
+
 Convert `Sample-` annotations into a `Sample` column:
 
 ```python
 sample_summary = qxy.assign_samples(adata)
 adata.obs["Sample"].value_counts()
 ```
+
+Adds `adata.obs["Sample"]` (string). Summary stored in `adata.uns["quxycell_sample_annotations"]`.
 
 ## QC
 
@@ -70,6 +106,8 @@ Generate per-sample QC tables and an HTML report:
 ```python
 qc = qxy.qc(adata, sample_col="Image")
 ```
+
+Results stored in `adata.uns["quxycell_qc"]`. HTML report and TSV tables written to `qxy_outputs_YYMMDD-HHMM/qc/`.
 
 ## Metadata
 
@@ -85,7 +123,7 @@ Match on a custom sample column or a different key column in the metadata file:
 qxy.add_metadata(
     adata,
     "sample_metadata.tsv",
-    sample_col="ImageID",          # column in adata.obs
+    sample_col="ImageID",          # column in adata.obs to match on
     metadata_sample_col="sample",  # column in the TSV (if different)
 )
 ```
@@ -95,6 +133,8 @@ Import only selected columns:
 ```python
 qxy.add_metadata(adata, "sample_metadata.tsv", columns=["group", "mouse_id"])
 ```
+
+Each column in the metadata file is broadcast to every cell belonging to that sample and added as a new column in `adata.obs`. For example, a `group` column in the TSV becomes `adata.obs["group"]`. Summary stored in `adata.uns["quxycell_sample_metadata"]`.
 
 ## Cell typing
 
@@ -111,19 +151,25 @@ This prints the prompt, saves it to `qxy_outputs_YYMMDD-HHMM/celltype/`, and ret
 summary = qxy.celltype(adata)
 ```
 
-QuXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used.
+Adds `adata.obs["celltype"]` (string). Cell type assignment summary stored in `adata.uns["quxycell_celltyping"]`. QuXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used.
 
 ## Cellular neighbourhoods
 
 Compute cellular neighbourhoods (CNs) using k-nearest neighbours:
 
 ```python
-# KNN graph — assigns a CN label to each cell
-qxy.cn_knn(adata, k=15, n_cn=10)
+# Step 1: build KNN graph and compute per-cell local composition profiles
+qxy.cn_knn(adata, k=15)
+```
 
-# K-means on local cell type composition
+Adds `adata.obsm["cn_profile"]` — a float32 array of shape `(n_cells, n_cell_types)` where each row is the local cell type composition around that cell. Run parameters stored in `adata.uns["cn"]`.
+
+```python
+# Step 2: cluster the profiles into CN groups
 qxy.cn_kmeans(adata, n_cn=10)
 ```
+
+Adds `adata.obs["cn"]` (integer cluster label). Updates `adata.uns["cn"]` with clustering parameters.
 
 Assign human-readable names to CN clusters:
 
@@ -131,7 +177,7 @@ Assign human-readable names to CN clusters:
 qxy.cn_name(adata, {0: "Immune-rich", 1: "Stromal", 2: "Tumour core"})
 ```
 
-CN labels are stored in `adata.obs["cn"]`.
+Renames values in `adata.obs["cn"]` (string). Label map stored in `adata.uns["cn"]["label_map"]`.
 
 ## Spatial plots
 
@@ -160,6 +206,8 @@ Use a short image label column (`ImageID`) instead of the full QuPath `Image` na
 qxy.plot_spatial(adata, sample_col="ImageID")
 ```
 
+Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Colour palette cached in `adata.uns["quxycell"]["palettes"]`.
+
 ## Stacked bar plots
 
 Cell type or CN frequency per sample:
@@ -183,6 +231,8 @@ qxy.plot_stacked_bar(adata, width="double")
 # Wider bars (default 8 mm per bar)
 qxy.plot_stacked_bar(adata, bar_width_mm=12)
 ```
+
+Reads from `adata.obs[category_col]` and `adata.obs[sample_col]`. Colour palette cached in `adata.uns["quxycell"]["palettes"]`.
 
 ## Heatmaps
 
@@ -212,6 +262,8 @@ qxy.plot_marker_heatmap(adata, row_strip=True)
 qxy.plot_marker_heatmap(adata, category_col="cn")
 ```
 
+Positivity mode reads `adata.obs["<marker>_pos"]` columns. Intensity mode reads `adata.X` (z-scored per marker column).
+
 CN abundance heatmaps:
 
 ```python
@@ -228,7 +280,7 @@ qxy.plot_cn_heatmap(adata, normalize="both")
 qxy.plot_cn_heatmap(adata, condition_col="group")
 ```
 
-Rows and columns are reordered by hierarchical clustering (no dendrogram). Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
+Reads from `adata.obs["cn"]` and `adata.obs[sample_col]`. Rows and columns are reordered by hierarchical clustering (no dendrogram). Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
 
 ## Colormaps
 
@@ -269,7 +321,7 @@ tma = qxy.assign_tma_cores(
 )
 ```
 
-GeoJSON files are matched to `adata.obs[sample_col]` using the filename stem.
+Adds `adata.obs["tma_core"]` (string core label, `NaN` for unassigned cells). Summary stored in `adata.uns["quxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]` using the filename stem.
 
 ## Save and load
 
@@ -280,9 +332,34 @@ qxy.save(adata)
 # Reload the most recent save
 adata = qxy.load_latest()
 
-# Reload a specific run
+# Reload a specific file
 adata = qxy.load("path/to/quxycell_YYMMDD-HHMM.h5ad")
 ```
+
+## AnnData structure summary
+
+| Location | Added by | Contents |
+|---|---|---|
+| `adata.obs["Image"]` | `qxy.run()` | QuPath image name per cell |
+| `adata.obs["<marker>_pos"]` | `qxy.run()` | Boolean marker positivity columns |
+| `adata.obs["annotation__<label>"]` | `qxy.run()` | Boolean annotation membership columns |
+| `adata.obs["Sample"]` | `qxy.assign_samples()` | Sample label from `Sample-` annotations |
+| `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
+| `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
+| `adata.obs["tma_core"]` | `qxy.assign_tma_cores()` | TMA core label |
+| `adata.obs[*metadata cols*]` | `qxy.add_metadata()` | Sample metadata broadcast to all cells |
+| `adata.X` | `qxy.run()` | Marker intensity matrix (cells × markers) |
+| `adata.var` | `qxy.run()` | Marker names and metadata |
+| `adata.obsm["spatial"]` | `qxy.run()` | Cell centroid x/y coordinates in microns |
+| `adata.obsm["cn_profile"]` | `qxy.cn_knn()` | Per-cell local cell type composition (sums to 1) |
+| `adata.uns["quxycell"]` | `qxy.run()` | Run metadata, output paths, colour palettes |
+| `adata.uns["quxycell_annotation_labels"]` | `qxy.run()` | Annotation class → column name map |
+| `adata.uns["quxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
+| `adata.uns["quxycell_qc"]` | `qxy.qc()` | QC metrics per sample |
+| `adata.uns["quxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
+| `adata.uns["quxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
+| `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
+| `adata.uns["quxycell_tma"]` | `qxy.assign_tma_cores()` | TMA assignment summary |
 
 ## Workflow shortcut
 
