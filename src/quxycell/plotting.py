@@ -43,15 +43,26 @@ def _fallback_color(label: object, hsv_to_rgb, to_hex) -> str:
     return to_hex(hsv_to_rgb((hue, 0.72, 0.90)))
 
 
+# Default matplotlib colormap to use per category column name.
+# Columns not listed here fall back to the glasbey palette.
+_COLUMN_CMAP_DEFAULTS: "dict[str, str]" = {
+    "cn": "tab20",
+}
+
+
 def _get_category_palette(adata, category_col: str) -> "dict[str, str]":
     """Return a stable ``{label: hex_colour}`` mapping for every category in
-    *category_col*, generated with the glasbey palette and cached in
-    ``adata.uns["quxycell"]["palettes"]``.
+    *category_col*, cached in ``adata.uns["quxycell"]["palettes"]``.
 
-    Caching ensures the same colour is used for a given cell type across
-    ``plot_spatial``, ``plot_stacked_bar``, and the heatmap row-strip.
+    The palette generator is chosen by ``_COLUMN_CMAP_DEFAULTS``:
+    - ``"cn"`` columns use ``tab20``.
+    - All other columns use the glasbey palette.
+
+    Caching ensures the same colour is used across ``plot_spatial``,
+    ``plot_stacked_bar``, and the heatmap row-strip.
     Call ``adata.uns["quxycell"]["palettes"].pop(category_col)`` to regenerate.
     """
+    import matplotlib.pyplot as _plt
     import matplotlib.colors as _mcolors
 
     uns = adata.uns.setdefault("quxycell", {})
@@ -60,10 +71,18 @@ def _get_category_palette(adata, category_col: str) -> "dict[str, str]":
         return dict(palettes[category_col])
 
     all_cats = sorted(adata.obs[category_col].astype(str).unique().tolist())
-    raw_colors = _glasbey_colors(len(all_cats))
+    cmap_name = _COLUMN_CMAP_DEFAULTS.get(category_col)
+
     palette: dict[str, str] = {}
-    for cat, color in zip(all_cats, raw_colors):
-        palette[cat] = color if isinstance(color, str) else _mcolors.to_hex(color)
+    if cmap_name is not None:
+        cmap = _plt.get_cmap(cmap_name)
+        n = len(all_cats)
+        for i, cat in enumerate(all_cats):
+            palette[cat] = _mcolors.to_hex(cmap(i % cmap.N if hasattr(cmap, "N") else i / max(n - 1, 1)))
+    else:
+        raw_colors = _glasbey_colors(len(all_cats))
+        for cat, color in zip(all_cats, raw_colors):
+            palette[cat] = color if isinstance(color, str) else _mcolors.to_hex(color)
 
     palettes[category_col] = palette
     return dict(palette)
@@ -220,7 +239,7 @@ def plot_stacked_bar(
     denominator: str = "all_cells",
     width: str = "single",
     bar_width_mm: float = 8.0,
-    height_mm: float = 60.0,
+    height_mm: float = 72.0,
     legend_width_mm: float = 38.0,
     dpi: int = 600,
     show: bool = True,
@@ -719,9 +738,43 @@ def plot_spatial(
 
 try:
     import cmcrameri  # noqa: F401
-    _DEFAULT_SEQ_CMAP = "cmc.batlow"
+    _CRAMERI_AVAILABLE = True
+    _DEFAULT_SEQ_CMAP  = "cmc.batlow"
 except ImportError:
-    _DEFAULT_SEQ_CMAP = "cividis"
+    _CRAMERI_AVAILABLE = False
+    _DEFAULT_SEQ_CMAP  = "cividis"
+
+# Short-name aliases for Crameri colormaps with fallbacks for when cmcrameri
+# is not installed. Pass these names as cmap= to any heatmap function.
+# e.g. cmap="roma", cmap="batlow", cmap="vik"
+_CRAMERI_ALIASES: "dict[str, tuple[str, str]]" = {
+    # name      → (cmc name,        fallback)
+    "batlow":    ("cmc.batlow",     "cividis"),
+    "batlowS":   ("cmc.batlowS",    "tab20"),
+    "roma":      ("cmc.roma",       "coolwarm"),
+    "vik":       ("cmc.vik",        "coolwarm"),
+    "berlin":    ("cmc.berlin",     "RdBu_r"),
+    "lisbon":    ("cmc.lisbon",     "RdBu"),
+    "cork":      ("cmc.cork",       "PiYG"),
+    "broc":      ("cmc.broc",       "PRGn"),
+    "oleron":    ("cmc.oleron",     "terrain"),
+    "nuuk":      ("cmc.nuuk",       "Blues"),
+    "lapaz":     ("cmc.lapaz",      "plasma"),
+    "tokyo":     ("cmc.tokyo",      "magma"),
+}
+
+
+def _resolve_cmap(name: str) -> str:
+    """Resolve a colormap name, expanding Crameri short aliases.
+
+    If *name* is a key in ``_CRAMERI_ALIASES``, returns the ``cmc.*`` name
+    when ``cmcrameri`` is installed, or the fallback matplotlib name otherwise.
+    Unknown names are returned as-is (passed directly to matplotlib).
+    """
+    if name in _CRAMERI_ALIASES:
+        cmc_name, fallback = _CRAMERI_ALIASES[name]
+        return cmc_name if _CRAMERI_AVAILABLE else fallback
+    return name
 
 _MM_TO_IN      = 1.0 / 25.4
 _TILE_MM       = 4.0                         # 0.25 cm per cell
@@ -1124,7 +1177,7 @@ def plot_marker_heatmap(
             row_labels = list(matrix_df.index)
             col_labels = display_markers
             cbar_label = "f"
-            _cmap      = cmap if cmap is not None else _DEFAULT_SEQ_CMAP
+            _cmap      = _resolve_cmap(cmap) if cmap is not None else _DEFAULT_SEQ_CMAP
             _vmin, _vmax, _center, _fmt = 0.0, 1.0, None, ".2f"
             title      = f"Marker positivity by {category_col}"
 
@@ -1154,7 +1207,7 @@ def plot_marker_heatmap(
             col_labels = valid
             matrix_df  = pd.DataFrame(matrix, index=row_labels, columns=col_labels)
             cbar_label = "z (↓)"
-            _cmap      = cmap if cmap is not None else "coolwarm"
+            _cmap      = _resolve_cmap(cmap) if cmap is not None else "coolwarm"
             _vmin, _vmax, _center, _fmt = -3.0, 3.0, 0.0, ".2f"
             title      = f"Marker intensity by {category_col} (Z-score)"
 
@@ -1276,9 +1329,13 @@ def plot_cn_heatmap(
     if condition_col is not None and condition_col not in adata.obs.columns:
         raise ValueError(f"'{condition_col}' not found in adata.obs.")
 
-    _cmap = cmap if cmap is not None else _DEFAULT_SEQ_CMAP
+    _cmap = _resolve_cmap(cmap) if cmap is not None else _DEFAULT_SEQ_CMAP
     modes = ["sample", "cn"] if normalize == "both" else [normalize]
     saved: dict[str, list] = {}
+
+    # Pre-build (or retrieve) the shared CN palette so the row strip uses the
+    # same colours as plot_stacked_bar(category_col="cn") and plot_spatial(category_col="cn").
+    _cn_palette = _get_category_palette(adata, cn_col) if row_strip else None
 
     for mode in modes:
         norm_arg = "columns" if mode == "sample" else "index"
@@ -1319,6 +1376,7 @@ def plot_cn_heatmap(
             title=title, cbar_label=cbar_label,
             cluster_rows=cluster_rows, cluster_cols=cluster_cols,
             row_strips=row_strips, col_strips=col_strips,
+            row_strip_palette=_cn_palette,
             width=width,
         )
 

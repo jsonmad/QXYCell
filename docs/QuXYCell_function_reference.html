@@ -564,7 +564,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       </tr>
       <tr>
         <td>Selected samples</td>
-        <td><code>qxy.plot_spatial(adata, sample_col="ImageID", samples=["beat-2", "beat-5"])</code></td>
+        <td><code>qxy.plot_spatial(adata, sample_col="ImageID", samples=["sample_A", "sample_B"])</code></td>
         <td>Restricts plots to listed samples.</td>
       </tr>
       <tr>
@@ -771,7 +771,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td><code>cmap</code></td>
         <td>both</td>
         <td><code>None</code></td>
-        <td>Override the default colormap. Sequential plots (positivity, CN) default to <code>batlow</code> if the <code>cmcrameri</code> package is installed, otherwise <code>cividis</code>. Intensity defaults to <code>coolwarm</code>. Pass any matplotlib colormap name.</td>
+        <td>Override the default colormap. Sequential plots (positivity, CN) default to <code>batlow</code> if <code>cmcrameri</code> is installed, otherwise <code>cividis</code>. Intensity defaults to <code>coolwarm</code>. Pass any matplotlib colormap name <em>or</em> a Crameri short alias (see table below).</td>
       </tr>
       <tr>
         <td><code>annotate</code></td>
@@ -793,6 +793,43 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       </tr>
     </tbody>
   </table>
+
+  <h3>Crameri Colormap Aliases</h3>
+
+  <p>QuXYCell resolves a set of short Crameri colormap names automatically.
+  If <code>cmcrameri</code> is installed the full scientific colormap is used;
+  otherwise a comparable matplotlib colormap is substituted silently.
+  Pass these names as <code>cmap=</code> to any heatmap function.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Alias</th>
+        <th>Type</th>
+        <th>Crameri name</th>
+        <th>Fallback</th>
+        <th>Good for</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>"batlow"</code></td><td>Sequential</td><td><code>cmc.batlow</code></td><td><code>cividis</code></td><td>Positivity, CN abundance (default)</td></tr>
+      <tr><td><code>"batlowS"</code></td><td>Sequential (cyclic)</td><td><code>cmc.batlowS</code></td><td><code>tab20</code></td><td>Categorical / cyclic data</td></tr>
+      <tr><td><code>"roma"</code></td><td>Diverging</td><td><code>cmc.roma</code></td><td><code>coolwarm</code></td><td>Z-score intensity (blue→white→red)</td></tr>
+      <tr><td><code>"vik"</code></td><td>Diverging</td><td><code>cmc.vik</code></td><td><code>coolwarm</code></td><td>Z-score intensity (cooler tones)</td></tr>
+      <tr><td><code>"berlin"</code></td><td>Diverging</td><td><code>cmc.berlin</code></td><td><code>RdBu_r</code></td><td>Signed fold-change, dark ends</td></tr>
+      <tr><td><code>"lisbon"</code></td><td>Diverging</td><td><code>cmc.lisbon</code></td><td><code>RdBu</code></td><td>Teal→white→purple</td></tr>
+      <tr><td><code>"cork"</code></td><td>Diverging</td><td><code>cmc.cork</code></td><td><code>PiYG</code></td><td>Green→white→pink</td></tr>
+      <tr><td><code>"broc"</code></td><td>Diverging</td><td><code>cmc.broc</code></td><td><code>PRGn</code></td><td>Purple→white→green</td></tr>
+      <tr><td><code>"nuuk"</code></td><td>Sequential</td><td><code>cmc.nuuk</code></td><td><code>Blues</code></td><td>Blue sequential</td></tr>
+      <tr><td><code>"lapaz"</code></td><td>Sequential</td><td><code>cmc.lapaz</code></td><td><code>plasma</code></td><td>Dark blue→yellow</td></tr>
+      <tr><td><code>"tokyo"</code></td><td>Sequential</td><td><code>cmc.tokyo</code></td><td><code>magma</code></td><td>Dark→light warm tones</td></tr>
+      <tr><td><code>"oleron"</code></td><td>Sequential</td><td><code>cmc.oleron</code></td><td><code>terrain</code></td><td>Terrain-like sequential</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">Install <code>cmcrameri</code> to access the full scientific colormaps:
+  <code>pip install cmcrameri</code>. Without it, the fallback column is used automatically —
+  no code changes needed.</div>
 
   <h2>Useful AnnData Commands</h2>
   <table>
