@@ -9,6 +9,9 @@ dist/
 build/
 *.egg-info/
 
+# Local notes
+INSTALL_NOTES.md
+
 # Local QuXYCell outputs
 quxycell_output*/
 quxycell_run*/

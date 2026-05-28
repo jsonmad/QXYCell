@@ -393,7 +393,10 @@ def run(
     run_dir = output_path / "run"
     h5ad_dir = run_dir / "h5ad"
     h5ad_dir.mkdir(parents=True, exist_ok=True)
-    h5ad_path = h5ad_dir / "quxycell.h5ad"
+    _folder_name = output_path.name  # e.g. qxy_outputs_260527-2029
+    _ts = _folder_name.removeprefix("qxy_outputs_") if _folder_name.startswith("qxy_outputs_") else ""
+    _h5ad_stem = f"quxycell_{_ts}" if _ts else "quxycell"
+    h5ad_path = h5ad_dir / f"{_h5ad_stem}.h5ad"
     tables_dir = run_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
 

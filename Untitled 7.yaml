@@ -1,0 +1,75 @@
+rules:
+  - name: Exhausted_CD4_T_cell
+    positive: [CD_45, CD4, PD_1]
+    negative: [CD14, CD16, CD56]
+
+  - name: Activated_CD4_T_cell
+    positive: [CD_45, CD4, CD86]
+    negative: [CD14, CD16, CD56]
+
+  - name: CD4_T_cell
+    positive: [CD_45, CD4]
+    negative: [CD14, CD16, CD56]
+
+  - name: NK_cell_PD1_pos
+    positive: [CD_45, CD56, PD_1]
+    negative: [CD4]
+
+  - name: NK_cell
+    positive: [CD_45, CD56]
+    negative: [CD4]
+
+  - name: Activated_myeloid_cell
+    positive: [CD_45, CD14, CD86]
+    negative: [CD4, CD56]
+
+  - name: Monocyte_macrophage
+    positive: [CD_45, CD14]
+    negative: [CD4, CD56]
+
+  - name: Nonclassical_monocyte
+    positive: [CD_45, CD16]
+    negative: [CD4, CD56]
+
+  - name: Endothelial_cell
+    positive: [CD31]
+    negative: [CD_45]
+
+  - name: Lymphatic_stromal_cell
+    positive: [PDPN]
+    negative: [CD_45]
+
+  - name: HMGB1_high_immune
+    positive: [CD_45, HMGB1]
+
+  - name: Immune_cell
+    positive: [CD_45]
+
+features:
+  PD1_positive:
+    positive: [PD_1]
+
+  Activated_state:
+    positive: [CD86]
+
+  HMGB1_positive:
+    positive: [HMGB1]
+
+  Proliferative_like_state:
+    positive: [HMGB1]
+
+  Endothelial_feature:
+    positive: [CD31]
+
+  Stromal_feature:
+    positive: [PDPN]
+
+derived_features:
+  Exhausted_immune_state:
+    all_of: [PD1_positive]
+
+  Activated_immune_state:
+    all_of: [Activated_state]
+
+  HMGB1_stress_state:
+    all_of: [HMGB1_positive]

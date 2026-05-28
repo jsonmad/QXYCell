@@ -9,7 +9,7 @@ from quxycell.filtering import remove_ignore
 from quxycell.io_utils import load, load_latest, save
 from quxycell.metadata import add_metadata
 from quxycell.pipeline import run
-from quxycell.plotting import plot_spatial, plot_stacked_bar
+from quxycell.plotting import plot_cn_heatmap, plot_marker_heatmap, plot_spatial, plot_stacked_bar
 from quxycell.prompts import celltype_prompt
 from quxycell.qc import qc
 from quxycell.neighbourhoods import cn_knn, cn_kmeans, cn_name
@@ -35,6 +35,8 @@ __all__ = [
     "load",
     "load_latest",
     "load_celltype_logic",
+    "plot_cn_heatmap",
+    "plot_marker_heatmap",
     "plot_spatial",
     "plot_stacked_bar",
     "qc",

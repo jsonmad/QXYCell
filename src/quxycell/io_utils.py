@@ -13,6 +13,13 @@ def _has_legacy_parent(path: Path) -> bool:
     return any(_is_legacy_default_output_path(parent) for parent in path.parents)
 
 
+def _h5ad_filename(output_path: Path) -> str:
+    """Return the h5ad filename for a given output directory, including timestamp."""
+    folder = output_path.name
+    ts = folder.removeprefix("qxy_outputs_") if folder.startswith("qxy_outputs_") else ""
+    return f"quxycell_{ts}.h5ad" if ts else "quxycell.h5ad"
+
+
 def _default_h5ad_path(adata=None, output_dir: str | Path | None = None) -> Path:
     if output_dir is None and adata is not None:
         metadata = getattr(adata, "uns", {}).get("quxycell", {})
@@ -21,7 +28,7 @@ def _default_h5ad_path(adata=None, output_dir: str | Path | None = None) -> Path
             if not _has_legacy_parent(h5ad_path):
                 return h5ad_path
     output_path = resolve_output_dir(output_dir, adata=adata)
-    return output_path / "run" / "h5ad" / "quxycell.h5ad"
+    return output_path / "run" / "h5ad" / _h5ad_filename(output_path)
 
 
 def save(
@@ -56,10 +63,12 @@ def _resolve_h5ad_input(path_or_output_dir: str | Path) -> Path:
     path = Path(path_or_output_dir).expanduser().resolve()
     if path.is_file():
         return path
-    h5ad_path = path / "run" / "h5ad" / "quxycell.h5ad"
-    if h5ad_path.exists():
-        return h5ad_path
-    raise FileNotFoundError(f"No QuXYCell H5AD found at {path} or {h5ad_path}")
+    h5ad_dir = path / "run" / "h5ad"
+    # Try timestamped name first, then fall back to any quxycell*.h5ad in the folder
+    candidates = sorted(h5ad_dir.glob("quxycell*.h5ad")) if h5ad_dir.is_dir() else []
+    if candidates:
+        return max(candidates, key=lambda p: p.stat().st_mtime)
+    raise FileNotFoundError(f"No QuXYCell H5AD found in {h5ad_dir}")
 
 
 def load(path_or_output_dir: str | Path):

@@ -202,6 +202,18 @@
         <td>PNG/PDF spatial plots and optional combined plot.</td>
       </tr>
       <tr>
+        <td><code>qxy.plot_marker_heatmap</code></td>
+        <td>Heatmap of marker positivity or intensity across cell types (or any category column).</td>
+        <td><code>qxy.plot_marker_heatmap(adata)</code></td>
+        <td>PNG, PDF, and CSV per mode.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.plot_cn_heatmap</code></td>
+        <td>Heatmap of CN abundance across samples, normalised by sample or by CN.</td>
+        <td><code>qxy.plot_cn_heatmap(adata)</code></td>
+        <td>PNG, PDF, and CSV per normalisation mode.</td>
+      </tr>
+      <tr>
         <td><code>qxy.save</code></td>
         <td>Save the current AnnData object to the run H5AD path.</td>
         <td><code>qxy.save(adata)</code></td>
@@ -554,6 +566,154 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td>Palette control</td>
         <td><code>qxy.plot_spatial(adata, palette="tab20")</code></td>
         <td>Uses a matplotlib palette.</td>
+      </tr>
+      <tr>
+        <td>Marker positivity heatmap</td>
+        <td><code>qxy.plot_marker_heatmap(adata)</code></td>
+        <td>Fraction positive per cell type × marker. PDF, SVG, TIFF, CSV. Clustered rows + cols. Cividis colormap.</td>
+      </tr>
+      <tr>
+        <td>Marker intensity heatmap</td>
+        <td><code>qxy.plot_marker_heatmap(adata, values="intensity")</code></td>
+        <td>Z-score mean intensity. Coolwarm colormap, centred 0, ±3.</td>
+      </tr>
+      <tr>
+        <td>Both marker heatmaps</td>
+        <td><code>qxy.plot_marker_heatmap(adata, values="both")</code></td>
+        <td>Positivity + intensity in one call.</td>
+      </tr>
+      <tr>
+        <td>Marker heatmap — journal single column</td>
+        <td><code>qxy.plot_marker_heatmap(adata, width="single")</code></td>
+        <td>Fixed 90 mm figure width.</td>
+      </tr>
+      <tr>
+        <td>Marker heatmap — journal double column</td>
+        <td><code>qxy.plot_marker_heatmap(adata, width="double")</code></td>
+        <td>Fixed 180 mm figure width.</td>
+      </tr>
+      <tr>
+        <td>Marker heatmap — selected markers, no cluster</td>
+        <td><code>qxy.plot_marker_heatmap(adata, markers=["CD45", "CD4", "CD8"], cluster_cols=False)</code></td>
+        <td>Columns in specified order.</td>
+      </tr>
+      <tr>
+        <td>CN abundance heatmap (by sample)</td>
+        <td><code>qxy.plot_cn_heatmap(adata)</code></td>
+        <td>CN fraction per sample (columns sum to 1). Clustered rows + cols. PDF, SVG, TIFF, CSV.</td>
+      </tr>
+      <tr>
+        <td>CN heatmap with condition strip</td>
+        <td><code>qxy.plot_cn_heatmap(adata, condition_col="group")</code></td>
+        <td>Glasby colour strip above samples grouping by condition, with legend.</td>
+      </tr>
+      <tr>
+        <td>CN heatmap — both normalisations</td>
+        <td><code>qxy.plot_cn_heatmap(adata, normalize="both")</code></td>
+        <td>Generates sample-normalised and CN-normalised plots.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Heatmap Parameters</h3>
+
+  <p>Both heatmap functions use <strong>0.25 cm × 0.25 cm tiles</strong> and save
+  <strong>PDF, SVG, and TIFF</strong> (no PNG). Rows and columns are independently
+  reordered by hierarchical clustering (average linkage, Euclidean distance) — no
+  dendrogram is drawn. A glasbey-palette colour strip flanks each axis automatically.
+  Text colour inside cells is chosen for luminance contrast against the background.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Function</th>
+        <th>Default</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>category_col</code></td>
+        <td><code>plot_marker_heatmap</code></td>
+        <td><code>"celltype"</code></td>
+        <td>Column in <code>adata.obs</code> used as rows (one row per category). Pass <code>"cn"</code> to show markers by CN instead.</td>
+      </tr>
+      <tr>
+        <td><code>markers</code></td>
+        <td><code>plot_marker_heatmap</code></td>
+        <td><code>None</code></td>
+        <td>List of marker names to include (column order). Defaults to all markers in <code>adata.var_names</code>.</td>
+      </tr>
+      <tr>
+        <td><code>values</code></td>
+        <td><code>plot_marker_heatmap</code></td>
+        <td><code>"positivity"</code></td>
+        <td><code>"positivity"</code> — mean of <code>_pos</code> binary columns; colormap <code>"cividis"</code>, scale 0–1.
+        <code>"intensity"</code> — Z-score mean of <code>adata.X</code>; colormap <code>"coolwarm"</code>, centred at 0, clipped ±3.
+        <code>"both"</code> — generates both plots.</td>
+      </tr>
+      <tr>
+        <td><code>cn_col</code></td>
+        <td><code>plot_cn_heatmap</code></td>
+        <td><code>"cn"</code></td>
+        <td>Column in <code>adata.obs</code> containing CN labels (rows).</td>
+      </tr>
+      <tr>
+        <td><code>sample_col</code></td>
+        <td><code>plot_cn_heatmap</code></td>
+        <td><code>"Image"</code></td>
+        <td>Column in <code>adata.obs</code> used as columns (one column per sample).</td>
+      </tr>
+      <tr>
+        <td><code>condition_col</code></td>
+        <td><code>plot_cn_heatmap</code></td>
+        <td><code>None</code></td>
+        <td>Optional column mapping samples to experimental conditions. When provided, a glasboy-coloured strip is drawn above the heatmap grouping samples by condition, with a legend.</td>
+      </tr>
+      <tr>
+        <td><code>normalize</code></td>
+        <td><code>plot_cn_heatmap</code></td>
+        <td><code>"sample"</code></td>
+        <td><code>"sample"</code> — columns sum to 1 (CN fraction per sample); <code>"cn"</code> — rows sum to 1 (sample distribution per CN); <code>"both"</code> — generates both.</td>
+      </tr>
+      <tr>
+        <td><code>cluster_rows</code></td>
+        <td>both</td>
+        <td><code>True</code></td>
+        <td>Reorder rows by hierarchical clustering. Set <code>False</code> to preserve input order.</td>
+      </tr>
+      <tr>
+        <td><code>cluster_cols</code></td>
+        <td>both</td>
+        <td><code>True</code></td>
+        <td>Reorder columns by hierarchical clustering. Set <code>False</code> to preserve input order.</td>
+      </tr>
+      <tr>
+        <td><code>width</code></td>
+        <td>both</td>
+        <td><code>"single"</code></td>
+        <td><code>"single"</code> — 90 mm, one journal column (default).
+        <code>"double"</code> — 180 mm, two journal columns / full page.
+        <code>"auto"</code> — tile-based (0.25 cm × 0.25 cm per cell); produces very small figures for typical marker/CN counts — use only when exact tile size matters.</td>
+      </tr>
+      <tr>
+        <td><code>cmap</code></td>
+        <td>both</td>
+        <td><code>None</code></td>
+        <td>Override the default colormap. Positivity defaults to <code>"cividis"</code>, intensity to <code>"coolwarm"</code>, CN heatmap to <code>"cividis"</code>. Pass any matplotlib colormap name.</td>
+      </tr>
+      <tr>
+        <td><code>annotate</code></td>
+        <td>both</td>
+        <td><code>False</code></td>
+        <td>Write values inside each cell. Text colour (black/white) is chosen automatically for luminance contrast. Default off — pass <code>annotate=True</code> to enable.</td>
+      </tr>
+      <tr>
+        <td><code>dpi</code></td>
+        <td>both</td>
+        <td><code>300</code></td>
+        <td>Resolution for the TIFF output only. PDF and SVG are vector formats and ignore this parameter.</td>
       </tr>
     </tbody>
   </table>
