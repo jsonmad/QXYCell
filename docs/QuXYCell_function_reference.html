@@ -543,6 +543,16 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td>Only selected categories plotted.</td>
       </tr>
       <tr>
+        <td>Stacked bar — journal double-column width</td>
+        <td><code>qxy.plot_stacked_bar(adata, width="double")</code></td>
+        <td>180 mm minimum figure width.</td>
+      </tr>
+      <tr>
+        <td>Stacked bar — wider bars</td>
+        <td><code>qxy.plot_stacked_bar(adata, bar_width_mm=12)</code></td>
+        <td>12 mm per bar column instead of the 8 mm default.</td>
+      </tr>
+      <tr>
         <td>Spatial plot by sample</td>
         <td><code>qxy.plot_spatial(adata, sample_col="ImageID")</code></td>
         <td>One spatial figure per sample.</td>
@@ -570,12 +580,12 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr>
         <td>Marker positivity heatmap</td>
         <td><code>qxy.plot_marker_heatmap(adata)</code></td>
-        <td>Fraction positive per cell type × marker. PDF, SVG, TIFF, CSV. Clustered rows + cols. Cividis colormap.</td>
+        <td>Fraction positive per cell type × marker. PDF, SVG, TIFF, CSV. Clustered rows + cols. Batlow colormap (cividis fallback). Colorbar label: <code>f</code>.</td>
       </tr>
       <tr>
         <td>Marker intensity heatmap</td>
         <td><code>qxy.plot_marker_heatmap(adata, values="intensity")</code></td>
-        <td>Z-score mean intensity. Coolwarm colormap, centred 0, ±3.</td>
+        <td>Z-score mean intensity per marker column. Coolwarm colormap, centred 0, ±3. Colorbar label: <code>z (↓)</code>.</td>
       </tr>
       <tr>
         <td>Both marker heatmaps</td>
@@ -600,7 +610,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr>
         <td>CN abundance heatmap (by sample)</td>
         <td><code>qxy.plot_cn_heatmap(adata)</code></td>
-        <td>CN fraction per sample (columns sum to 1). Clustered rows + cols. PDF, SVG, TIFF, CSV.</td>
+        <td>CN fraction per sample (columns sum to 1). Clustered rows + cols. Batlow colormap. Colorbar label: <code>f (↓)</code>. PDF, SVG, TIFF, CSV.</td>
       </tr>
       <tr>
         <td>CN heatmap with condition strip</td>
@@ -615,13 +625,71 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
     </tbody>
   </table>
 
+  <h3>Stacked Bar Parameters</h3>
+
+  <p>Figure width is determined by <code>bar_width_mm × n_bars</code>, with <code>width="single"</code> or
+  <code>"double"</code> acting as a minimum (same convention as the heatmaps). Colours are shared
+  with <code>plot_spatial</code> and <code>plot_marker_heatmap</code> via the glasbey palette cached
+  in <code>adata.uns["quxycell"]["palettes"]</code>.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Default</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>width</code></td>
+        <td><code>"single"</code></td>
+        <td><code>"single"</code> — 90 mm minimum total figure width. <code>"double"</code> — 180 mm minimum. Figure grows beyond the minimum when there are many bars.</td>
+      </tr>
+      <tr>
+        <td><code>bar_width_mm</code></td>
+        <td><code>8.0</code></td>
+        <td>Width of each bar column in mm. Total plot width = <code>bar_width_mm × n_bars</code> + legend, subject to the <code>width</code> minimum.</td>
+      </tr>
+      <tr>
+        <td><code>height_mm</code></td>
+        <td><code>60.0</code></td>
+        <td>Total figure height in mm.</td>
+      </tr>
+      <tr>
+        <td><code>legend_width_mm</code></td>
+        <td><code>38.0</code></td>
+        <td>Width of the legend panel in mm.</td>
+      </tr>
+      <tr>
+        <td><code>denominator</code></td>
+        <td><code>"all_cells"</code></td>
+        <td>Frequency denominator. <code>"all_cells"</code> — divide by all cells in the sample (including unplotted categories). <code>"plotted_cells"</code> — divide by only the plotted categories.</td>
+      </tr>
+      <tr>
+        <td><code>dpi</code></td>
+        <td><code>600</code></td>
+        <td>Resolution for PNG output. PDF is vector.</td>
+      </tr>
+    </tbody>
+  </table>
+
   <h3>Heatmap Parameters</h3>
 
-  <p>Both heatmap functions use <strong>0.25 cm × 0.25 cm tiles</strong> and save
-  <strong>PDF, SVG, and TIFF</strong> (no PNG). Rows and columns are independently
+  <p>Both heatmap functions use <strong>4 mm × 4 mm tiles</strong> and save
+  <strong>PDF, SVG, and TIFF</strong> (600 dpi raster, no PNG). Rows and columns are independently
   reordered by hierarchical clustering (average linkage, Euclidean distance) — no
-  dendrogram is drawn. A glasbey-palette colour strip flanks each axis automatically.
-  Text colour inside cells is chosen for luminance contrast against the background.</p>
+  dendrogram is drawn. When <code>row_strip=True</code>, a glasbey colour strip is drawn to
+  the left of the heatmap using the same per-category palette as
+  <code>plot_spatial</code> and <code>plot_stacked_bar</code>, so colours are consistent across
+  all three plot types. Text colour inside annotated cells is chosen for luminance
+  contrast against the background.</p>
+
+  <div class="note">Colour consistency: the first call to <code>plot_spatial</code>,
+  <code>plot_stacked_bar</code>, or <code>plot_marker_heatmap</code> (with <code>row_strip=True</code>)
+  generates a glasbey palette for all categories and caches it in
+  <code>adata.uns["quxycell"]["palettes"]</code>. Subsequent calls re-use the same colours.
+  To regenerate (e.g. after adding new cell types): <code>adata.uns["quxycell"]["palettes"].pop("celltype")</code>.</div>
 
   <table>
     <thead>
@@ -649,9 +717,9 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td><code>values</code></td>
         <td><code>plot_marker_heatmap</code></td>
         <td><code>"positivity"</code></td>
-        <td><code>"positivity"</code> — mean of <code>_pos</code> binary columns; colormap <code>"cividis"</code>, scale 0–1.
-        <code>"intensity"</code> — Z-score mean of <code>adata.X</code>; colormap <code>"coolwarm"</code>, centred at 0, clipped ±3.
-        <code>"both"</code> — generates both plots.</td>
+        <td><code>"positivity"</code> — mean of <code>_pos</code> binary columns; colormap <code>batlow</code> (cividis fallback), scale 0–1, colorbar label <code>f</code>.
+        <code>"intensity"</code> — Z-score mean of <code>adata.X</code>; colormap <code>coolwarm</code>, centred at 0, clipped ±3, colorbar label <code>z (↓)</code> (compare cell types within a marker column).
+        <code>"both"</code> — generates both plots in one call.</td>
       </tr>
       <tr>
         <td><code>cn_col</code></td>
@@ -669,13 +737,15 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td><code>condition_col</code></td>
         <td><code>plot_cn_heatmap</code></td>
         <td><code>None</code></td>
-        <td>Optional column mapping samples to experimental conditions. When provided, a glasboy-coloured strip is drawn above the heatmap grouping samples by condition, with a legend.</td>
+        <td>Optional column mapping samples to experimental conditions. When provided, a glasbey-coloured strip is drawn above the heatmap grouping samples by condition, with a legend.</td>
       </tr>
       <tr>
         <td><code>normalize</code></td>
         <td><code>plot_cn_heatmap</code></td>
         <td><code>"sample"</code></td>
-        <td><code>"sample"</code> — columns sum to 1 (CN fraction per sample); <code>"cn"</code> — rows sum to 1 (sample distribution per CN); <code>"both"</code> — generates both.</td>
+        <td><code>"sample"</code> — columns sum to 1 (CN fraction per sample); colorbar label <code>f (↓)</code> — compare CNs within a sample column.
+        <code>"cn"</code> — rows sum to 1 (sample distribution per CN); colorbar label <code>f (→)</code> — compare samples within a CN row.
+        <code>"both"</code> — generates both plots in one call. Colormap defaults to <code>batlow</code> (cividis fallback).</td>
       </tr>
       <tr>
         <td><code>cluster_rows</code></td>
@@ -701,7 +771,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td><code>cmap</code></td>
         <td>both</td>
         <td><code>None</code></td>
-        <td>Override the default colormap. Positivity defaults to <code>"cividis"</code>, intensity to <code>"coolwarm"</code>, CN heatmap to <code>"cividis"</code>. Pass any matplotlib colormap name.</td>
+        <td>Override the default colormap. Sequential plots (positivity, CN) default to <code>batlow</code> if the <code>cmcrameri</code> package is installed, otherwise <code>cividis</code>. Intensity defaults to <code>coolwarm</code>. Pass any matplotlib colormap name.</td>
       </tr>
       <tr>
         <td><code>annotate</code></td>
@@ -710,9 +780,15 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td>Write values inside each cell. Text colour (black/white) is chosen automatically for luminance contrast. Default off — pass <code>annotate=True</code> to enable.</td>
       </tr>
       <tr>
+        <td><code>row_strip</code></td>
+        <td>both</td>
+        <td><code>False</code></td>
+        <td>Draw a glasbey colour strip to the left of the heatmap, one colour per row category. Uses the shared palette cached in <code>adata.uns["quxycell"]["palettes"]</code> so colours match <code>plot_spatial</code> and <code>plot_stacked_bar</code>.</td>
+      </tr>
+      <tr>
         <td><code>dpi</code></td>
         <td>both</td>
-        <td><code>300</code></td>
+        <td><code>600</code></td>
         <td>Resolution for the TIFF output only. PDF and SVG are vector formats and ignore this parameter.</td>
       </tr>
     </tbody>

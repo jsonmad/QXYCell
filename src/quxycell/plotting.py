@@ -43,6 +43,32 @@ def _fallback_color(label: object, hsv_to_rgb, to_hex) -> str:
     return to_hex(hsv_to_rgb((hue, 0.72, 0.90)))
 
 
+def _get_category_palette(adata, category_col: str) -> "dict[str, str]":
+    """Return a stable ``{label: hex_colour}`` mapping for every category in
+    *category_col*, generated with the glasbey palette and cached in
+    ``adata.uns["quxycell"]["palettes"]``.
+
+    Caching ensures the same colour is used for a given cell type across
+    ``plot_spatial``, ``plot_stacked_bar``, and the heatmap row-strip.
+    Call ``adata.uns["quxycell"]["palettes"].pop(category_col)`` to regenerate.
+    """
+    import matplotlib.colors as _mcolors
+
+    uns = adata.uns.setdefault("quxycell", {})
+    palettes = uns.setdefault("palettes", {})
+    if category_col in palettes:
+        return dict(palettes[category_col])
+
+    all_cats = sorted(adata.obs[category_col].astype(str).unique().tolist())
+    raw_colors = _glasbey_colors(len(all_cats))
+    palette: dict[str, str] = {}
+    for cat, color in zip(all_cats, raw_colors):
+        palette[cat] = color if isinstance(color, str) else _mcolors.to_hex(color)
+
+    palettes[category_col] = palette
+    return dict(palette)
+
+
 def _color_map(
     labels: Iterable[object],
     hsv_to_rgb,
@@ -192,9 +218,11 @@ def plot_stacked_bar(
     colors: dict[str, str] | None = None,
     palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     denominator: str = "all_cells",
-    figsize: tuple[float, float] = (8.0, 4.0),
+    width: str = "single",
+    bar_width_mm: float = 8.0,
+    height_mm: float = 60.0,
+    legend_width_mm: float = 38.0,
     dpi: int = 600,
-    legend_width: float = 3.0,
     show: bool = True,
     verbose: bool = True,
 ) -> dict[str, Path]:
@@ -204,6 +232,9 @@ def plot_stacked_bar(
     ``group_col``. Set ``sample_col`` to use a shortened image label column such
     as ``ImageID`` instead of the default QuPath ``Image`` column. By default,
     each category count is divided by all cells in the sample.
+
+    Figure width is determined by ``bar_width_mm`` × number of bars, with
+    ``width="single"`` (90 mm) or ``"double"`` (180 mm) acting as a minimum.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -276,11 +307,28 @@ def plot_stacked_bar(
         safe_parts.append(f"by_{_safe_name(group_col)}")
     prefix = save_prefix or filename_prefix or "_".join(safe_parts)
 
-    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors, palette)
+    _base_palette = _get_category_palette(adata, category_col)
+    color_lookup = _color_map(
+        category_order, hsv_to_rgb, to_hex, colors, palette if palette is not None else _base_palette
+    )
     stack_colors = [color_lookup[str(label)] for label in category_order]
 
-    fig = plt.figure(figsize=(figsize[0] + legend_width, figsize[1]), constrained_layout=True)
-    gs = fig.add_gridspec(1, 2, width_ratios=[figsize[0], legend_width], wspace=0.08)
+    # ── Figure sizing (mm → inches) ──────────────────────────────────────────
+    _mm = 1.0 / 25.4
+    n_bars      = len(freq_plot)
+    plot_w_in   = n_bars * bar_width_mm * _mm
+    legend_w_in = legend_width_mm * _mm
+    total_w_in  = plot_w_in + legend_w_in
+    if width == "single":
+        total_w_in = max(total_w_in, 90.0 * _mm)
+    elif width == "double":
+        total_w_in = max(total_w_in, 180.0 * _mm)
+    # recompute plot width after any minimum bump
+    plot_w_in  = total_w_in - legend_w_in
+    height_in  = height_mm * _mm
+
+    fig = plt.figure(figsize=(total_w_in, height_in), constrained_layout=True)
+    gs = fig.add_gridspec(1, 2, width_ratios=[plot_w_in, legend_w_in], wspace=0.08)
     ax = fig.add_subplot(gs[0, 0])
     legend_ax = fig.add_subplot(gs[0, 1])
     legend_ax.axis("off")
@@ -298,7 +346,7 @@ def plot_stacked_bar(
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0, decimals=0))
     ax.set_ylim(0, _stack_ymax(freq_plot, np))
     ax.tick_params(axis="x", rotation=0)
-    ax.set_title(subset_value if subset_value else f"{category_col} frequency")
+    ax.set_title(subset_value if subset_value else f"{category_col} frequency", pad=35)
     handles, labels = ax.get_legend_handles_labels()
     leg = ax.get_legend()
     if leg is not None:
@@ -307,6 +355,7 @@ def plot_stacked_bar(
         handles,
         labels,
         loc="center left",
+        bbox_to_anchor=(0, 0.5),
         frameon=False,
         fontsize=8,
         borderaxespad=0.0,
@@ -408,7 +457,10 @@ def plot_spatial(
         category_order = [str(celltype) for celltype in celltypes]
     else:
         category_order = sorted(obs_plot[category_col].astype(str).unique().tolist())
-    color_lookup = _color_map(category_order, hsv_to_rgb, to_hex, colors, palette)
+    _base_palette = _get_category_palette(adata, category_col)
+    color_lookup = _color_map(
+        category_order, hsv_to_rgb, to_hex, colors, palette if palette is not None else _base_palette
+    )
     center_method = str(center_method).lower()
     if center_method not in {"median", "mean", "bbox"}:
         raise ValueError("center_method must be 'median', 'mean', or 'bbox'.")
@@ -532,7 +584,7 @@ def plot_spatial(
         if scale_bar:
             _add_scale_bar(ax, x_lim, y_lim, length_um=scale_bar_um, label=scale_bar_label)
         title = f"{subset_value} | {image}" if subset_value else image
-        ax.set_title(title, fontsize=10)
+        ax.set_title(title, fontsize=10, pad=10)
         return True
 
     fig_paths: list[Path] = []
@@ -665,6 +717,12 @@ def plot_spatial(
 # Saved formats: PDF (vector), SVG (vector), TIFF (dpi-raster, default 300)
 # ─────────────────────────────────────────────────────────────────────────────
 
+try:
+    import cmcrameri  # noqa: F401
+    _DEFAULT_SEQ_CMAP = "cmc.batlow"
+except ImportError:
+    _DEFAULT_SEQ_CMAP = "cividis"
+
 _MM_TO_IN      = 1.0 / 25.4
 _TILE_MM       = 4.0                         # 0.25 cm per cell
 _TILE_IN       = _TILE_MM * _MM_TO_IN        # ≈ 0.0984 in
@@ -731,12 +789,30 @@ def _cluster_order(matrix) -> "tuple[list[int], list[int]]":
     return _leaves(matrix), _leaves(matrix.T)
 
 
-def _cat_strip_colors(labels: list) -> "tuple[dict, list]":
+def _cat_strip_colors(labels: list, palette: "dict | None" = None) -> "tuple[dict, list]":
     """Build ``{label: colour}`` mapping using the glasbey palette.
 
+    If *palette* is provided (a pre-built ``{label: hex}`` dict), colours from
+    it are used preferentially so strips stay consistent with other plots.
     Returns ``(color_map, ordered_categories)``.
     """
+    import matplotlib.colors as _mcolors
+
     cats = list(dict.fromkeys(str(l) for l in labels))   # unique, insertion-ordered
+    if palette:
+        out: dict[str, str] = {}
+        missing = []
+        for c in cats:
+            if c in palette:
+                col = palette[c]
+                out[c] = col if isinstance(col, str) else _mcolors.to_hex(col)
+            else:
+                missing.append(c)
+        if missing:
+            extra = _glasbey_colors(len(missing))
+            for c, col in zip(missing, extra):
+                out[c] = col if isinstance(col, str) else _mcolors.to_hex(col)
+        return out, cats
     colors = _glasbey_colors(len(cats))
     return {c: colors[i] for i, c in enumerate(cats)}, cats
 
@@ -764,6 +840,7 @@ def _build_heatmap_figure(
     # each strip: (label_list_in_original_order, strip_name_or_None)
     row_strips: "list | None" = None,   # drawn left of heatmap
     col_strips: "list | None" = None,   # drawn above heatmap
+    row_strip_palette: "dict | None" = None,  # pre-built {label: colour} for row strips
     # layout
     width: str = "auto",                # "auto" | "single" | "double"
 ) -> "tuple":
@@ -887,8 +964,9 @@ def _build_heatmap_figure(
     x_cb = _fx(rstrip_w + core_w_use + _row_lbl_w + _CBAR_PAD)
     ax_cb = fig.add_axes([x_cb, y0, _fx(_CBAR_W), h_c])
     cb = fig.colorbar(im, cax=ax_cb)
-    cb.set_label(cbar_label, fontsize=7, rotation=0, labelpad=8)
-    cb.ax.tick_params(labelsize=6)
+    cb.set_label("")
+    cb.ax.set_xlabel(cbar_label, fontsize=7, labelpad=4, ha="center")
+    cb.ax.tick_params(labelsize=5, length=2, width=0.5)
     for sp in cb.ax.spines.values():
         sp.set_visible(False)
 
@@ -898,7 +976,7 @@ def _build_heatmap_figure(
 
     # ── 7. Row strips (left of heatmap; row 0 at top to match imshow) ───────
     for si, (strip_lbls, _strip_name) in enumerate(row_strips):
-        color_map, _ = _cat_strip_colors(strip_lbls)
+        color_map, _ = _cat_strip_colors(strip_lbls, palette=row_strip_palette)
         sx = _fx(si * (_STRIP_W + _STRIP_GAP))
         ax_s = fig.add_axes([sx, y0, _fx(_STRIP_W), h_c])
         for ri, lbl in enumerate(strip_lbls):
@@ -958,6 +1036,7 @@ def plot_marker_heatmap(
     width: str = "single",
     cmap: "str | None" = None,
     annotate: bool = False,
+    row_strip: bool = False,
     dpi: int = 600,
     output_dir: "str | Path | None" = None,
     show: bool = True,
@@ -1022,6 +1101,10 @@ def plot_marker_heatmap(
     if category_col not in adata.obs.columns:
         raise ValueError(f"'{category_col}' not found in adata.obs.")
 
+    # Pre-build (or retrieve) the global glasbey palette for this category column
+    # so the row strip uses the same colours as plot_spatial / plot_stacked_bar.
+    _cat_palette = _get_category_palette(adata, category_col) if row_strip else None
+
     marker_names = list(markers) if markers is not None else list(adata.var_names)
     modes = ["positivity", "intensity"] if values == "both" else [values]
     saved: dict[str, list] = {}
@@ -1040,8 +1123,8 @@ def plot_marker_heatmap(
             matrix     = matrix_df.values.astype(float)
             row_labels = list(matrix_df.index)
             col_labels = display_markers
-            cbar_label = "%"
-            _cmap      = cmap if cmap is not None else "cividis"
+            cbar_label = "f"
+            _cmap      = cmap if cmap is not None else _DEFAULT_SEQ_CMAP
             _vmin, _vmax, _center, _fmt = 0.0, 1.0, None, ".2f"
             title      = f"Marker positivity by {category_col}"
 
@@ -1070,7 +1153,7 @@ def plot_marker_heatmap(
             row_labels = list(groups.index)
             col_labels = valid
             matrix_df  = pd.DataFrame(matrix, index=row_labels, columns=col_labels)
-            cbar_label = "z"
+            cbar_label = "z (↓)"
             _cmap      = cmap if cmap is not None else "coolwarm"
             _vmin, _vmax, _center, _fmt = -3.0, 3.0, 0.0, ".2f"
             title      = f"Marker intensity by {category_col} (Z-score)"
@@ -1078,8 +1161,7 @@ def plot_marker_heatmap(
         else:
             raise ValueError("values must be 'positivity', 'intensity', or 'both'.")
 
-        # Left colour strip: one colour per category row
-        row_strips = [(list(row_labels), None)]
+        row_strips = [(list(row_labels), None)] if row_strip else []
 
         fig, out_df = _build_heatmap_figure(
             matrix, row_labels, col_labels,
@@ -1088,6 +1170,7 @@ def plot_marker_heatmap(
             title=title, cbar_label=cbar_label,
             cluster_rows=cluster_rows, cluster_cols=cluster_cols,
             row_strips=row_strips, col_strips=[],
+            row_strip_palette=_cat_palette,
             width=width,
         )
 
@@ -1122,6 +1205,7 @@ def plot_cn_heatmap(
     width: str = "single",
     cmap: "str | None" = None,
     annotate: bool = False,
+    row_strip: bool = False,
     dpi: int = 600,
     output_dir: "str | Path | None" = None,
     show: bool = True,
@@ -1192,7 +1276,7 @@ def plot_cn_heatmap(
     if condition_col is not None and condition_col not in adata.obs.columns:
         raise ValueError(f"'{condition_col}' not found in adata.obs.")
 
-    _cmap = cmap if cmap is not None else "cividis"
+    _cmap = cmap if cmap is not None else _DEFAULT_SEQ_CMAP
     modes = ["sample", "cn"] if normalize == "both" else [normalize]
     saved: dict[str, list] = {}
 
@@ -1214,8 +1298,7 @@ def plot_cn_heatmap(
             title      = f"CN composition by {sample_col} (rows sum to 1)"
             cbar_label = "f (→)"
 
-        # Left strip: one colour per CN row (glasbey)
-        row_strips = [(list(row_labels), None)]
+        row_strips = [(list(row_labels), None)] if row_strip else []
 
         # Top strip: sample → condition (if condition_col supplied)
         col_strips: list = []
