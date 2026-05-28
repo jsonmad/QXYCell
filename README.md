@@ -239,13 +239,6 @@ QuXYCell resolves Crameri scientific colormap short names automatically. Install
 | `"batlow"` | Sequential | Positivity, CN abundance (default) |
 | `"roma"` | Diverging | Z-score intensity (blue→white→red) |
 | `"vik"` | Diverging | Z-score intensity (cooler tones) |
-| `"berlin"` | Diverging | Signed fold-change, dark ends |
-| `"lisbon"` | Diverging | Teal→white→purple |
-| `"cork"` | Diverging | Green→white→pink |
-| `"broc"` | Diverging | Purple→white→green |
-| `"nuuk"` | Sequential | Blue sequential |
-| `"lapaz"` | Sequential | Dark blue→yellow |
-| `"tokyo"` | Sequential | Dark→light warm |
 
 ```python
 qxy.plot_marker_heatmap(adata, values="intensity", cmap="roma")
