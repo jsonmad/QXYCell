@@ -14,9 +14,11 @@ Full function reference: https://jsonmad.github.io/QuXYCell/
 
 ### conda (recommended)
 
-Create and activate a dedicated conda environment using the provided `environment.yml`:
+Clone the repo, then create and activate the environment from the repo root:
 
 ```bash
+git clone https://github.com/jsonmad/QuXYCell.git
+cd QuXYCell
 conda env create -f environment.yml
 conda activate quxycell
 ```
@@ -26,6 +28,8 @@ This installs all dependencies via conda-forge (better binary compatibility, esp
 To update an existing environment after pulling new changes:
 
 ```bash
+cd QuXYCell
+git pull
 conda env update -f environment.yml --prune
 ```
 
