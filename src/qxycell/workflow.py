@@ -20,15 +20,15 @@ def workflow(
     plot_sample_col: str | None = None,
     verbose: bool = True,
 ):
-    """Run the common QuXYCell notebook workflow and return AnnData."""
+    """Run the common QXYCell notebook workflow and return AnnData."""
 
-    from quxycell.celltyping import apply_celltypes
-    from quxycell.filtering import remove_ignore
-    from quxycell.io_utils import save
-    from quxycell.metadata import add_metadata
-    from quxycell.pipeline import run
-    from quxycell.plotting import plot_spatial, plot_stacked_bar
-    from quxycell.qc import qc
+    from qxycell.celltyping import apply_celltypes
+    from qxycell.filtering import remove_ignore
+    from qxycell.io_utils import save
+    from qxycell.metadata import add_metadata
+    from qxycell.pipeline import run
+    from qxycell.plotting import plot_spatial, plot_stacked_bar
+    from qxycell.qc import qc
 
     adata = run(project_dir, output_dir=output_dir, verbose=verbose)
 
@@ -56,7 +56,7 @@ def workflow(
         plot_spatial(adata, sample_col=plot_col, show=False, verbose=verbose)
 
     save(adata, verbose=verbose)
-    adata.uns["quxycell_workflow"] = {
+    adata.uns["qxycell_workflow"] = {
         "sample_metadata": str(sample_metadata) if sample_metadata is not None else None,
         "celltype_logic": str(celltype_logic) if celltype_logic is not None else None,
         "remove_ignore_cells": bool(remove_ignore_cells),

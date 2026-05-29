@@ -7,9 +7,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from quxycell.paths import latest_timestamped_output_dir
-from quxycell.paths import output_dir_from_adata
-from quxycell.paths import resolve_output_dir
+from qxycell.paths import latest_timestamped_output_dir
+from qxycell.paths import output_dir_from_adata
+from qxycell.paths import resolve_output_dir
 
 
 def _safe_name(value: str) -> str:
@@ -320,7 +320,7 @@ def apply_celltypes(
         logic = logic_source
 
     if verbose and logic_source is not None:
-        print(f"Using QuXYCell cell type logic YAML:\n{logic_source}")
+        print(f"Using QXYCell cell type logic YAML:\n{logic_source}")
 
     bundle = load_celltype_logic(logic)
     obs = adata.obs
@@ -428,7 +428,7 @@ def apply_celltypes(
         n_cells=len(obs),
     )
     summary["rule_summary_tsv"] = str(rule_summary_tsv)
-    adata.uns["quxycell_celltyping"] = summary
+    adata.uns["qxycell_celltyping"] = summary
     if verbose:
         print(f"Saved cell type rule summary TSV:\n{rule_summary_tsv}")
     return summary

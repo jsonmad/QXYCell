@@ -1,4 +1,4 @@
-"""Filtering helpers for QuXYCell AnnData objects."""
+"""Filtering helpers for QXYCell AnnData objects."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import pandas as pd
 
 def _annotation_label_for_column(adata, column: str, annotation_prefix: str) -> str:
     label_maps = [
-        getattr(adata, "uns", {}).get("quxycell_annotation_labels", {}),
-        getattr(adata, "uns", {}).get("quxycell", {}).get("annotation_labels", {}),
+        getattr(adata, "uns", {}).get("qxycell_annotation_labels", {}),
+        getattr(adata, "uns", {}).get("qxycell", {}).get("annotation_labels", {}),
     ]
     for label_map in label_maps:
         if isinstance(label_map, dict) and column in label_map:
@@ -70,7 +70,7 @@ def assign_samples(
             "n_conflicting_cells": 0,
             "conflict_examples": [],
         }
-        adata.uns["quxycell_sample_annotations"] = {
+        adata.uns["qxycell_sample_annotations"] = {
             **summary,
             "conflict_examples": json.dumps([]),
         }
@@ -129,7 +129,7 @@ def assign_samples(
         "n_conflicting_cells": int(conflict_mask.sum()),
         "conflict_examples": conflict_examples,
     }
-    adata.uns["quxycell_sample_annotations"] = {
+    adata.uns["qxycell_sample_annotations"] = {
         **summary,
         "conflict_examples": json.dumps(conflict_examples),
     }

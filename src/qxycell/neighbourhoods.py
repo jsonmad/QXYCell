@@ -139,14 +139,16 @@ def cn_knn(
 
 def cn_kmeans(
     adata: "AnnData",
-    n_clusters: int = 12,
+    n_cn: int = 12,
     key: str = "cn",
     random_state: int = 0,
+    *,
+    n_clusters: int | None = None,  # legacy alias for n_cn
 ) -> "AnnData":
     """Cluster cells into CNs using MiniBatchKMeans.
 
     Clusters ``adata.obsm["cn_profile"]`` (built by :func:`cn_knn`) into
-    *n_clusters* CNs and stores the labels as a ``pd.Categorical`` in
+    *n_cn* CNs and stores the labels as a ``pd.Categorical`` in
     ``adata.obs[key]``.
 
     Requires scikit-learn (``pip install scikit-learn``).
@@ -155,8 +157,9 @@ def cn_kmeans(
     ----------
     adata:
         AnnData object with ``adata.obsm["cn_profile"]`` present.
-    n_clusters:
-        Number of CNs (default 12).
+    n_cn:
+        Number of CNs (default 12). Also accepted as ``n_clusters`` for
+        backwards compatibility.
     key:
         Column name written to ``adata.obs`` (default ``"cn"``).
     random_state:
@@ -180,6 +183,9 @@ def cn_kmeans(
 
     import pandas as pd
 
+    if n_clusters is not None:
+        n_cn = n_clusters  # honour legacy kwarg
+
     if "cn_profile" not in adata.obsm:
         raise ValueError(
             "adata.obsm['cn_profile'] not found. Run qxy.cn_knn(adata) first."
@@ -188,7 +194,7 @@ def cn_kmeans(
     profile = adata.obsm["cn_profile"]
 
     kmeans = MiniBatchKMeans(
-        n_clusters=n_clusters,
+        n_clusters=n_cn,
         random_state=random_state,
         n_init="auto",
     )
@@ -200,14 +206,14 @@ def cn_kmeans(
         adata.uns["cn"] = {}
     adata.uns["cn"].update(
         {
-            "n_clusters": n_clusters,
+            "n_cn": n_cn,
             "key": key,
             "method": "MiniBatchKMeans",
             "random_state": random_state,
         }
     )
 
-    print(f"cn_kmeans: {n_clusters} CNs → adata.obs['{key}']")
+    print(f"cn_kmeans: {n_cn} CNs → adata.obs['{key}']")
     return adata
 
 
@@ -251,7 +257,7 @@ def cn_name(
         e.g. ``{"CD8+PD1+LAG3+": "PD1 LAG3 CD8"}``. Applied before naming.
         Unmatched cell types are used as-is.
     output_dir:
-        Folder to write ``cn_labels.csv``. Defaults to the QuXYCell output folder
+        Folder to write ``cn_labels.csv``. Defaults to the QXYCell output folder
         stored in ``adata.uns``.
     verbose:
         Print a summary table (default True).
@@ -265,7 +271,7 @@ def cn_name(
     import numpy as np
     import pandas as pd
 
-    from quxycell.paths import resolve_output_dir
+    from qxycell.paths import resolve_output_dir
 
     # --- validate ---
     if key not in adata.obs.columns:

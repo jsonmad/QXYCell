@@ -1,12 +1,12 @@
-"""Save and load helpers for QuXYCell AnnData outputs."""
+"""Save and load helpers for QXYCell AnnData outputs."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from quxycell.paths import _is_legacy_default_output_path
-from quxycell.paths import latest_timestamped_output_dir
-from quxycell.paths import resolve_output_dir
+from qxycell.paths import _is_legacy_default_output_path
+from qxycell.paths import latest_timestamped_output_dir
+from qxycell.paths import resolve_output_dir
 
 
 def _has_legacy_parent(path: Path) -> bool:
@@ -17,12 +17,12 @@ def _h5ad_filename(output_path: Path) -> str:
     """Return the h5ad filename for a given output directory, including timestamp."""
     folder = output_path.name
     ts = folder.removeprefix("qxy_outputs_") if folder.startswith("qxy_outputs_") else ""
-    return f"quxycell_{ts}.h5ad" if ts else "quxycell.h5ad"
+    return f"qxycell_{ts}.h5ad" if ts else "qxycell.h5ad"
 
 
 def _default_h5ad_path(adata=None, output_dir: str | Path | None = None) -> Path:
     if output_dir is None and adata is not None:
-        metadata = getattr(adata, "uns", {}).get("quxycell", {})
+        metadata = getattr(adata, "uns", {}).get("qxycell", {})
         if isinstance(metadata, dict) and metadata.get("h5ad_path"):
             h5ad_path = Path(metadata["h5ad_path"]).expanduser().resolve()
             if not _has_legacy_parent(h5ad_path):
@@ -38,7 +38,7 @@ def save(
     output_dir: str | Path | None = None,
     verbose: bool = True,
 ) -> Path:
-    """Save an AnnData object to the current QuXYCell H5AD path."""
+    """Save an AnnData object to the current QXYCell H5AD path."""
 
     h5ad_path = Path(path).expanduser().resolve() if path is not None else _default_h5ad_path(
         adata,
@@ -48,14 +48,14 @@ def save(
     adata.write_h5ad(h5ad_path)
 
     output_path = h5ad_path.parents[2] if h5ad_path.match("*/run/h5ad/*.h5ad") else h5ad_path.parent
-    metadata = adata.uns.setdefault("quxycell", {})
+    metadata = adata.uns.setdefault("qxycell", {})
     metadata["output_dir"] = str(output_path)
     metadata["run_dir"] = str(output_path / "run")
     metadata["h5ad_path"] = str(h5ad_path)
     metadata["tables_dir"] = str(output_path / "run" / "tables")
 
     if verbose:
-        print(f"Saved QuXYCell H5AD:\n{h5ad_path}")
+        print(f"Saved QXYCell H5AD:\n{h5ad_path}")
     return h5ad_path
 
 
@@ -64,15 +64,15 @@ def _resolve_h5ad_input(path_or_output_dir: str | Path) -> Path:
     if path.is_file():
         return path
     h5ad_dir = path / "run" / "h5ad"
-    # Try timestamped name first, then fall back to any quxycell*.h5ad in the folder
-    candidates = sorted(h5ad_dir.glob("quxycell*.h5ad")) if h5ad_dir.is_dir() else []
+    # Try timestamped name first, then fall back to any qxycell*.h5ad in the folder
+    candidates = sorted(h5ad_dir.glob("qxycell*.h5ad")) if h5ad_dir.is_dir() else []
     if candidates:
         return max(candidates, key=lambda p: p.stat().st_mtime)
-    raise FileNotFoundError(f"No QuXYCell H5AD found in {h5ad_dir}")
+    raise FileNotFoundError(f"No QXYCell H5AD found in {h5ad_dir}")
 
 
 def load(path_or_output_dir: str | Path):
-    """Load a QuXYCell H5AD from a file path or output directory."""
+    """Load a QXYCell H5AD from a file path or output directory."""
 
     import anndata as ad
 
@@ -81,7 +81,7 @@ def load(path_or_output_dir: str | Path):
 
 
 def load_latest(base_dir: str | Path = "."):
-    """Load the latest timestamped QuXYCell output in ``base_dir``."""
+    """Load the latest timestamped QXYCell output in ``base_dir``."""
 
     latest = latest_timestamped_output_dir(base_dir)
     if latest is None:

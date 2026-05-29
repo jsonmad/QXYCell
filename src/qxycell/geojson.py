@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from quxycell.types import GeoJsonFile, Message
+from qxycell.types import GeoJsonFile, Message
 
 
 def discover_geojson_files(project_dir: str | Path) -> list[Path]:

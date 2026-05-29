@@ -1,4 +1,4 @@
-"""Shared path helpers for QuXYCell outputs."""
+"""Shared path helpers for QXYCell outputs."""
 
 from __future__ import annotations
 
@@ -22,14 +22,14 @@ def _is_legacy_default_output_path(path: Path) -> bool:
 
 
 def timestamped_output_dir(base_dir: str | Path = ".") -> Path:
-    """Return the default timestamped QuXYCell output directory."""
+    """Return the default timestamped QXYCell output directory."""
 
     timestamp = datetime.now().strftime(OUTPUT_TIMESTAMP_FORMAT)
     return (Path(base_dir).expanduser() / f"{OUTPUT_DIR_PREFIX}{timestamp}").resolve()
 
 
 def latest_timestamped_output_dir(base_dir: str | Path = ".") -> Path | None:
-    """Return the most recently modified timestamped QuXYCell output directory."""
+    """Return the most recently modified timestamped QXYCell output directory."""
 
     base_path = Path(base_dir).expanduser().resolve()
     candidates = [
@@ -43,9 +43,9 @@ def latest_timestamped_output_dir(base_dir: str | Path = ".") -> Path | None:
 
 
 def output_dir_from_adata(adata) -> Path | None:
-    """Return the QuXYCell output directory stored on an AnnData object."""
+    """Return the QXYCell output directory stored on an AnnData object."""
 
-    metadata = getattr(adata, "uns", {}).get("quxycell", {})
+    metadata = getattr(adata, "uns", {}).get("qxycell", {})
     output_dir = metadata.get("output_dir") if isinstance(metadata, dict) else None
     if not output_dir:
         return None

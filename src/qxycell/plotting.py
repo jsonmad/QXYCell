@@ -1,4 +1,4 @@
-"""Generic plotting helpers for QuXYCell AnnData objects."""
+"""Generic plotting helpers for QXYCell AnnData objects."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Iterable
 
-from quxycell.paths import resolve_output_dir
+from qxycell.paths import resolve_output_dir
 
 
 def _resolve_plot_dir(adata, output_dir: str | Path | None) -> Path:
@@ -26,8 +26,8 @@ def _require_plotting():
         from matplotlib.colors import hsv_to_rgb, to_hex
     except ImportError as exc:
         raise ImportError(
-            "QuXYCell plotting requires plot dependencies. Install with "
-            "`pip install -e '.[plot]'` or `pip install quxycell[plot]`."
+            "QXYCell plotting requires plot dependencies. Install with "
+            "`pip install -e '.[plot]'` or `pip install qxycell[plot]`."
         ) from exc
     return plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex
 
@@ -52,7 +52,7 @@ _COLUMN_CMAP_DEFAULTS: "dict[str, str]" = {
 
 def _get_category_palette(adata, category_col: str) -> "dict[str, str]":
     """Return a stable ``{label: hex_colour}`` mapping for every category in
-    *category_col*, cached in ``adata.uns["quxycell"]["palettes"]``.
+    *category_col*, cached in ``adata.uns["qxycell"]["palettes"]``.
 
     The palette generator is chosen by ``_COLUMN_CMAP_DEFAULTS``:
     - ``"cn"`` columns use ``tab20``.
@@ -60,12 +60,12 @@ def _get_category_palette(adata, category_col: str) -> "dict[str, str]":
 
     Caching ensures the same colour is used across ``plot_spatial``,
     ``plot_stacked_bar``, and the heatmap row-strip.
-    Call ``adata.uns["quxycell"]["palettes"].pop(category_col)`` to regenerate.
+    Call ``adata.uns["qxycell"]["palettes"].pop(category_col)`` to regenerate.
     """
     import matplotlib.pyplot as _plt
     import matplotlib.colors as _mcolors
 
-    uns = adata.uns.setdefault("quxycell", {})
+    uns = adata.uns.setdefault("qxycell", {})
     palettes = uns.setdefault("palettes", {})
     if category_col in palettes:
         return dict(palettes[category_col])
@@ -238,7 +238,7 @@ def plot_stacked_bar(
     palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     denominator: str = "all_cells",
     width: str = "single",
-    bar_width_mm: float = 8.0,
+    bar_width_mm: float = 15.0,
     height_mm: float = 72.0,
     legend_width_mm: float = 38.0,
     dpi: int = 600,
@@ -1137,7 +1137,7 @@ def plot_marker_heatmap(
         Resolution for the TIFF output (default 300). PDF and SVG are
         vector formats and ignore this parameter.
     output_dir:
-        Folder to save plots. Defaults to the QuXYCell output folder.
+        Folder to save plots. Defaults to the QXYCell output folder.
     show:
         Display the figure inline (default True).
     verbose:
@@ -1306,7 +1306,7 @@ def plot_cn_heatmap(
     dpi:
         Resolution for the TIFF output (default 300). PDF and SVG ignore this.
     output_dir:
-        Folder to save plots. Defaults to the QuXYCell output folder.
+        Folder to save plots. Defaults to the QXYCell output folder.
     show:
         Display the figure inline (default True).
     verbose:

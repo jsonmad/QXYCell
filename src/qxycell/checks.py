@@ -8,19 +8,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quxycell.classifiers import (
+from qxycell.classifiers import (
     discover_classifier_files,
     parse_classifiers,
     validate_classifiers,
 )
-from quxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
-from quxycell.measurements import (
+from qxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
+from qxycell.measurements import (
     discover_measurement_files,
     summarize_measurement_file,
     validate_measurement_files,
 )
-from quxycell.paths import resolve_output_dir
-from quxycell.types import ClassifierDefinition, GeoJsonFile, MeasurementFile, Message
+from qxycell.paths import resolve_output_dir
+from qxycell.types import ClassifierDefinition, GeoJsonFile, MeasurementFile, Message
 
 
 @dataclass(frozen=True)
@@ -82,8 +82,31 @@ def _write_report(report: CheckReport) -> None:
         encoding="utf-8",
     )
 
+    # Aggregate annotation labels across all GeoJSON files.
+    # QuPath exports: class = the classification assigned in QuPath, name = the label typed by the user.
+    # We merge both (class_counts + name_counts) to capture annotations however they were set.
+    all_labels: dict[str, int] = {}
+    for gf in report.geojson_files:
+        for label, count in {**gf.class_counts, **gf.name_counts}.items():
+            if label and label.lower() not in ("", "none", "null"):
+                all_labels[label] = all_labels.get(label, 0) + count
+
+    # Categorise labels into known QXYCell roles.
+    ignore_labels = {k: v for k, v in all_labels.items() if k.lower() == "ignore"}
+    sample_labels = {k: v for k, v in all_labels.items() if k.lower().startswith("sample-")}
+    tma_labels = {k: v for k, v in all_labels.items() if k.lower().startswith("tma")}
+    other_labels = {
+        k: v for k, v in all_labels.items()
+        if k not in ignore_labels and k not in sample_labels and k not in tma_labels
+    }
+
+    def _fmt_labels(d: dict[str, int]) -> str:
+        if not d:
+            return "none"
+        return ", ".join(f"{k} ({v})" for k, v in sorted(d.items()))
+
     lines = [
-        "QuXYCell check report",
+        "QXYCell check report",
         f"Project: {report.project_dir}",
         f"Output: {report.output_dir}",
         f"Status: {'PASS' if report.ok else 'FAIL'}",
@@ -92,8 +115,15 @@ def _write_report(report: CheckReport) -> None:
         "",
         f"Measurement files: {len(report.measurement_files)}",
         f"Classifier JSON files: {len(report.classifiers)}",
-        f"Simple classifiers: {sum(1 for item in report.classifiers if item.is_simple)}",
+        f"  Simple classifiers: {sum(1 for item in report.classifiers if item.is_simple)}",
+        f"  Markers: {', '.join(c.name for c in report.classifiers if c.is_simple) or 'none'}",
         f"GeoJSON files: {len(report.geojson_files)}",
+        "",
+        "Annotations:",
+        f"  Sample-  : {_fmt_labels(sample_labels)}",
+        f"  Ignore   : {_fmt_labels(ignore_labels)}",
+        f"  TMA      : {_fmt_labels(tma_labels)}",
+        f"  Other    : {_fmt_labels(other_labels)}",
         "",
         "Messages:",
     ]
@@ -103,7 +133,9 @@ def _write_report(report: CheckReport) -> None:
             lines.append(f"- {message.level.upper()} {message.code}: {message.message}{suffix}")
     else:
         lines.append("- No errors or warnings.")
-    (report.output_dir / "check_report.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    report_text = "\n".join(lines) + "\n"
+    (report.output_dir / "check_report.txt").write_text(report_text, encoding="utf-8")
+    print(report_text, end="")
 
     _write_csv(
         tables_dir / "measurement_files.csv",

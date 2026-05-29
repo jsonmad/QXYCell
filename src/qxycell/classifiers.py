@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from quxycell.types import ClassifierDefinition, Message, MeasurementFile
+from qxycell.types import ClassifierDefinition, Message, MeasurementFile
 
 
 def discover_classifier_files(project_dir: str | Path) -> list[Path]:

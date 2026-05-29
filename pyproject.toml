@@ -3,14 +3,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "quxycell"
+name = "qxycell"
 version = "0.1.0"
 description = "QuPath exported single-cell measurements to annotated AnnData."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-  { name = "QuXYCell contributors" }
+  { name = "QXYCell contributors" }
 ]
 dependencies = [
   "anndata>=0.10",
@@ -33,10 +33,10 @@ dev = [
 ]
 
 [project.scripts]
-quxycell = "quxycell.cli:main"
+qxycell = "qxycell.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/quxycell"]
+packages = ["src/qxycell"]
 
 [tool.ruff]
 line-length = 100

@@ -1,4 +1,4 @@
-name: quxycell
+name: qxycell
 channels:
   - conda-forge
   - defaults
@@ -18,4 +18,4 @@ dependencies:
   - pip:
       - pyyaml>=6.0
       - cmcrameri>=1.0
-      - quxycell
+      - qxycell

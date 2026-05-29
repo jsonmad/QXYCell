@@ -1,4 +1,4 @@
-"""QC summary reports for QuXYCell AnnData objects."""
+"""QC summary reports for QXYCell AnnData objects."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from quxycell.paths import resolve_output_dir
+from qxycell.paths import resolve_output_dir
 
 
 def _write_table(table, path: Path) -> Path:
@@ -25,7 +25,7 @@ def qc(
     output_dir: str | Path | None = None,
     verbose: bool = True,
 ) -> dict[str, Any]:
-    """Write a compact QC report for a QuXYCell AnnData object."""
+    """Write a compact QC report for a QXYCell AnnData object."""
 
     import pandas as pd
 
@@ -167,9 +167,9 @@ def qc(
         paths["ignore_cells"] = _write_table(ignore_table, out_dir / "ignore_cells.tsv")
 
     html_parts = [
-        "<html><head><meta charset=\"utf-8\"><title>QuXYCell QC</title>",
+        "<html><head><meta charset=\"utf-8\"><title>QXYCell QC</title>",
         "<style>body{font-family:Arial,sans-serif;margin:24px;}table{border-collapse:collapse;margin-bottom:24px;}th,td{border:1px solid #ddd;padding:4px 8px;}th{background:#f2f2f2;}</style>",
-        "</head><body><h1>QuXYCell QC Report</h1>",
+        "</head><body><h1>QXYCell QC Report</h1>",
     ]
     for name, table in tables.items():
         html_parts.append(f"<h2>{escape(name.replace('_', ' ').title())}</h2>")
@@ -184,12 +184,12 @@ def qc(
         "paths": paths,
         "tables": tables,
     }
-    adata.uns["quxycell_qc"] = {
+    adata.uns["qxycell_qc"] = {
         "output_dir": str(out_dir),
         "paths": {key: str(value) for key, value in paths.items()},
     }
 
     if verbose:
-        print(f"Saved QuXYCell QC report:\n{html_path}")
+        print(f"Saved QXYCell QC report:\n{html_path}")
 
     return result

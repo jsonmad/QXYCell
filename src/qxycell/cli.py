@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import argparse
 
-from quxycell.checks import check
-from quxycell.pipeline import run
+from qxycell.checks import check
+from qxycell.pipeline import run
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="quxycell")
+    parser = argparse.ArgumentParser(prog="qxycell")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     check_parser = subparsers.add_parser("check", help="Inspect and validate a QuPath export.")
@@ -27,14 +27,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Count measurement table rows during check. Slower for large exports.",
     )
 
-    run_parser = subparsers.add_parser("run", help="Run QuXYCell on a QuPath export.")
+    run_parser = subparsers.add_parser("run", help="Run QXYCell on a QuPath export.")
     run_parser.add_argument("project_dir", help="Path to a manually exported QuPath project folder.")
     run_parser.add_argument(
         "--out",
         "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output folder for QuXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
+        help="Output folder for QXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
     )
     run_parser.add_argument(
         "--pixel-size-um",
@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         report = check(args.project_dir, output_dir=args.output_dir, count_rows=args.count_rows)
         status = "PASS" if report.ok else "FAIL"
-        print(f"QuXYCell check {status}")
+        print(f"QXYCell check {status}")
         print(f"Report: {report.output_dir / 'check_report.txt'}")
         print(f"Measurement files: {len(report.measurement_files)}")
         print(f"Classifier JSON files: {len(report.classifiers)}")
@@ -72,9 +72,9 @@ def main(argv: list[str] | None = None) -> int:
             pixel_size_um=args.pixel_size_um,
             celltype_logic=args.celltype_logic,
         )
-        print("QuXYCell run complete")
-        print(f"H5AD: {adata.uns['quxycell']['h5ad_path']}")
-        print(f"Output: {adata.uns['quxycell']['run_dir']}")
+        print("QXYCell run complete")
+        print(f"H5AD: {adata.uns['qxycell']['h5ad_path']}")
+        print(f"Output: {adata.uns['qxycell']['run_dir']}")
         return 0
 
     parser.error(f"Unknown command: {args.command}")

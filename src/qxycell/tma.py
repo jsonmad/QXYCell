@@ -7,10 +7,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-from quxycell.geojson import _classification_name
-from quxycell.paths import resolve_output_dir
-from quxycell.pipeline import _image_key
-from quxycell.plotting import _resolve_spatial_key
+from qxycell.geojson import _classification_name
+from qxycell.paths import resolve_output_dir
+from qxycell.pipeline import _image_key
+from qxycell.plotting import _resolve_spatial_key
 
 
 def _safe_column(value: object) -> str:
@@ -258,7 +258,7 @@ def assign_tma_cores(
         "counts_tsv": str(counts_path),
         "metadata_columns": list(metadata_columns.values()),
     }
-    adata.uns["quxycell_tma"] = summary
+    adata.uns["qxycell_tma"] = summary
 
     if verbose:
         print(

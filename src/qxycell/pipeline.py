@@ -1,4 +1,4 @@
-"""Main QuXYCell pipeline entry point."""
+"""Main QXYCell pipeline entry point."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from quxycell.classifiers import ClassifierDefinition
-from quxycell.celltyping import apply_celltypes
-from quxycell.checks import check
-from quxycell.geojson import _classification_name
-from quxycell.markers import marker_name_from_classifier_name
-from quxycell.measurements import required_columns
-from quxycell.paths import resolve_output_dir
+from qxycell.classifiers import ClassifierDefinition
+from qxycell.celltyping import apply_celltypes
+from qxycell.checks import check
+from qxycell.geojson import _classification_name
+from qxycell.markers import marker_name_from_classifier_name
+from qxycell.measurements import required_columns
+from qxycell.paths import resolve_output_dir
 
 
 def _import_runtime_dependencies():
@@ -22,8 +22,8 @@ def _import_runtime_dependencies():
         import pandas as pd
     except ImportError as exc:
         raise ImportError(
-            "QuXYCell run() requires the package runtime dependencies. "
-            "Install with `pip install -e .` from this repo, or `pip install quxycell` "
+            "QXYCell run() requires the package runtime dependencies. "
+            "Install with `pip install -e .` from this repo, or `pip install qxycell` "
             "once the package is published."
         ) from exc
     return ad, np, pd
@@ -105,7 +105,7 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
         from shapely.prepared import prep
     except ImportError as exc:
         raise ImportError(
-            "GeoJSON annotation mapping requires shapely. Install QuXYCell runtime dependencies."
+            "GeoJSON annotation mapping requires shapely. Install QXYCell runtime dependencies."
         ) from exc
 
     def _prepare(feature_dict) -> Any:
@@ -199,7 +199,7 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
         for features in annotations_by_image.values()
         for feature in features
     }
-    adata.uns["quxycell_annotation_labels"] = annotation_label_map
+    adata.uns["qxycell_annotation_labels"] = annotation_label_map
     for column in annotation_columns:
         obs[column] = False
 
@@ -267,7 +267,7 @@ def run(
     celltype_logic: str | Path | dict[str, Any] | None = None,
     verbose: bool = True,
 ) -> Any:
-    """Run QuXYCell on a manually exported QuPath project.
+    """Run QXYCell on a manually exported QuPath project.
 
     The v1 pipeline imports one ``adata.X`` column per usable simple measurement
     classifier JSON, stores only required QuPath identity/spatial columns in
@@ -285,7 +285,7 @@ def run(
         if verbose:
             print(message)
 
-    log("QuXYCell run started")
+    log("QXYCell run started")
     log(f"Project: {Path(project_dir).expanduser().resolve()}")
     log(f"Output: {output_path}")
 
@@ -302,7 +302,7 @@ def run(
 
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
-            "QuXYCell check failed. See "
+            "QXYCell check failed. See "
             f"{output_path / 'check_report.txt'}"
         )
 
@@ -368,13 +368,39 @@ def run(
     annotation_cols = [
         column for column in adata.obs.columns if str(column).startswith("annotation__")
     ]
-    annotation_label_map = adata.uns.get("quxycell_annotation_labels", {})
+    annotation_label_map = adata.uns.get("qxycell_annotation_labels", {})
     log(f"Annotation columns: {len(annotation_cols)}")
     if "tma_core" in adata.obs.columns:
         n_assigned = adata.obs["tma_core"].notna().sum()
         n_cores = adata.obs["tma_core"].dropna().nunique()
         log(f"TMA cores: {n_cores} cores, {n_assigned:,} cells assigned")
     log(f"Annotation conflicts: {len(annotation_conflicts)}")
+
+    # Per-image cell counts.
+    image_counts = adata.obs["Image"].value_counts().sort_index()
+    log("")
+    log("Cells per image:")
+    for image_name, count in image_counts.items():
+        log(f"  {image_name}: {count:,}")
+
+    # Ignore annotation summary.
+    ignore_col = "annotation__Ignore"
+    if ignore_col in adata.obs.columns:
+        n_ignore = int(adata.obs[ignore_col].sum())
+        log(f"Cells inside Ignore region(s): {n_ignore:,} of {adata.n_obs:,} "
+            f"({100 * n_ignore / adata.n_obs:.1f}%) — remove with qxy.remove_ignore(adata)")
+    else:
+        log("No Ignore annotations found.")
+
+    # Sample annotation summary.
+    sample_cols = [c for c in adata.obs.columns if str(c).startswith("annotation__Sample-")]
+    if sample_cols:
+        log(f"Sample annotations: {len(sample_cols)}")
+        for col in sorted(sample_cols):
+            label = col.removeprefix("annotation__")
+            n = int(adata.obs[col].sum())
+            log(f"  {label}: {n:,} cells")
+    log("")
 
     celltyping_summary = None
     if celltype_logic is not None:
@@ -395,12 +421,12 @@ def run(
     h5ad_dir.mkdir(parents=True, exist_ok=True)
     _folder_name = output_path.name  # e.g. qxy_outputs_260527-2029
     _ts = _folder_name.removeprefix("qxy_outputs_") if _folder_name.startswith("qxy_outputs_") else ""
-    _h5ad_stem = f"quxycell_{_ts}" if _ts else "quxycell"
+    _h5ad_stem = f"qxycell_{_ts}" if _ts else "qxycell"
     h5ad_path = h5ad_dir / f"{_h5ad_stem}.h5ad"
     tables_dir = run_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
 
-    adata.uns["quxycell"] = {
+    adata.uns["qxycell"] = {
         "project_dir": str(Path(project_dir).expanduser().resolve()),
         "output_dir": str(output_path),
         "run_dir": str(run_dir),
@@ -437,7 +463,7 @@ def run(
             tables_dir / "celltype_counts.csv",
             index=False,
         )
-    log("QuXYCell run complete")
+    log("QXYCell run complete")
     (run_dir / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
 
     return adata

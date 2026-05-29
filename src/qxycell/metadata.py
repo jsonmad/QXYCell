@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from quxycell.paths import resolve_output_dir
+from qxycell.paths import resolve_output_dir
 
 
 def _read_metadata_table(metadata: str | Path | Any):
@@ -94,7 +94,7 @@ def add_metadata(
         "unused_metadata": unused_metadata,
         "added_columns": added_columns,
     }
-    adata.uns["quxycell_sample_metadata"] = summary
+    adata.uns["qxycell_sample_metadata"] = summary
 
     out_dir = resolve_output_dir(output_dir, adata=adata) / "run" / "tables"
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -1,14 +1,14 @@
-# QuXYCell
+# QXYCell
 
 <p align="center">
-  <img src="assets/quxycell-icon.png" alt="QuXYCell icon" width="180">
+  <img src="assets/qxycell-icon.png" alt="QXYCell icon" width="180">
 </p>
 
-QuXYCell converts manually exported QuPath single-cell projects into analysis-ready AnnData `.h5ad` objects, with built-in tools for cell typing, neighbourhood analysis, and publication-quality plotting.
+QXYCell converts manually exported QuPath single-cell projects into analysis-ready AnnData `.h5ad` objects, with built-in tools for cell typing, neighbourhood analysis, and publication-quality plotting.
 
 ## Documentation
 
-Full function reference: https://jsonmad.github.io/QuXYCell/
+Full function reference: https://jsonmad.github.io/QXYCell/
 
 ## Installation
 
@@ -17,18 +17,18 @@ Full function reference: https://jsonmad.github.io/QuXYCell/
 Clone the repo, then create and activate the environment from the repo root:
 
 ```bash
-git clone https://github.com/jsonmad/QuXYCell.git
-cd QuXYCell
+git clone https://github.com/jsonmad/QXYCell.git
+cd QXYCell
 conda env create -f environment.yml
-conda activate quxycell
+conda activate qxycell
 ```
 
-This installs all dependencies via conda-forge (better binary compatibility, especially for `geopandas` on macOS/Windows) and then installs `quxycell` itself via pip.
+This installs all dependencies via conda-forge (better binary compatibility, especially for `geopandas` on macOS/Windows) and then installs `qxycell` itself via pip.
 
 To update an existing environment after pulling new changes:
 
 ```bash
-cd QuXYCell
+cd QXYCell
 git pull
 conda env update -f environment.yml --prune
 ```
@@ -36,7 +36,7 @@ conda env update -f environment.yml --prune
 ### pip
 
 ```bash
-pip install quxycell
+pip install qxycell
 ```
 
 This installs all required dependencies: `anndata`, `cmcrameri`, `geopandas`, `matplotlib`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, `seaborn`, and `shapely`.
@@ -44,7 +44,7 @@ This installs all required dependencies: `anndata`, `cmcrameri`, `geopandas`, `m
 ## Quick start
 
 ```python
-import quxycell as qxy
+import qxycell as qxy
 
 # Validate your QuPath export before running
 report = qxy.check("/path/to/qupath_export")
@@ -63,15 +63,15 @@ Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`
 | `adata.X` | Marker intensity matrix (cells × markers) |
 | `adata.var` | Marker names and metadata |
 | `adata.obsm["spatial"]` | Cell centroid coordinates in microns, shape `(n_cells, 2)` |
-| `adata.uns["quxycell"]` | Run metadata: output directory, timestamps, file paths |
-| `adata.uns["quxycell_annotation_labels"]` | Map of annotation class names to `annotation__<label>` column names |
+| `adata.uns["qxycell"]` | Run metadata: output directory, timestamps, file paths |
+| `adata.uns["qxycell_annotation_labels"]` | Map of annotation class names to `annotation__<label>` column names |
 
 ## QuPath inputs
 
-QuXYCell is built around manual QuPath exports. Required files:
+QXYCell is built around manual QuPath exports. Required files:
 
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
-- **Object classifier JSONs** — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QuXYCell reads the marker name and positivity threshold from each JSON and creates `<marker>_pos` boolean columns in `adata.obs`.
+- **Object classifier JSONs** — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell reads the marker name and positivity threshold from each JSON and creates `<marker>_pos` boolean columns in `adata.obs`.
 - **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Each annotation's class/name becomes a boolean `annotation__<label>` column in `adata.obs`. Annotations labelled `Sample-` define sample boundaries within an image; annotations labelled `Ignore` mark regions to exclude.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
 - **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects.
@@ -95,7 +95,7 @@ sample_summary = qxy.assign_samples(adata)
 adata.obs["Sample"].value_counts()
 ```
 
-Adds `adata.obs["Sample"]` (string). Summary stored in `adata.uns["quxycell_sample_annotations"]`.
+Adds `adata.obs["Sample"]` (string). Summary stored in `adata.uns["qxycell_sample_annotations"]`.
 
 ## QC
 
@@ -105,7 +105,7 @@ Generate per-sample QC tables and an HTML report:
 qc = qxy.qc(adata, sample_col="Image")
 ```
 
-Results stored in `adata.uns["quxycell_qc"]`. HTML report and TSV tables written to `qxy_outputs_YYMMDD-HHMM/qc/`.
+Results stored in `adata.uns["qxycell_qc"]`. HTML report and TSV tables written to `qxy_outputs_YYMMDD-HHMM/qc/`.
 
 ## Metadata
 
@@ -132,7 +132,7 @@ Import only selected columns:
 qxy.add_metadata(adata, "sample_metadata.tsv", columns=["group", "mouse_id"])
 ```
 
-Each column in the metadata file is broadcast to every cell belonging to that sample and added as a new column in `adata.obs`. For example, a `group` column in the TSV becomes `adata.obs["group"]`. Summary stored in `adata.uns["quxycell_sample_metadata"]`.
+Each column in the metadata file is broadcast to every cell belonging to that sample and added as a new column in `adata.obs`. For example, a `group` column in the TSV becomes `adata.obs["group"]`. Summary stored in `adata.uns["qxycell_sample_metadata"]`.
 
 ## Cell typing
 
@@ -149,7 +149,7 @@ This prints the prompt, saves it to `qxy_outputs_YYMMDD-HHMM/celltype/`, and ret
 summary = qxy.celltype(adata)
 ```
 
-Adds `adata.obs["celltype"]` (string). Cell type assignment summary stored in `adata.uns["quxycell_celltyping"]`. QuXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used.
+Adds `adata.obs["celltype"]` (string). Cell type assignment summary stored in `adata.uns["qxycell_celltyping"]`. QXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used.
 
 ## Cellular neighbourhoods
 
@@ -169,13 +169,19 @@ qxy.cn_kmeans(adata, n_cn=10)
 
 Adds `adata.obs["cn"]` (integer cluster label). Updates `adata.uns["cn"]` with clustering parameters.
 
-Assign human-readable names to CN clusters:
+Auto-assign descriptive names to CN clusters from their composition profiles:
 
 ```python
-qxy.cn_name(adata, {0: "Immune-rich", 1: "Stromal", 2: "Tumour core"})
+label_table = qxy.cn_name(adata)
 ```
 
-Renames values in `adata.obs["cn"]` (string). Label map stored in `adata.uns["cn"]["label_map"]`.
+Labels are derived from `adata.obsm["cn_profile"]` using a priority rule: clusters where one cell type dominates (≥ 50 %) are labelled `<type> hi`; mixed clusters show the top two contributors (e.g. `CD8 T/Macrophage`). Renames values in `adata.obs["cn"]` (string). Label map stored in `adata.uns["cn"]["label_map"]`. Summary saved to `qxy_outputs_YYMMDD-HHMM/cn/cn_labels.csv`.
+
+Optionally shorten long cell type names before labelling:
+
+```python
+label_table = qxy.cn_name(adata, compaction={"CD8+PD1+LAG3+": "PD1 LAG3 CD8"})
+```
 
 ## Spatial plots
 
@@ -204,7 +210,7 @@ Use a short image label column (`ImageID`) instead of the full QuPath `Image` na
 qxy.plot_spatial(adata, sample_col="ImageID")
 ```
 
-Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Colour palette cached in `adata.uns["quxycell"]["palettes"]`.
+Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Colour palette cached in `adata.uns["qxycell"]["palettes"]`.
 
 ## Stacked bar plots
 
@@ -230,7 +236,7 @@ qxy.plot_stacked_bar(adata, width="double")
 qxy.plot_stacked_bar(adata, bar_width_mm=12)
 ```
 
-Reads from `adata.obs[category_col]` and `adata.obs[sample_col]`. Colour palette cached in `adata.uns["quxycell"]["palettes"]`.
+Reads from `adata.obs[category_col]` and `adata.obs[sample_col]`. Colour palette cached in `adata.uns["qxycell"]["palettes"]`.
 
 ## Heatmaps
 
@@ -282,7 +288,7 @@ Reads from `adata.obs["cn"]` and `adata.obs[sample_col]`. Rows and columns are r
 
 ## Colormaps
 
-QuXYCell resolves Crameri scientific colormap short names automatically. If `cmcrameri` is not installed a comparable matplotlib colormap is substituted silently.
+QXYCell resolves Crameri scientific colormap short names automatically. If `cmcrameri` is not installed a comparable matplotlib colormap is substituted silently.
 
 | Alias | Type | Good for |
 |---|---|---|
@@ -299,12 +305,12 @@ Any standard matplotlib colormap name also works (`cmap="viridis"` etc.).
 
 ## Colour consistency
 
-`plot_spatial`, `plot_stacked_bar`, and `plot_marker_heatmap` (with `row_strip=True`) share a per-category colour palette cached in `adata.uns["quxycell"]["palettes"]`. The same cell type or CN always gets the same colour across all plot types. Cell type plots use the glasbey palette; CN plots use `tab20` by default.
+`plot_spatial`, `plot_stacked_bar`, and `plot_marker_heatmap` (with `row_strip=True`) share a per-category colour palette cached in `adata.uns["qxycell"]["palettes"]`. The same cell type or CN always gets the same colour across all plot types. Cell type plots use the glasbey palette; CN plots use `tab20` by default.
 
 To regenerate a palette after adding new categories:
 
 ```python
-adata.uns["quxycell"]["palettes"].pop("celltype")  # or "cn"
+adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 ```
 
 ## TMA
@@ -319,7 +325,7 @@ tma = qxy.assign_tma_cores(
 )
 ```
 
-Adds `adata.obs["tma_core"]` (string core label, `NaN` for unassigned cells). Summary stored in `adata.uns["quxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]` using the filename stem.
+Adds `adata.obs["tma_core"]` (string core label, `NaN` for unassigned cells). Summary stored in `adata.uns["qxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]` using the filename stem.
 
 ## Save and load
 
@@ -331,7 +337,7 @@ qxy.save(adata)
 adata = qxy.load_latest()
 
 # Reload a specific file
-adata = qxy.load("path/to/quxycell_YYMMDD-HHMM.h5ad")
+adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
 ```
 
 ## AnnData structure summary
@@ -350,14 +356,14 @@ adata = qxy.load("path/to/quxycell_YYMMDD-HHMM.h5ad")
 | `adata.var` | `qxy.run()` | Marker names and metadata |
 | `adata.obsm["spatial"]` | `qxy.run()` | Cell centroid x/y coordinates in microns |
 | `adata.obsm["cn_profile"]` | `qxy.cn_knn()` | Per-cell local cell type composition (sums to 1) |
-| `adata.uns["quxycell"]` | `qxy.run()` | Run metadata, output paths, colour palettes |
-| `adata.uns["quxycell_annotation_labels"]` | `qxy.run()` | Annotation class → column name map |
-| `adata.uns["quxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
-| `adata.uns["quxycell_qc"]` | `qxy.qc()` | QC metrics per sample |
-| `adata.uns["quxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
-| `adata.uns["quxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
+| `adata.uns["qxycell"]` | `qxy.run()` | Run metadata, output paths, colour palettes |
+| `adata.uns["qxycell_annotation_labels"]` | `qxy.run()` | Annotation class → column name map |
+| `adata.uns["qxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
+| `adata.uns["qxycell_qc"]` | `qxy.qc()` | QC metrics per sample |
+| `adata.uns["qxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
+| `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
-| `adata.uns["quxycell_tma"]` | `qxy.assign_tma_cores()` | TMA assignment summary |
+| `adata.uns["qxycell_tma"]` | `qxy.assign_tma_cores()` | TMA assignment summary |
 
 ## Workflow shortcut
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from quxycell.types import MeasurementFile, Message
+from qxycell.types import MeasurementFile, Message
 
 REQUIRED_MEASUREMENT_COLUMNS = ("Image", "Object ID", "Centroid X µm", "Centroid Y µm")
 
@@ -29,7 +29,7 @@ def discover_measurement_files(project_dir: str | Path) -> list[Path]:
 
 
 def required_columns() -> tuple[str, ...]:
-    """Return QuXYCell's required v1 QuPath measurement columns."""
+    """Return QXYCell's required v1 QuPath measurement columns."""
 
     return REQUIRED_MEASUREMENT_COLUMNS
 
