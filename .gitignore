@@ -38,3 +38,4 @@ outputs/
 
 # Test scripts referencing private data paths
 test_*.py
+.DS_Store
