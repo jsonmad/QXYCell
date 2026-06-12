@@ -510,6 +510,7 @@ def plot_spatial(
     scale_bar: bool = True,
     scale_bar_um: float = 1000.0,
     scale_bar_label: str = "1 mm",
+    flip_y: bool = True,
     figsize: tuple[float, float] = (10.0, 10.0),
     auto_figsize: bool = False,
     dpi: int = 600,
@@ -531,7 +532,9 @@ def plot_spatial(
     ``auto_figsize=True`` to derive the plot panel aspect ratio from the
     selected samples' shared spatial X/Y extent instead of using a fixed square
     ``figsize`` panel. Set ``save_pdf=False`` for very large scatter plots when
-    a vector PDF would be slow or unnecessarily large.
+    a vector PDF would be slow or unnecessarily large. By default the y-axis is
+    flipped across the horizontal centre line to match image-viewer orientation;
+    pass ``flip_y=False`` to use the raw coordinate orientation.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -662,6 +665,8 @@ def plot_spatial(
         centered_coords = coords.copy()
         centered_coords[:, 0] = centered_coords[:, 0] - bounds["x_center"]
         centered_coords[:, 1] = centered_coords[:, 1] - bounds["y_center"]
+        if flip_y:
+            centered_coords[:, 1] *= -1.0
         plot_coords = centered_coords[plot_mask, :]
 
         ax.scatter(
@@ -830,6 +835,7 @@ def plot_spatial(
         "shared_extent_um": {"width": shared_width, "height": shared_height},
         "panel_figsize": {"width": panel_figsize[0], "height": panel_figsize[1]},
         "auto_figsize": bool(auto_figsize),
+        "flip_y": bool(flip_y),
         "center_method": center_method,
         "sample_bounds": sample_bounds,
     }
@@ -853,7 +859,7 @@ def plot_cell_boundaries(
     colors: dict[str, str] | None = None,
     palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     fixed_window_um: float | None = None,
-    center_method: str = "median",
+    center_method: str = "bbox",
     fill: bool = True,
     fill_alpha: float = 0.85,
     boundary_linewidth: float = 0.08,
@@ -866,6 +872,7 @@ def plot_cell_boundaries(
     scale_bar: bool = True,
     scale_bar_um: float = 1000.0,
     scale_bar_label: str = "1 mm",
+    flip_y: bool = True,
     label_celltypes: str | Iterable[str] | None = None,
     label_max_per_celltype: int = 1,
     label_offset_um: tuple[float, float] = (150.0, 150.0),
@@ -888,6 +895,12 @@ def plot_cell_boundaries(
     or by ``qxy.load_cell_polygons()``. Pass ``label_celltypes="Tumor"`` or a
     list of labels to annotate representative cells from only those cell types.
     Labels use the cell type colour by default; pass ``label_color`` to override.
+    By default, each sample is centered on the geometric bounding box of the
+    visible cell polygons. Pass ``center_method="median"`` or ``"mean"`` to
+    center on cell centroids instead.
+    By default the y-axis is flipped across the horizontal centre line to match
+    image-viewer orientation; pass ``flip_y=False`` to use the raw coordinate
+    orientation.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -953,6 +966,30 @@ def plot_cell_boundaries(
     if center_method not in {"median", "mean", "bbox"}:
         raise ValueError("center_method must be 'median', 'mean', or 'bbox'.")
 
+    def _bounds_from_wkt(values):
+        x_min = y_min = float("inf")
+        x_max = y_max = float("-inf")
+        found = False
+        for value in values:
+            text = str(value)
+            if not text:
+                continue
+            try:
+                geom = wkt.loads(text)
+            except Exception:
+                continue
+            if geom.is_empty:
+                continue
+            min_x, min_y, max_x, max_y = geom.bounds
+            x_min = min(x_min, float(min_x))
+            x_max = max(x_max, float(max_x))
+            y_min = min(y_min, float(min_y))
+            y_max = max(y_max, float(max_y))
+            found = True
+        if not found:
+            return None
+        return x_min, x_max, y_min, y_max
+
     sample_bounds = {}
     for sample in selected_samples:
         sample_mask = adata.obs[sample_col].astype(str) == sample
@@ -960,10 +997,16 @@ def plot_cell_boundaries(
             continue
         sample_positions = np.flatnonzero(sample_mask.to_numpy())
         sample_coords = adata.obsm[spatial_key][sample_positions, :]
-        x_min = float(np.min(sample_coords[:, 0]))
-        x_max = float(np.max(sample_coords[:, 0]))
-        y_min = float(np.min(sample_coords[:, 1]))
-        y_max = float(np.max(sample_coords[:, 1]))
+        sample_obs = adata.obs.loc[sample_mask]
+        bounds_obs = sample_obs if underlay else obs_plot.loc[obs_plot.index.intersection(sample_obs.index)]
+        polygon_bounds = _bounds_from_wkt(bounds_obs[polygon_col].to_numpy())
+        if polygon_bounds is None:
+            x_min = float(np.min(sample_coords[:, 0]))
+            x_max = float(np.max(sample_coords[:, 0]))
+            y_min = float(np.min(sample_coords[:, 1]))
+            y_max = float(np.max(sample_coords[:, 1]))
+        else:
+            x_min, x_max, y_min, y_max = polygon_bounds
         if center_method == "median":
             x_center = float(np.median(sample_coords[:, 0]))
             y_center = float(np.median(sample_coords[:, 1]))
@@ -1026,6 +1069,8 @@ def plot_cell_boundaries(
                 coords = np.asarray(poly.exterior.coords, dtype=float)
                 coords[:, 0] = coords[:, 0] - x_center
                 coords[:, 1] = coords[:, 1] - y_center
+                if flip_y:
+                    coords[:, 1] *= -1.0
                 patches.append(MplPolygon(coords, closed=True))
         return patches
 
@@ -1060,6 +1105,8 @@ def plot_cell_boundaries(
         centered_coords = coords.copy()
         centered_coords[:, 0] = centered_coords[:, 0] - bounds["x_center"]
         centered_coords[:, 1] = centered_coords[:, 1] - bounds["y_center"]
+        if flip_y:
+            centered_coords[:, 1] *= -1.0
         sub_obs["_qxy_x_centered"] = centered_coords[:, 0]
         sub_obs["_qxy_y_centered"] = centered_coords[:, 1]
         plot_obs = sub_obs.loc[sub_obs.index.intersection(obs_plot.index)]
@@ -1227,6 +1274,7 @@ def plot_cell_boundaries(
         "shared_extent_um": {"width": shared_width, "height": shared_height},
         "panel_figsize": {"width": panel_figsize[0], "height": panel_figsize[1]},
         "auto_figsize": bool(auto_figsize),
+        "flip_y": bool(flip_y),
         "center_method": center_method,
         "sample_bounds": sample_bounds,
         "polygon_col": polygon_col,

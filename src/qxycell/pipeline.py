@@ -85,6 +85,16 @@ def _is_sample_annotation_label(label: str) -> bool:
     return "sample" in str(label).lower()
 
 
+def _annotation_labels(properties: dict[str, Any]) -> list[str]:
+    labels = [_classification_name(properties)]
+    name = properties.get("name")
+    if name:
+        label = str(name)
+        if label and label.lower() not in {"none", "null"} and label not in labels:
+            labels.append(label)
+    return labels
+
+
 def _geojson_image_key(path: Path) -> str:
     stem = path.stem
     return stem[:-4] if stem.endswith(".ome") else stem
@@ -153,17 +163,17 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
                 prepared = _prepare(feature)
                 if prepared is None:
                     continue
-                label = _classification_name(properties)
-                prefix = "sample_annotation" if _is_sample_annotation_label(label) else "annotation"
-                annotations_by_image.setdefault(image_key, []).append(
-                    {
-                        "label": label,
-                        "column": _safe_obs_column_name(prefix, label),
-                        "is_sample": _is_sample_annotation_label(label),
-                        "prepared": prepared,
-                        "source": str(geojson_file.path),
-                    }
-                )
+                for label in _annotation_labels(properties):
+                    prefix = "sample_annotation" if _is_sample_annotation_label(label) else "annotation"
+                    annotations_by_image.setdefault(image_key, []).append(
+                        {
+                            "label": label,
+                            "column": _safe_obs_column_name(prefix, label),
+                            "is_sample": _is_sample_annotation_label(label),
+                            "prepared": prepared,
+                            "source": str(geojson_file.path),
+                        }
+                    )
 
     return annotations_by_image
 

@@ -72,7 +72,7 @@ QXYCell is built around manual QuPath exports. Required files:
 
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
 - **Object classifier JSONs** — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell reads the marker name and positivity threshold from each JSON and creates `<marker>_pos` boolean columns in `adata.obs`.
-- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotations become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude.
+- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
 - **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects.
 
@@ -205,6 +205,9 @@ qxy.plot_spatial(adata, fixed_window_um=11500)
 # Figure panel aspect from selected sample X/Y extent
 qxy.plot_spatial(adata, auto_figsize=True)
 
+# Use raw coordinate orientation instead of the default image-viewer y flip
+qxy.plot_spatial(adata, flip_y=False)
+
 # Plot CNs instead of cell types
 qxy.plot_spatial(adata, category_col="cn")
 ```
@@ -227,6 +230,7 @@ qxy.plot_cell_boundaries(
     samples=["sample_A", "sample_B"],
     label_celltypes="Tumor",
     auto_figsize=True,
+    flip_y=True,
     save_pdf=False,
 )
 ```

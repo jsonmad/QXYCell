@@ -11,12 +11,14 @@ from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, run
 from qxycell.tma import assign_tma_cores
 
 
-def _feature(*, object_type, name, coords):
+def _feature(*, object_type, name, coords, classification=None):
     properties = {}
     if object_type is not None:
         properties["objectType"] = object_type
     if name is not None:
         properties["name"] = name
+    if classification is not None:
+        properties["classification"] = {"name": classification}
     return {
         "type": "Feature",
         "properties": properties,
@@ -172,6 +174,32 @@ def test_run_sample_annotations_collapse_to_one_sample_column(tmp_path):
     assert adata.obs["Sample"].astype(str).tolist() == ["Ambiguous", "Sample-B"]
     assert adata.uns["qxycell_sample_annotations"]["n_conflicting_cells"] == 1
     assert adata.uns["qxycell"]["n_annotation_conflicts"] == 0
+
+
+def test_run_annotation_mapper_uses_classification_and_name_labels(tmp_path):
+    geojson_path = _write_geojson(
+        tmp_path / "img.geojson",
+        [
+            _feature(
+                object_type="annotation",
+                name="artifacts",
+                classification="Ignore*",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ),
+        ],
+    )
+    adata = _adata_for_img([(5, 5), (20, 20)])
+
+    _apply_annotations(
+        adata,
+        [summarize_geojson_file(geojson_path)],
+        pixel_size_um=1.0,
+    )
+
+    assert adata.obs["annotation__Ignore"].tolist() == [True, False]
+    assert adata.obs["annotation__artifacts"].tolist() == [True, False]
+    assert adata.uns["qxycell_annotation_labels"]["annotation__Ignore"] == "Ignore*"
+    assert adata.uns["qxycell_annotation_labels"]["annotation__artifacts"] == "artifacts"
 
 
 def test_run_cell_polygons_match_qupath_cells_suffix_by_object_id(tmp_path):
