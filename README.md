@@ -39,7 +39,7 @@ conda env update -f environment.yml --prune
 pip install qxycell
 ```
 
-This installs all required dependencies: `anndata`, `cmcrameri`, `geopandas`, `matplotlib`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, `seaborn`, and `shapely`.
+This installs all required dependencies: `anndata`, `colorcet`, `cmcrameri`, `geopandas`, `matplotlib`, `numpy`, `pandas`, `pyyaml`, `scikit-learn`, `scipy`, `seaborn`, and `shapely`.
 
 ## Quick start
 
@@ -72,7 +72,7 @@ QXYCell is built around manual QuPath exports. Required files:
 
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
 - **Object classifier JSONs** — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell reads the marker name and positivity threshold from each JSON and creates `<marker>_pos` boolean columns in `adata.obs`.
-- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Each annotation's class/name becomes a boolean `annotation__<label>` column in `adata.obs`. Annotations labelled `Sample-` define sample boundaries within an image; annotations labelled `Ignore` mark regions to exclude.
+- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotations become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
 - **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects.
 
@@ -88,7 +88,9 @@ adata = qxy.remove_ignore(adata)
 
 Removes rows from `adata.obs` in-place. Cells inside any `annotation__Ignore` polygon are dropped.
 
-Convert `Sample-` annotations into a `Sample` column:
+`qxy.run()` converts annotations with `Sample` in the label into one `Sample`
+column. Cells inside more than one sample annotation are labelled `Ambiguous`
+and a warning is emitted. You can rerun sample assignment explicitly:
 
 ```python
 sample_summary = qxy.assign_samples(adata)
@@ -200,6 +202,9 @@ qxy.plot_spatial(adata, samples=["sample_A", "sample_B"])
 # Fixed square window (microns)
 qxy.plot_spatial(adata, fixed_window_um=11500)
 
+# Figure panel aspect from selected sample X/Y extent
+qxy.plot_spatial(adata, auto_figsize=True)
+
 # Plot CNs instead of cell types
 qxy.plot_spatial(adata, category_col="cn")
 ```
@@ -211,6 +216,24 @@ qxy.plot_spatial(adata, sample_col="ImageID")
 ```
 
 Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Colour palette cached in `adata.uns["qxycell"]["palettes"]`.
+
+Plot cell boundary polygons instead of centroid dots when
+`adata.obs["cell_polygon_wkt"]` is available:
+
+```python
+qxy.plot_cell_boundaries(
+    adata,
+    sample_col="Sample",
+    samples=["sample_A", "sample_B"],
+    label_celltypes="Tumor",
+    auto_figsize=True,
+    save_pdf=False,
+)
+```
+
+Boundary plots are more memory-intensive than dot plots because each cell is
+drawn as a polygon. Cell labels are optional and only added for the cell type(s)
+specified by `label_celltypes`.
 
 ## Stacked bar plots
 
@@ -315,7 +338,11 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 
 ## TMA
 
-Assign cells to TMA cores from a GeoJSON boundary file:
+If `qxy.run()` detects GeoJSON features with `objectType="tmaCore"`, it assigns
+TMA cores automatically through `qxy.assign_tma_cores()` so core-level metadata
+propagation is handled in one place.
+
+You can also assign or rerun TMA core assignment explicitly:
 
 ```python
 tma = qxy.assign_tma_cores(
@@ -325,7 +352,11 @@ tma = qxy.assign_tma_cores(
 )
 ```
 
-Adds `adata.obs["tma_core"]` (string core label, `NaN` for unassigned cells). Summary stored in `adata.uns["qxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]` using the filename stem.
+Adds `adata.obs["tma_core"]` (string core label, `Unassigned` for unassigned
+cells). Cells whose centroids fall inside overlapping TMA cores are left as
+`Unassigned` rather than assigned arbitrarily. Summary stored in
+`adata.uns["qxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]`
+using the filename stem.
 
 ## Save and load
 
@@ -347,7 +378,8 @@ adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
 | `adata.obs["Image"]` | `qxy.run()` | QuPath image name per cell |
 | `adata.obs["<marker>_pos"]` | `qxy.run()` | Boolean marker positivity columns |
 | `adata.obs["annotation__<label>"]` | `qxy.run()` | Boolean annotation membership columns |
-| `adata.obs["Sample"]` | `qxy.assign_samples()` | Sample label from `Sample-` annotations |
+| `adata.obs["cell_polygon_wkt"]` | `qxy.run()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
+| `adata.obs["Sample"]` | `qxy.run()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
 | `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
 | `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
 | `adata.obs["tma_core"]` | `qxy.assign_tma_cores()` | TMA core label |

@@ -238,9 +238,10 @@ quxy_source_row
 quxy_cell_id
 &lt;marker&gt;_pos
 annotation__&lt;label&gt;
-tma_core              # Categorical — NaN if outside all TMA cores (only present when tmaCore features exist in GeoJSON)
-Sample                # Categorical — NaN if unassigned; added by qxy.assign_samples()
-celltype              # added by qxy.celltype()
+cell_polygon_wkt      # WKT cell boundary polygons when cell GeoJSON is available
+tma_core              # String label; Unassigned if outside all TMA cores or in overlapping cores
+Sample                # Categorical — NaN if unassigned; added by qxy.run() / qxy.assign_samples()
+celltype              # added by qxy.celltype() / qxy.apply_celltypes()
 cn    # Categorical — added by qxy.cn_kmeans()</code></pre>
 
     <p>Example marker positivity columns:</p>
@@ -295,10 +296,11 @@ qxy.cn_kmeans(adata, n_clusters=12)</code></pre>
     <h2>Annotation and TMA Core Handling</h2>
     <p>GeoJSON files are parsed in the same pass for two feature types:</p>
     <ul>
-      <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — each class/name becomes a boolean column in <code>adata.obs</code> (e.g. <code>annotation__Ignore</code>, <code>annotation__Region</code>). Cells outside all polygons of a given label get <code>False</code>.</li>
-      <li><strong>TMA cores</strong> (<code>objectType: tmaCore</code>) — when present in the same GeoJSON, core boundaries are extracted and tested against cell centroids. The result is stored as a single <code>adata.obs["tma_core"]</code> column. The column is a <code>pd.Categorical</code>: cells inside a core receive the core name; cells outside all cores receive <code>NaN</code> and are automatically excluded from <code>value_counts()</code>, <code>groupby()</code>, and <code>cat.categories</code>. First-match wins if cores overlap.</li>
+      <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_ignore()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
+      <li><strong>TMA cores</strong> (<code>objectType: tmaCore</code>) — when present in GeoJSON, core boundaries are extracted and tested against cell centroids. The result is stored as a single <code>adata.obs["tma_core"]</code> column. Cells inside a core receive the core name; cells outside all cores or inside overlapping cores receive <code>Unassigned</code>.</li>
+      <li><strong>Cell polygons</strong> (<code>objectType: cell</code>) — matched to cells by QuPath Object ID and stored as WKT strings in <code>adata.obs["cell_polygon_wkt"]</code>. These can be plotted with <code>qxy.plot_cell_boundaries()</code>.</li>
     </ul>
-    <p>GeoJSON files are matched to images by comparing the GeoJSON filename stem against the <code>Image</code> column value stem (both stripped of <code>.ome</code> and their file extension). Only files whose stem matches a loaded image are mapped to cells.</p>
+    <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation and TMA geometry is applied by spatial containment of cell centroids.</p>
     <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels or between annotations and TMA cores are expected geometry and are not flagged. Conflicts are written to:</p>
     <pre><code>run/tables/annotation_conflicts.csv</code></pre>
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,47 @@ class CheckReport:
     def n_warnings(self) -> int:
         return sum(1 for message in self.messages if message.level == "warning")
 
+    @property
+    def report_path(self) -> Path:
+        """Path to the plain-text check report written by :func:`check`."""
+
+        return self.output_dir / "check_report.txt"
+
+    @property
+    def json_path(self) -> Path:
+        """Path to the JSON check report written by :func:`check`."""
+
+        return self.output_dir / "check_report.json"
+
+    def summary_lines(self) -> list[str]:
+        """Return a compact, notebook-friendly report summary."""
+
+        return [
+            f"QXYCell check: {'PASS' if self.ok else 'FAIL'}",
+            f"Errors: {self.n_errors}",
+            f"Warnings: {self.n_warnings}",
+            f"Measurement files: {len(self.measurement_files)}",
+            f"Classifier JSON files: {len(self.classifiers)}",
+            f"Simple classifiers: {sum(1 for item in self.classifiers if item.is_simple)}",
+            f"GeoJSON files: {len(self.geojson_files)}",
+            f"Report: {self.report_path}",
+        ]
+
+    def __str__(self) -> str:
+        return "\n".join(self.summary_lines())
+
+    def __repr__(self) -> str:
+        return str(self)
+
+    def _repr_pretty_(self, printer: Any, cycle: bool) -> None:
+        if cycle:
+            printer.text("CheckReport(...)")
+        else:
+            printer.text(str(self))
+
+    def _repr_html_(self) -> str:
+        return "<pre>" + escape(str(self)) + "</pre>"
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize report content."""
 
@@ -82,21 +124,32 @@ def _write_report(report: CheckReport) -> None:
         encoding="utf-8",
     )
 
-    # Aggregate annotation labels across all GeoJSON files.
-    # QuPath exports: class = the classification assigned in QuPath, name = the label typed by the user.
-    # We merge both (class_counts + name_counts) to capture annotations however they were set.
-    all_labels: dict[str, int] = {}
+    def _add_label_count(target: dict[str, int], label: str, count: int) -> None:
+        if label and label.lower() not in ("", "none", "null"):
+            target[label] = target.get(label, 0) + count
+
+    # Aggregate labels by GeoJSON object type. QuPath exports can include
+    # annotation polygons, TMA cores, and individual cell objects in the same
+    # file; the check report should not mix those categories.
+    annotation_labels: dict[str, int] = {}
+    tma_labels: dict[str, int] = {}
+    cell_labels: dict[str, int] = {}
     for gf in report.geojson_files:
-        for label, count in {**gf.class_counts, **gf.name_counts}.items():
-            if label and label.lower() not in ("", "none", "null"):
-                all_labels[label] = all_labels.get(label, 0) + count
+        for object_type, labels in gf.labels_by_object_type.items():
+            object_type_lower = object_type.lower()
+            for label, count in labels.items():
+                if object_type_lower == "annotation":
+                    _add_label_count(annotation_labels, label, count)
+                elif object_type_lower == "tmacore":
+                    _add_label_count(tma_labels, label, count)
+                elif object_type_lower == "cell":
+                    _add_label_count(cell_labels, label, count)
 
     # Categorise labels into known QXYCell roles.
-    ignore_labels = {k: v for k, v in all_labels.items() if k.lower() == "ignore"}
-    sample_labels = {k: v for k, v in all_labels.items() if k.lower().startswith("sample-")}
-    tma_labels = {k: v for k, v in all_labels.items() if k.lower().startswith("tma")}
+    ignore_labels = {k: v for k, v in annotation_labels.items() if "ignore" in k.lower()}
+    sample_labels = {k: v for k, v in annotation_labels.items() if "sample" in k.lower()}
     other_labels = {
-        k: v for k, v in all_labels.items()
+        k: v for k, v in annotation_labels.items()
         if k not in ignore_labels and k not in sample_labels and k not in tma_labels
     }
 
@@ -120,10 +173,11 @@ def _write_report(report: CheckReport) -> None:
         f"GeoJSON files: {len(report.geojson_files)}",
         "",
         "Annotations:",
-        f"  Sample-  : {_fmt_labels(sample_labels)}",
+        f"  Sample   : {_fmt_labels(sample_labels)}",
         f"  Ignore   : {_fmt_labels(ignore_labels)}",
         f"  TMA      : {_fmt_labels(tma_labels)}",
         f"  Other    : {_fmt_labels(other_labels)}",
+        f"  Cell labels: {_fmt_labels(cell_labels)}",
         "",
         "Messages:",
     ]
@@ -176,6 +230,9 @@ def _write_report(report: CheckReport) -> None:
                 "object_type_counts": json.dumps(item.object_type_counts, sort_keys=True),
                 "class_counts": json.dumps(item.class_counts, sort_keys=True),
                 "name_counts": json.dumps(item.name_counts, sort_keys=True),
+                "labels_by_object_type": json.dumps(
+                    item.labels_by_object_type, sort_keys=True
+                ),
                 "error": item.error,
             }
             for item in report.geojson_files
@@ -187,6 +244,7 @@ def _write_report(report: CheckReport) -> None:
             "object_type_counts",
             "class_counts",
             "name_counts",
+            "labels_by_object_type",
             "error",
         ],
     )

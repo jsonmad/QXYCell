@@ -14,6 +14,7 @@ authors = [
 ]
 dependencies = [
   "anndata>=0.10",
+  "colorcet>=3.0",
   "cmcrameri>=1.0",
   "geopandas>=0.14",
   "matplotlib>=3.8",

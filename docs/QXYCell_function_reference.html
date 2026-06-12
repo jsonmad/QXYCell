@@ -144,7 +144,7 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, and TMA core boundaries into AnnData. Classifier JSONs are searched across the entire project folder. TMA cores (<code>tmaCore</code> features) in GeoJSON files are extracted automatically alongside annotation polygons and stored as <code>adata.obs["tma_core"]</code> (Categorical, NaN outside all cores).</td>
+        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and TMA core boundaries into AnnData. Classifier JSONs are searched across the entire project folder. TMA cores (<code>tmaCore</code> features) are assigned automatically and stored as <code>adata.obs["tma_core"]</code> with <code>Unassigned</code> outside all cores.</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
@@ -161,9 +161,21 @@
         <td>Adds <code>adata.obs["celltype"]</code> and saves a rule summary TSV.</td>
       </tr>
       <tr>
+        <td><code>qxy.apply_celltypes</code></td>
+        <td>Long-name alias for <code>qxy.celltype</code>.</td>
+        <td><code>summary = qxy.apply_celltypes(adata, "celltype_logic.yaml")</code></td>
+        <td>Adds <code>adata.obs["celltype"]</code> and saves a rule summary TSV.</td>
+      </tr>
+      <tr>
         <td><code>qxy.remove_ignore</code></td>
         <td>Remove cells inside annotation columns containing <code>Ignore</code>.</td>
         <td><code>qxy.remove_ignore(adata)</code></td>
+        <td>Filters <code>adata</code> in place by default.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.remove_annotations</code></td>
+        <td>Remove cells inside annotation columns matching a custom text string.</td>
+        <td><code>qxy.remove_annotations(adata, text="artifact")</code></td>
         <td>Filters <code>adata</code> in place by default.</td>
       </tr>
       <tr>
@@ -349,7 +361,7 @@ qxy.save(adata)</code></pre>
   <h2>TMA Commands</h2>
 
   <div class="note">
-    <strong>Automatic TMA core assignment:</strong> When QuPath GeoJSON files contain <code>tmaCore</code> features alongside annotations, <code>qxy.run()</code> assigns them automatically. Each cell centroid is tested against core boundaries; the result is stored as <code>adata.obs["tma_core"]</code> — a <code>pd.Categorical</code> where cells outside all cores are <code>NaN</code>. Use <code>qxy.assign_tma_cores()</code> only when core boundaries are in a separate GeoJSON file not covered by the project folder.
+    <strong>Automatic TMA core assignment:</strong> When QuPath GeoJSON files contain <code>tmaCore</code> features alongside annotations, <code>qxy.run()</code> assigns them automatically. Each cell centroid is tested against core boundaries; the result is stored as <code>adata.obs["tma_core"]</code>. Cells outside all cores, and cells falling inside overlapping cores, are labelled <code>Unassigned</code>.
   </div>
 
   <table>
@@ -577,6 +589,11 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td>Palette control</td>
         <td><code>qxy.plot_spatial(adata, palette="tab20")</code></td>
         <td>Uses a matplotlib palette.</td>
+      </tr>
+      <tr>
+        <td>Cell boundary polygons</td>
+        <td><code>qxy.plot_cell_boundaries(adata, sample_col="ImageID", label_celltypes="Tumor", save_pdf=False)</code></td>
+        <td>Draws WKT cell polygons instead of centroid dots. More memory-intensive than dot plots.</td>
       </tr>
       <tr>
         <td>Marker positivity heatmap</td>

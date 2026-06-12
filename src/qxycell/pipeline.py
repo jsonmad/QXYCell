@@ -9,6 +9,7 @@ from typing import Any
 from qxycell.classifiers import ClassifierDefinition
 from qxycell.celltyping import apply_celltypes
 from qxycell.checks import check
+from qxycell.filtering import assign_samples
 from qxycell.geojson import _classification_name
 from qxycell.markers import marker_name_from_classifier_name
 from qxycell.measurements import required_columns
@@ -80,6 +81,10 @@ def _safe_obs_column_name(prefix: str, label: str) -> str:
     return f"{prefix}__{safe or 'Unclassified'}"
 
 
+def _is_sample_annotation_label(label: str) -> bool:
+    return "sample" in str(label).lower()
+
+
 def _geojson_image_key(path: Path) -> str:
     stem = path.stem
     return stem[:-4] if stem.endswith(".ome") else stem
@@ -92,11 +97,10 @@ def _image_key(value: str) -> str:
 
 
 def _load_geojson_features(geojson_files, pixel_size_um: float):
-    """Load annotation and tmaCore features from GeoJSON files, keyed by image.
+    """Load annotation features from GeoJSON files, keyed by image.
 
-    Returns a tuple of two dicts:
-      annotations_by_image  – {image_key: [{"label", "column", "prepared", "source"}, ...]}
-      tmacores_by_image     – {image_key: [{"name", "prepared", "source"}, ...]}
+    Returns:
+      {image_key: [{"label", "column", "prepared", "source"}, ...]}
     """
     try:
         import json
@@ -129,7 +133,6 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
         return prep(geometry)
 
     annotations_by_image: dict[str, list[dict[str, Any]]] = {}
-    tmacores_by_image: dict[str, list[dict[str, Any]]] = {}
 
     for geojson_file in geojson_files:
         if not geojson_file.readable:
@@ -151,29 +154,100 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
                 if prepared is None:
                     continue
                 label = _classification_name(properties)
+                prefix = "sample_annotation" if _is_sample_annotation_label(label) else "annotation"
                 annotations_by_image.setdefault(image_key, []).append(
                     {
                         "label": label,
-                        "column": _safe_obs_column_name("annotation", label),
+                        "column": _safe_obs_column_name(prefix, label),
+                        "is_sample": _is_sample_annotation_label(label),
                         "prepared": prepared,
                         "source": str(geojson_file.path),
                     }
                 )
 
-            elif object_type == "tmacore":
-                prepared = _prepare(feature)
-                if prepared is None:
+    return annotations_by_image
+
+
+def _apply_cell_polygons(adata, geojson_files, pixel_size_um: float) -> int:
+    """Match cell detection polygons from GeoJSON to adata.obs rows via Object ID.
+
+    Stores WKT geometry strings in ``adata.obs["cell_polygon_wkt"]`` (empty string for
+    unmatched cells). Returns the number of cells successfully matched.
+    """
+    try:
+        import json as _json
+        import numpy as _np
+        from shapely import affinity
+        from shapely.geometry import shape
+    except ImportError:
+        return 0
+
+    # QuPath Object IDs are globally unique UUIDs. Match by Object ID alone so
+    # standard exports such as "image-cells.geojson" do not depend on filename
+    # heuristics to recover the measurement-table Image value.
+    cell_geoms: dict[str, Any] = {}
+
+    for geojson_file in geojson_files:
+        if not geojson_file.readable:
+            continue
+        data = _json.loads(geojson_file.path.read_text(errors="replace"))
+        features = data.get("features", []) if isinstance(data, dict) else []
+
+        for feature in features:
+            if not isinstance(feature, dict):
+                continue
+            properties = feature.get("properties") or {}
+            if not isinstance(properties, dict):
+                properties = {}
+            object_type = str(properties.get("objectType") or "").lower()
+            if object_type != "cell":
+                continue
+            geometry_data = feature.get("geometry")
+            if not geometry_data:
+                continue
+            try:
+                geom = shape(geometry_data)
+                if geom.is_empty or geom.geom_type not in {"Polygon", "MultiPolygon"}:
                     continue
-                core_name = str(properties.get("name") or "").strip() or "Unknown"
-                tmacores_by_image.setdefault(image_key, []).append(
-                    {
-                        "name": core_name,
-                        "prepared": prepared,
-                        "source": str(geojson_file.path),
-                    }
-                )
+                if pixel_size_um != 1.0:
+                    geom = affinity.scale(geom, xfact=pixel_size_um, yfact=pixel_size_um, origin=(0, 0))
+                if not geom.is_valid:
+                    geom = geom.buffer(0)
+                if geom.is_empty:
+                    continue
+            except Exception:
+                continue
 
-    return annotations_by_image, tmacores_by_image
+            # QuPath stores Object ID as the top-level GeoJSON feature "id",
+            # not inside "properties". Fall back to property keys for others.
+            obj_id = (
+                feature.get("id")
+                or properties.get("objectID")
+                or properties.get("id")
+                or properties.get("Object ID")
+                or ""
+            )
+            obj_id = str(obj_id).strip()
+            if obj_id:
+                cell_geoms[obj_id] = geom
+
+    if not cell_geoms:
+        return 0
+
+    obs = adata.obs
+    object_ids = obs["Object ID"].astype(str)
+
+    wkt_array = _np.full(len(obs), "", dtype=object)
+    n_matched = 0
+
+    for position, obj_id in enumerate(object_ids):
+        geom = cell_geoms.get(obj_id)
+        if geom is not None:
+            wkt_array[position] = str(geom.wkt)
+            n_matched += 1
+
+    adata.obs["cell_polygon_wkt"] = wkt_array
+    return n_matched
 
 
 def _apply_annotations(adata, geojson_files, pixel_size_um: float):
@@ -182,10 +256,8 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
     except ImportError:
         return []
 
-    annotations_by_image, tmacores_by_image = _load_geojson_features(
-        geojson_files, pixel_size_um=pixel_size_um
-    )
-    if not annotations_by_image and not tmacores_by_image:
+    annotations_by_image = _load_geojson_features(geojson_files, pixel_size_um=pixel_size_um)
+    if not annotations_by_image:
         return []
 
     obs = adata.obs
@@ -203,20 +275,10 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
     for column in annotation_columns:
         obs[column] = False
 
-    # --- TMA core column ---
-    has_tmacores = bool(tmacores_by_image)
-    if has_tmacores:
-        obs["tma_core"] = None
-
     spatial = adata.obsm["spatial"]
     image_keys = obs["Image"].astype(str).map(_image_key)
-    conflict_rows = []
 
-    all_image_keys = set(annotations_by_image) | set(tmacores_by_image)
-    for image_key in all_image_keys:
-        annotation_features = annotations_by_image.get(image_key, [])
-        tmacore_features = tmacores_by_image.get(image_key, [])
-
+    for image_key, annotation_features in annotations_by_image.items():
         indices = list(obs.index[image_keys == image_key])
         if not indices:
             continue
@@ -226,36 +288,11 @@ def _apply_annotations(adata, geojson_files, pixel_size_um: float):
             point = Point(float(spatial[position, 0]), float(spatial[position, 1]))
 
             # Annotation assignment
-            label_hits: dict[str, int] = {}
             for feature in annotation_features:
                 if feature["prepared"].contains(point):
                     obs.at[index, feature["column"]] = True
-                    label_hits[feature["column"]] = label_hits.get(feature["column"], 0) + 1
-            for column, count in label_hits.items():
-                if count > 1:
-                    conflict_rows.append(
-                        {
-                            "Image": obs.at[index, "Image"],
-                            "Object ID": obs.at[index, "Object ID"],
-                            "annotation_column": column,
-                            "hit_count": count,
-                        }
-                    )
 
-            # TMA core assignment — first match wins; overlapping cores are not
-            # annotation conflicts so they are not added to conflict_rows.
-            if tmacore_features:
-                matched = [f["name"] for f in tmacore_features if f["prepared"].contains(point)]
-                if matched:
-                    obs.at[index, "tma_core"] = matched[0]
-
-    # Convert tma_core to Categorical so NaN (no core assigned) is proper missing
-    # data and does not appear in value_counts, groupby, or cat.categories.
-    if has_tmacores and "tma_core" in obs.columns:
-        import pandas as _pd
-        obs["tma_core"] = _pd.Categorical(obs["tma_core"])
-
-    return conflict_rows
+    return []
 
 
 def run(
@@ -368,13 +405,73 @@ def run(
     annotation_cols = [
         column for column in adata.obs.columns if str(column).startswith("annotation__")
     ]
+    sample_annotation_cols = [
+        column for column in adata.obs.columns if str(column).startswith("sample_annotation__")
+    ]
     annotation_label_map = adata.uns.get("qxycell_annotation_labels", {})
     log(f"Annotation columns: {len(annotation_cols)}")
-    if "tma_core" in adata.obs.columns:
-        n_assigned = adata.obs["tma_core"].notna().sum()
-        n_cores = adata.obs["tma_core"].dropna().nunique()
-        log(f"TMA cores: {n_cores} cores, {n_assigned:,} cells assigned")
     log(f"Annotation conflicts: {len(annotation_conflicts)}")
+    sample_summary = None
+    if sample_annotation_cols:
+        sample_summary = assign_samples(
+            adata,
+            annotation_prefix="sample_annotation__",
+            sample_col="Sample",
+            verbose=verbose,
+        )
+        sample_summary_for_uns = adata.uns.get("qxycell_sample_annotations", sample_summary)
+        adata.obs.drop(columns=sample_annotation_cols, inplace=True)
+        annotation_label_map = {
+            column: label
+            for column, label in annotation_label_map.items()
+            if not str(column).startswith("sample_annotation__")
+        }
+        adata.uns["qxycell_annotation_labels"] = annotation_label_map
+        log(
+            "Sample annotations: "
+            f"{len(sample_annotation_cols)} labels, "
+            f"{sample_summary['n_assigned_cells']:,} assigned, "
+            f"{sample_summary['n_conflicting_cells']:,} ambiguous"
+        )
+
+    n_tma_core_features = sum(
+        count
+        for geojson_file in report.geojson_files
+        for object_type, count in geojson_file.object_type_counts.items()
+        if str(object_type).lower() == "tmacore"
+    )
+    tma_summary = None
+    if n_tma_core_features:
+        from qxycell.tma import assign_tma_cores
+
+        log(
+            "TMA core features detected: "
+            f"{n_tma_core_features}. "
+            "Assigning TMA cores with qxy.assign_tma_cores(...)."
+        )
+        tma_summary = assign_tma_cores(
+            adata,
+            Path(project_dir).expanduser().resolve(),
+            pixel_size_um=pixel_size_um,
+            output_dir=output_path,
+            verbose=verbose,
+        )
+        log(
+            "TMA assignment: "
+            f"{tma_summary['n_cores']} cores, "
+            f"{tma_summary['n_assigned_cells']:,}/{tma_summary['n_cells']:,} cells assigned"
+        )
+
+    log("Mapping cell segmentation polygons...")
+    n_matched = _apply_cell_polygons(adata, report.geojson_files, pixel_size_um=pixel_size_um)
+    if n_matched > 0:
+        log(
+            "Cell polygons matched: "
+            f"{n_matched:,} of {adata.n_obs:,} cells → "
+            "adata.obs['cell_polygon_wkt']"
+        )
+    else:
+        log("Cell segmentation GeoJSON not found or no Object ID matches — skipping.")
 
     # Per-image cell counts.
     image_counts = adata.obs["Image"].value_counts().sort_index()
@@ -392,14 +489,6 @@ def run(
     else:
         log("No Ignore annotations found.")
 
-    # Sample annotation summary.
-    sample_cols = [c for c in adata.obs.columns if str(c).startswith("annotation__Sample-")]
-    if sample_cols:
-        log(f"Sample annotations: {len(sample_cols)}")
-        for col in sorted(sample_cols):
-            label = col.removeprefix("annotation__")
-            n = int(adata.obs[col].sum())
-            log(f"  {label}: {n:,} cells")
     log("")
 
     celltyping_summary = None
@@ -443,8 +532,11 @@ def run(
         "n_classifiers": int(len(report.classifiers)),
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),
         "n_geojson_files": int(len(report.geojson_files)),
+        "n_tma_core_features": int(n_tma_core_features),
+        "tma_assignment": tma_summary,
         "n_annotation_conflicts": int(len(annotation_conflicts)),
         "annotation_labels": dict(annotation_label_map),
+        "sample_assignment": sample_summary_for_uns if sample_summary is not None else None,
         "celltyping_applied": bool(celltyping_summary is not None),
     }
     log(f"Writing H5AD: {h5ad_path}")

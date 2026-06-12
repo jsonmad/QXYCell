@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from qxycell.geojson import _classification_name
 from qxycell.paths import resolve_output_dir
@@ -27,7 +27,7 @@ def _geojson_paths(path: str | Path) -> list[Path]:
             [
                 item
                 for pattern in ("*.geojson", "*.json")
-                for item in path.glob(pattern)
+                for item in path.rglob(pattern)
                 if item.is_file()
             ]
         )
@@ -65,13 +65,25 @@ def _scalar_metadata(properties: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _load_cores(core_geojson: str | Path, pixel_size_um: float):
+def _normalise_object_types(object_types: Iterable[str] | None) -> set[str] | None:
+    if object_types is None:
+        return None
+    return {str(value).lower() for value in object_types}
+
+
+def _load_cores(
+    core_geojson: str | Path,
+    pixel_size_um: float,
+    *,
+    core_object_types: Iterable[str] | None,
+):
     try:
         from shapely import affinity
         from shapely.geometry import shape
     except ImportError as exc:
         raise ImportError("TMA core assignment requires shapely.") from exc
 
+    allowed_object_types = _normalise_object_types(core_object_types)
     cores = []
     counter = 0
     for path in _geojson_paths(core_geojson):
@@ -80,6 +92,11 @@ def _load_cores(core_geojson: str | Path, pixel_size_um: float):
         image_key = _geojson_image_key(path)
         for feature in features:
             properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
+            if not isinstance(properties, dict):
+                properties = {}
+            object_type = str(properties.get("objectType") or "").lower()
+            if allowed_object_types is not None and object_type not in allowed_object_types:
+                continue
             geometry_data = feature.get("geometry") if isinstance(feature, dict) else None
             if not geometry_data:
                 continue
@@ -110,8 +127,8 @@ def _load_cores(core_geojson: str | Path, pixel_size_um: float):
     return cores
 
 
-def _validate_no_core_overlaps(cores: list[dict[str, Any]]) -> None:
-    overlap_rows = []
+def _count_core_overlaps(cores: list[dict[str, Any]]) -> int:
+    n_overlaps = 0
     for i, left in enumerate(cores):
         for right in cores[i + 1 :]:
             if left["image_key"] != right["image_key"]:
@@ -120,14 +137,8 @@ def _validate_no_core_overlaps(cores: list[dict[str, Any]]) -> None:
                 continue
             intersection = left["geometry"].intersection(right["geometry"])
             if intersection.area > 0:
-                overlap_rows.append(
-                    f"{left['core_label']} overlaps {right['core_label']} "
-                    f"in {left['image_key']} (area={intersection.area:.3f})"
-                )
-    if overlap_rows:
-        raise ValueError(
-            "Overlapping TMA cores are not allowed:\n" + "\n".join(overlap_rows[:20])
-        )
+                n_overlaps += 1
+    return n_overlaps
 
 
 def _cores_for_sample(
@@ -156,15 +167,24 @@ def assign_tma_cores(
     core_col: str = "tma_core",
     metadata_prefix: str = "tma_",
     unassigned_label: str = "Unassigned",
+    core_object_types: tuple[str, ...] | None = ("tmaCore", ""),
     output_dir: str | Path | None = None,
     verbose: bool = True,
 ) -> dict[str, Any]:
-    """Assign cells to non-overlapping TMA cores from GeoJSON boundaries.
+    """Assign cells to TMA cores from GeoJSON boundaries.
 
     TMA GeoJSON files are matched to ``adata.obs[sample_col]`` using the
     GeoJSON filename stem. With the default ``sample_col="Image"``, this matches
     QuPath image names. A single unmatched GeoJSON is only applied globally when
     the AnnData object contains one sample.
+
+    By default, only QuPath ``objectType="tmaCore"`` features and generic
+    polygon features with no object type are treated as cores. Set
+    ``core_object_types=None`` to treat every polygon feature in ``core_geojson``
+    as a core.
+
+    If core geometries overlap, cells whose centroids fall in the overlapping
+    area are left as ``unassigned_label`` rather than assigned arbitrarily.
     """
 
     import pandas as pd
@@ -174,10 +194,14 @@ def assign_tma_cores(
         raise KeyError(f"sample_col not found in adata.obs: {sample_col}")
 
     spatial_key = _resolve_spatial_key(adata, spatial_key)
-    cores = _load_cores(core_geojson, pixel_size_um=pixel_size_um)
+    cores = _load_cores(
+        core_geojson,
+        pixel_size_um=pixel_size_um,
+        core_object_types=core_object_types,
+    )
     if not cores:
         raise ValueError(f"No polygon TMA cores found in {core_geojson}")
-    _validate_no_core_overlaps(cores)
+    n_overlapping_core_pairs = _count_core_overlaps(cores)
 
     metadata_keys = sorted({key for core in cores for key in core["metadata"]})
     metadata_columns = {key: metadata_prefix + _safe_column(key) for key in metadata_keys}
@@ -191,6 +215,7 @@ def assign_tma_cores(
     sample_values = adata.obs[sample_col].astype(str)
     n_samples = int(sample_values.nunique())
     assigned = 0
+    ambiguous_overlap_cells = 0
     unmatched_samples = set()
 
     for sample in sorted(sample_values.unique()):
@@ -204,11 +229,8 @@ def assign_tma_cores(
             point = Point(float(coords[position, 0]), float(coords[position, 1]))
             hits = [core for core in sample_cores if core["geometry"].covers(point)]
             if len(hits) > 1:
-                labels = ", ".join(core["core_label"] for core in hits)
-                raise ValueError(
-                    "Cell assigned to multiple TMA cores. "
-                    f"sample={sample}, obs_index={adata.obs.index[position]}, cores={labels}"
-                )
+                ambiguous_overlap_cells += 1
+                continue
             if not hits:
                 continue
             core = hits[0]
@@ -218,6 +240,9 @@ def assign_tma_cores(
             for key, column in metadata_columns.items():
                 adata.obs.at[obs_index, column] = core["metadata"].get(key, pd.NA)
             assigned += 1
+
+    for column in metadata_columns.values():
+        adata.obs[column] = adata.obs[column].fillna("").astype(str)
 
     out_dir = resolve_output_dir(output_dir, adata=adata) / "tma"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -248,11 +273,14 @@ def assign_tma_cores(
     summary = {
         "core_col": core_col,
         "n_cores": len(cores),
+        "n_overlapping_core_pairs": int(n_overlapping_core_pairs),
         "n_cells": int(adata.n_obs),
         "n_assigned_cells": int(assigned),
         "n_unassigned_cells": int(adata.n_obs - assigned),
+        "n_ambiguous_overlap_cells": int(ambiguous_overlap_cells),
         "sample_col": sample_col,
         "core_image_keys": sorted({core["image_key"] for core in cores}),
+        "core_object_types": None if core_object_types is None else list(core_object_types),
         "unmatched_samples": sorted(unmatched_samples),
         "core_table_tsv": str(core_table_path),
         "counts_tsv": str(counts_path),

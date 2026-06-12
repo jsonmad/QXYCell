@@ -63,6 +63,7 @@ class GeoJsonFile:
     object_type_counts: dict[str, int] = field(default_factory=dict)
     class_counts: dict[str, int] = field(default_factory=dict)
     name_counts: dict[str, int] = field(default_factory=dict)
+    labels_by_object_type: dict[str, dict[str, int]] = field(default_factory=dict)
     readable: bool = True
     error: str = ""
 
@@ -70,4 +71,3 @@ class GeoJsonFile:
         data = asdict(self)
         data["path"] = str(self.path)
         return data
-

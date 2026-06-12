@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+import textwrap
 from pathlib import Path
 from typing import Iterable
 
@@ -35,6 +36,63 @@ def _require_plotting():
 def _safe_name(value: object) -> str:
     safe = re.sub(r"[^A-Za-z0-9_]+", "_", str(value)).strip("_")
     return safe or "plot"
+
+
+def _wrap_axis_label(value: object, width: int = 18) -> str:
+    label = str(value)
+    pieces = re.findall(r"[^\s_-]+(?:[_-]|\s+)?|[_-]+|\s+", label)
+    if not pieces:
+        return label
+
+    lines: list[str] = []
+    current = ""
+    for piece in pieces:
+        candidate = current + piece
+        if current and len(candidate.rstrip()) > width:
+            lines.append(current.rstrip())
+            current = piece.lstrip()
+        else:
+            current = candidate
+    if current:
+        lines.append(current.rstrip())
+
+    return "\n".join(
+        textwrap.fill(
+            line,
+            width=width,
+            break_long_words=True,
+            break_on_hyphens=True,
+        )
+        for line in lines
+    )
+
+
+def _stacked_bar_bottom_margin(labels: Iterable[object]) -> float:
+    max_line_length = 0
+    for label in labels:
+        lines = _wrap_axis_label(label).splitlines()
+        max_line_length = max(max_line_length, *(len(line) for line in lines))
+    return min(0.50, max(0.24, 0.014 * max_line_length))
+
+
+def _auto_spatial_figsize(
+    base_figsize: tuple[float, float],
+    shared_width: float,
+    shared_height: float,
+    *,
+    auto: bool,
+    min_side: float = 3.0,
+) -> tuple[float, float]:
+    width, height = float(base_figsize[0]), float(base_figsize[1])
+    if not auto:
+        return width, height
+
+    shared_width = max(float(shared_width), 1.0)
+    shared_height = max(float(shared_height), 1.0)
+    long_side = max(width, height, min_side)
+    if shared_width >= shared_height:
+        return long_side, max(min_side, long_side * shared_height / shared_width)
+    return max(min_side, long_side * shared_width / shared_height), long_side
 
 
 def _fallback_color(label: object, hsv_to_rgb, to_hex) -> str:
@@ -241,6 +299,9 @@ def plot_stacked_bar(
     bar_width_mm: float = 15.0,
     height_mm: float = 72.0,
     legend_width_mm: float = 38.0,
+    show_axis_labels: bool = True,
+    x_axis_label: str | None = None,
+    y_axis_label: str | None = None,
     dpi: int = 600,
     show: bool = True,
     verbose: bool = True,
@@ -254,6 +315,8 @@ def plot_stacked_bar(
 
     Figure width is determined by ``bar_width_mm`` × number of bars, with
     ``width="single"`` (90 mm) or ``"double"`` (180 mm) acting as a minimum.
+    Set ``show_axis_labels=False`` to hide both x/y axis titles, or pass
+    ``x_axis_label`` / ``y_axis_label`` to override either title.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -346,7 +409,7 @@ def plot_stacked_bar(
     plot_w_in  = total_w_in - legend_w_in
     height_in  = height_mm * _mm
 
-    fig = plt.figure(figsize=(total_w_in, height_in), constrained_layout=True)
+    fig = plt.figure(figsize=(total_w_in, height_in), constrained_layout=False)
     gs = fig.add_gridspec(1, 2, width_ratios=[plot_w_in, legend_w_in], wspace=0.08)
     ax = fig.add_subplot(gs[0, 0])
     legend_ax = fig.add_subplot(gs[0, 1])
@@ -360,12 +423,30 @@ def plot_stacked_bar(
         edgecolor="none",
         linewidth=0,
     )
-    ax.set_xlabel(x_label)
-    ax.set_ylabel("Frequency")
+    if show_axis_labels:
+        ax.set_xlabel(x_axis_label if x_axis_label is not None else x_label)
+        ax.set_ylabel(y_axis_label if y_axis_label is not None else "Frequency")
+    else:
+        ax.set_xlabel("")
+        ax.set_ylabel("")
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0, decimals=0))
     ax.set_ylim(0, _stack_ymax(freq_plot, np))
-    ax.tick_params(axis="x", rotation=0)
+    ax.set_xticks(
+        ax.get_xticks(),
+        labels=[_wrap_axis_label(label.get_text()) for label in ax.get_xticklabels()],
+        rotation=90,
+        ha="center",
+        va="top",
+    )
+    ax.tick_params(axis="x", pad=2)
     ax.set_title(subset_value if subset_value else f"{category_col} frequency", pad=35)
+    fig.subplots_adjust(
+        left=0.12,
+        right=0.98,
+        bottom=_stacked_bar_bottom_margin(freq_plot.index),
+        top=0.84,
+        wspace=0.08,
+    )
     handles, labels = ax.get_legend_handles_labels()
     leg = ax.get_legend()
     if leg is not None:
@@ -430,10 +511,12 @@ def plot_spatial(
     scale_bar_um: float = 1000.0,
     scale_bar_label: str = "1 mm",
     figsize: tuple[float, float] = (10.0, 10.0),
+    auto_figsize: bool = False,
     dpi: int = 600,
     legend_width: float = 2.2,
     combined: bool = False,
     save_individual: bool = True,
+    save_pdf: bool = True,
     max_cols: int = 3,
     show: bool = True,
     verbose: bool = True,
@@ -444,7 +527,11 @@ def plot_spatial(
     instead of the default QuPath ``Image`` column. By default, all selected
     samples are plotted in a shared centered window based on the largest sample
     x/y extent around each sample's median cell coordinate. Pass
-    ``fixed_window_um`` to force a square fixed-size window.
+    ``fixed_window_um`` to force a square fixed-size window. Pass
+    ``auto_figsize=True`` to derive the plot panel aspect ratio from the
+    selected samples' shared spatial X/Y extent instead of using a fixed square
+    ``figsize`` panel. Set ``save_pdf=False`` for very large scatter plots when
+    a vector PDF would be slow or unnecessarily large.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -526,10 +613,19 @@ def plot_spatial(
     else:
         shared_width = 2.0 * max(bounds["x_radius"] for bounds in sample_bounds.values())
         shared_height = 2.0 * max(bounds["y_radius"] for bounds in sample_bounds.values())
-        shared_width = max(shared_width, float(scale_bar_um) * 1.2, 1.0)
+        if scale_bar:
+            shared_width = max(shared_width, float(scale_bar_um) * 1.2)
+        shared_width = max(shared_width, 1.0)
         shared_height = max(shared_height, 1.0)
-        shared_width *= 1.04
-        shared_height *= 1.04
+        shared_width *= 1.08
+        shared_height *= 1.08
+
+    panel_figsize = _auto_spatial_figsize(
+        figsize,
+        shared_width,
+        shared_height,
+        auto=auto_figsize,
+    )
 
     def _legend_handles():
         return [
@@ -611,7 +707,10 @@ def plot_spatial(
 
     if save_individual:
         for image in selected_samples:
-            fig = plt.figure(figsize=(figsize[0] + legend_width, figsize[1]), constrained_layout=False)
+            fig = plt.figure(
+                figsize=(panel_figsize[0] + legend_width, panel_figsize[1]),
+                constrained_layout=False,
+            )
             gs = fig.add_gridspec(
                 1,
                 2,
@@ -619,7 +718,7 @@ def plot_spatial(
                 right=0.98,
                 bottom=0.04,
                 top=0.94,
-                width_ratios=[figsize[0], legend_width],
+                width_ratios=[panel_figsize[0], legend_width],
                 wspace=0.02,
             )
             ax = fig.add_subplot(gs[0, 0])
@@ -647,13 +746,16 @@ def plot_spatial(
             else:
                 prefix = filename_prefix or "_".join(prefix_parts)
             fig_path = output_dir / f"{prefix}.png"
-            pdf_path = output_dir / f"{prefix}.pdf"
             fig.savefig(fig_path, dpi=dpi)
-            fig.savefig(pdf_path, dpi=dpi)
+            if save_pdf:
+                pdf_path = output_dir / f"{prefix}.pdf"
+                fig.savefig(pdf_path, dpi=dpi)
             if show:
                 plt.show()
             plt.close(fig)
-            fig_paths.extend([fig_path, pdf_path])
+            fig_paths.append(fig_path)
+            if save_pdf:
+                fig_paths.append(pdf_path)
 
             if verbose:
                 print(f"Saved spatial plot: {fig_path}")
@@ -666,7 +768,10 @@ def plot_spatial(
             n_cols = max(1, min(int(max_cols), n_plots))
             n_rows = int(np.ceil(n_plots / n_cols))
             fig = plt.figure(
-                figsize=((figsize[0] / 2) * n_cols + legend_width, (figsize[1] / 2) * n_rows),
+                figsize=(
+                    (panel_figsize[0] / 2) * n_cols + legend_width,
+                    (panel_figsize[1] / 2) * n_rows,
+                ),
                 constrained_layout=False,
             )
             gs = fig.add_gridspec(
@@ -705,13 +810,16 @@ def plot_spatial(
                 prefix_parts.append(_safe_name(subset_value))
             prefix = save_prefix or filename_prefix or "_".join(prefix_parts)
             fig_path = output_dir / f"{prefix}.png"
-            pdf_path = output_dir / f"{prefix}.pdf"
             fig.savefig(fig_path, dpi=dpi)
-            fig.savefig(pdf_path, dpi=dpi)
+            if save_pdf:
+                pdf_path = output_dir / f"{prefix}.pdf"
+                fig.savefig(pdf_path, dpi=dpi)
             if show:
                 plt.show()
             plt.close(fig)
-            combined_paths.extend([fig_path, pdf_path])
+            combined_paths.append(fig_path)
+            if save_pdf:
+                combined_paths.append(pdf_path)
             fig_paths.extend(combined_paths)
             if verbose:
                 print(f"Saved combined spatial plot: {fig_path}")
@@ -720,8 +828,408 @@ def plot_spatial(
         "figures": fig_paths,
         "combined_figures": combined_paths,
         "shared_extent_um": {"width": shared_width, "height": shared_height},
+        "panel_figsize": {"width": panel_figsize[0], "height": panel_figsize[1]},
+        "auto_figsize": bool(auto_figsize),
         "center_method": center_method,
         "sample_bounds": sample_bounds,
+    }
+
+
+def plot_cell_boundaries(
+    adata,
+    *,
+    category_col: str = "celltype",
+    sample_col: str = "Image",
+    polygon_col: str = "cell_polygon_wkt",
+    subset_col: str | None = None,
+    subset_value: str | None = None,
+    samples: Iterable[str] | None = None,
+    celltypes: Iterable[str] | None = None,
+    images: Iterable[str] | None = None,
+    spatial_key: str | None = None,
+    output_dir: str | Path | None = None,
+    filename_prefix: str | None = None,
+    save_prefix: str | None = None,
+    colors: dict[str, str] | None = None,
+    palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
+    fixed_window_um: float | None = None,
+    center_method: str = "median",
+    fill: bool = True,
+    fill_alpha: float = 0.85,
+    boundary_linewidth: float = 0.08,
+    boundary_color: str | None = None,
+    underlay: bool = True,
+    underlay_facecolor: str = "#d9d9d9",
+    underlay_edgecolor: str = "#bdbdbd",
+    underlay_alpha: float = 0.25,
+    underlay_linewidth: float = 0.04,
+    scale_bar: bool = True,
+    scale_bar_um: float = 1000.0,
+    scale_bar_label: str = "1 mm",
+    label_celltypes: str | Iterable[str] | None = None,
+    label_max_per_celltype: int = 1,
+    label_offset_um: tuple[float, float] = (150.0, 150.0),
+    label_fontsize: float = 7.0,
+    label_linewidth: float = 0.6,
+    label_color: str | None = None,
+    figsize: tuple[float, float] = (10.0, 10.0),
+    auto_figsize: bool = False,
+    dpi: int = 600,
+    legend_width: float = 2.2,
+    save_individual: bool = True,
+    save_pdf: bool = False,
+    show: bool = True,
+    verbose: bool = True,
+) -> dict[str, object]:
+    """Create spatial plots from cell boundary polygons instead of dot centroids.
+
+    Cell polygons are read from ``adata.obs[polygon_col]`` as WKT strings. This
+    column is created by ``qxy.run()`` when cell GeoJSON boundaries are present,
+    or by ``qxy.load_cell_polygons()``. Pass ``label_celltypes="Tumor"`` or a
+    list of labels to annotate representative cells from only those cell types.
+    Labels use the cell type colour by default; pass ``label_color`` to override.
+    """
+
+    plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    try:
+        from matplotlib.collections import PatchCollection
+        from matplotlib.patches import Polygon as MplPolygon
+        from shapely import wkt
+    except ImportError as exc:
+        raise ImportError(
+            "plot_cell_boundaries requires matplotlib and shapely polygon support."
+        ) from exc
+
+    spatial_key = _resolve_spatial_key(adata, spatial_key)
+    if polygon_col not in adata.obs.columns:
+        raise KeyError(
+            f"Cell polygon column not found in adata.obs: {polygon_col!r}. "
+            "Run qxy.run() with cell GeoJSON files present or call "
+            "qxy.load_cell_polygons(adata, project_dir)."
+        )
+
+    output_dir = _resolve_plot_dir(adata, output_dir) / "cell_boundaries"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    obs_plot = _prepare_obs(
+        adata,
+        category_col=category_col,
+        sample_col=sample_col,
+        subset_col=subset_col,
+        subset_value=subset_value,
+        samples=samples if samples is not None else images,
+        categories=celltypes,
+    )
+    obs_plot = obs_plot[obs_plot[polygon_col].astype(str).str.len() > 0].copy()
+    if obs_plot.empty:
+        raise ValueError("No cells with polygon WKT available for boundary plotting.")
+
+    all_samples = sorted(adata.obs[sample_col].astype(str).unique().tolist())
+    if samples is not None:
+        selected_samples = list(samples)
+    elif images is not None:
+        selected_samples = list(images)
+    else:
+        selected_samples = all_samples
+    selected_samples = [str(sample) for sample in selected_samples]
+    if celltypes is not None:
+        category_order = [str(celltype) for celltype in celltypes]
+    else:
+        category_order = sorted(obs_plot[category_col].astype(str).unique().tolist())
+
+    if label_celltypes is None:
+        label_categories: set[str] = set()
+    elif isinstance(label_celltypes, str):
+        label_categories = {label_celltypes}
+    else:
+        label_categories = {str(label) for label in label_celltypes}
+    label_max_per_celltype = max(int(label_max_per_celltype), 0)
+
+    _base_palette = _get_category_palette(adata, category_col)
+    color_lookup = _color_map(
+        category_order, hsv_to_rgb, to_hex, colors, palette if palette is not None else _base_palette
+    )
+    center_method = str(center_method).lower()
+    if center_method not in {"median", "mean", "bbox"}:
+        raise ValueError("center_method must be 'median', 'mean', or 'bbox'.")
+
+    sample_bounds = {}
+    for sample in selected_samples:
+        sample_mask = adata.obs[sample_col].astype(str) == sample
+        if not sample_mask.any():
+            continue
+        sample_positions = np.flatnonzero(sample_mask.to_numpy())
+        sample_coords = adata.obsm[spatial_key][sample_positions, :]
+        x_min = float(np.min(sample_coords[:, 0]))
+        x_max = float(np.max(sample_coords[:, 0]))
+        y_min = float(np.min(sample_coords[:, 1]))
+        y_max = float(np.max(sample_coords[:, 1]))
+        if center_method == "median":
+            x_center = float(np.median(sample_coords[:, 0]))
+            y_center = float(np.median(sample_coords[:, 1]))
+        elif center_method == "mean":
+            x_center = float(np.mean(sample_coords[:, 0]))
+            y_center = float(np.mean(sample_coords[:, 1]))
+        else:
+            x_center = (x_min + x_max) / 2.0
+            y_center = (y_min + y_max) / 2.0
+        sample_bounds[sample] = {
+            "x_min": x_min,
+            "x_max": x_max,
+            "y_min": y_min,
+            "y_max": y_max,
+            "x_center": x_center,
+            "y_center": y_center,
+            "width": x_max - x_min,
+            "height": y_max - y_min,
+            "x_radius": max(abs(x_min - x_center), abs(x_max - x_center)),
+            "y_radius": max(abs(y_min - y_center), abs(y_max - y_center)),
+        }
+
+    if not sample_bounds:
+        raise ValueError(f"No samples found for plotting using sample_col={sample_col!r}.")
+
+    if fixed_window_um is not None:
+        shared_width = float(fixed_window_um)
+        shared_height = float(fixed_window_um)
+    else:
+        shared_width = 2.0 * max(bounds["x_radius"] for bounds in sample_bounds.values())
+        shared_height = 2.0 * max(bounds["y_radius"] for bounds in sample_bounds.values())
+        if scale_bar:
+            shared_width = max(shared_width, float(scale_bar_um) * 1.2)
+        shared_width = max(shared_width, 1.0)
+        shared_height = max(shared_height, 1.0)
+        shared_width *= 1.08
+        shared_height *= 1.08
+
+    panel_figsize = _auto_spatial_figsize(
+        figsize,
+        shared_width,
+        shared_height,
+        auto=auto_figsize,
+    )
+
+    def _patches_from_wkt(values, *, x_center: float, y_center: float):
+        patches = []
+        for value in values:
+            text = str(value)
+            if not text:
+                continue
+            try:
+                geom = wkt.loads(text)
+            except Exception:
+                continue
+            geoms = list(geom.geoms) if geom.geom_type == "MultiPolygon" else [geom]
+            for poly in geoms:
+                if poly.is_empty or poly.geom_type != "Polygon":
+                    continue
+                coords = np.asarray(poly.exterior.coords, dtype=float)
+                coords[:, 0] = coords[:, 0] - x_center
+                coords[:, 1] = coords[:, 1] - y_center
+                patches.append(MplPolygon(coords, closed=True))
+        return patches
+
+    def _legend_handles():
+        return [
+            Line2D(
+                [0],
+                [0],
+                marker="s",
+                linestyle="",
+                color=color_lookup[category],
+                markersize=8,
+                label=category,
+            )
+            for category in category_order
+        ]
+
+    def _draw_sample(ax, image: str) -> bool:
+        image_mask = adata.obs[sample_col].astype(str) == image
+        if not image_mask.any():
+            return False
+
+        image_positions = np.flatnonzero(image_mask.to_numpy())
+        coords = adata.obsm[spatial_key][image_positions, :]
+        sub_obs = adata.obs.loc[image_mask].copy()
+
+        bounds = sample_bounds[image]
+        x_half = shared_width / 2.0
+        y_half = shared_height / 2.0
+        x_lim = (-x_half, x_half)
+        y_lim = (-y_half, y_half)
+        centered_coords = coords.copy()
+        centered_coords[:, 0] = centered_coords[:, 0] - bounds["x_center"]
+        centered_coords[:, 1] = centered_coords[:, 1] - bounds["y_center"]
+        sub_obs["_qxy_x_centered"] = centered_coords[:, 0]
+        sub_obs["_qxy_y_centered"] = centered_coords[:, 1]
+        plot_obs = sub_obs.loc[sub_obs.index.intersection(obs_plot.index)]
+        if plot_obs.empty:
+            return False
+
+        if underlay:
+            underlay_obs = sub_obs[sub_obs[polygon_col].astype(str).str.len() > 0]
+            patches = _patches_from_wkt(
+                underlay_obs[polygon_col].to_numpy(),
+                x_center=bounds["x_center"],
+                y_center=bounds["y_center"],
+            )
+            if patches:
+                ax.add_collection(
+                    PatchCollection(
+                        patches,
+                        facecolor=underlay_facecolor,
+                        edgecolor=underlay_edgecolor,
+                        alpha=underlay_alpha,
+                        linewidth=underlay_linewidth,
+                        zorder=1,
+                    )
+                )
+
+        for category in category_order:
+            category_obs = plot_obs[plot_obs[category_col].astype(str) == category]
+            if category_obs.empty:
+                continue
+            patches = _patches_from_wkt(
+                category_obs[polygon_col].to_numpy(),
+                x_center=bounds["x_center"],
+                y_center=bounds["y_center"],
+            )
+            if not patches:
+                continue
+            facecolor = color_lookup[category] if fill else "none"
+            edgecolor = boundary_color or color_lookup[category]
+            ax.add_collection(
+                PatchCollection(
+                    patches,
+                    facecolor=facecolor,
+                    edgecolor=edgecolor,
+                    alpha=fill_alpha if fill else 1.0,
+                    linewidth=boundary_linewidth,
+                    zorder=3,
+                )
+            )
+
+        if label_categories and label_max_per_celltype > 0:
+            dx, dy = label_offset_um
+            for category_index, category in enumerate(category_order):
+                if category not in label_categories:
+                    continue
+                category_obs = plot_obs[plot_obs[category_col].astype(str) == category].copy()
+                if category_obs.empty:
+                    continue
+                category_obs["_qxy_label_distance"] = (
+                    category_obs["_qxy_x_centered"].astype(float) ** 2
+                    + category_obs["_qxy_y_centered"].astype(float) ** 2
+                )
+                label_obs = category_obs.sort_values("_qxy_label_distance").head(
+                    label_max_per_celltype
+                )
+                for label_index, (_, row) in enumerate(label_obs.iterrows()):
+                    x = float(row["_qxy_x_centered"])
+                    y = float(row["_qxy_y_centered"])
+                    direction = -1 if (category_index + label_index) % 2 else 1
+                    annotation_color = label_color or color_lookup.get(category, "black")
+                    ax.annotate(
+                        category,
+                        xy=(x, y),
+                        xytext=(x + direction * float(dx), y + float(dy)),
+                        fontsize=label_fontsize,
+                        color=annotation_color,
+                        ha="left" if direction > 0 else "right",
+                        va="bottom",
+                        arrowprops={
+                            "arrowstyle": "-",
+                            "color": annotation_color,
+                            "linewidth": label_linewidth,
+                            "shrinkA": 0,
+                            "shrinkB": 0,
+                        },
+                        bbox={
+                            "boxstyle": "round,pad=0.15",
+                            "facecolor": "white",
+                            "edgecolor": "none",
+                            "alpha": 0.75,
+                        },
+                        zorder=6,
+                    )
+
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
+        ax.set_aspect("equal")
+        ax.set_anchor("C")
+        ax.axis("off")
+        if scale_bar:
+            _add_scale_bar(ax, x_lim, y_lim, length_um=scale_bar_um, label=scale_bar_label)
+        title = f"{subset_value} | {image}" if subset_value else image
+        ax.set_title(title, fontsize=10, pad=10)
+        return True
+
+    fig_paths: list[Path] = []
+    handles = _legend_handles()
+
+    if save_individual:
+        for image in selected_samples:
+            fig = plt.figure(
+                figsize=(panel_figsize[0] + legend_width, panel_figsize[1]),
+                constrained_layout=False,
+            )
+            gs = fig.add_gridspec(
+                1,
+                2,
+                left=0.02,
+                right=0.98,
+                bottom=0.04,
+                top=0.94,
+                width_ratios=[panel_figsize[0], legend_width],
+                wspace=0.02,
+            )
+            ax = fig.add_subplot(gs[0, 0])
+            legend_ax = fig.add_subplot(gs[0, 1])
+            legend_ax.axis("off")
+            plotted = _draw_sample(ax, image)
+            if not plotted:
+                plt.close(fig)
+                continue
+            if handles:
+                legend_ax.legend(
+                    handles=handles,
+                    loc="center left",
+                    frameon=False,
+                    fontsize=8,
+                    borderaxespad=0.0,
+                )
+
+            prefix_parts = ["cell_boundaries"]
+            if subset_value:
+                prefix_parts.append(_safe_name(subset_value))
+            prefix_parts.append(_safe_name(image))
+            if save_prefix:
+                prefix = f"{save_prefix}_{_safe_name(image)}"
+            else:
+                prefix = filename_prefix or "_".join(prefix_parts)
+            fig_path = output_dir / f"{prefix}.png"
+            fig.savefig(fig_path, dpi=dpi)
+            if save_pdf:
+                pdf_path = output_dir / f"{prefix}.pdf"
+                fig.savefig(pdf_path, dpi=dpi)
+            if show:
+                plt.show()
+            plt.close(fig)
+            fig_paths.append(fig_path)
+            if save_pdf:
+                fig_paths.append(pdf_path)
+
+            if verbose:
+                print(f"Saved cell boundary plot: {fig_path}")
+
+    return {
+        "figures": fig_paths,
+        "shared_extent_um": {"width": shared_width, "height": shared_height},
+        "panel_figsize": {"width": panel_figsize[0], "height": panel_figsize[1]},
+        "auto_figsize": bool(auto_figsize),
+        "center_method": center_method,
+        "sample_bounds": sample_bounds,
+        "polygon_col": polygon_col,
     }
 
 
@@ -851,7 +1359,7 @@ def _cat_strip_colors(labels: list, palette: "dict | None" = None) -> "tuple[dic
     """
     import matplotlib.colors as _mcolors
 
-    cats = list(dict.fromkeys(str(l) for l in labels))   # unique, insertion-ordered
+    cats = list(dict.fromkeys(str(label) for label in labels))   # unique, insertion-ordered
     if palette:
         out: dict[str, str] = {}
         missing = []
@@ -943,7 +1451,7 @@ def _build_heatmap_figure(
 
     # Estimate width needed for row label text (right side of heatmap).
     # At 7 pt sans-serif each character is ≈ 4.2 pt wide; add 4 pt tick pad.
-    _max_row_chars = max((len(str(l)) for l in row_labels), default=4)
+    _max_row_chars = max((len(str(label)) for label in row_labels), default=4)
     _row_lbl_w = max((_max_row_chars * 4.2 + 4) / 72, 0.35)  # inches
 
     # Height: bottom pad + core + col strips above + title space

@@ -144,34 +144,37 @@ def assign_samples(
     return summary
 
 
-def remove_ignore(
+def remove_annotations(
     adata,
     *,
     annotation_prefix: str = "annotation__",
-    ignore_text: str = "Ignore",
+    text: str = "Ignore",
     copy: bool = False,
     verbose: bool = True,
 ):
-    """Remove cells that fall inside annotation columns containing ``Ignore``.
+    """Remove cells that fall inside annotation columns containing ``text``.
 
     The function searches ``adata.obs`` for annotation columns whose names start
-    with ``annotation_prefix`` and contain ``ignore_text`` case-insensitively.
+    with ``annotation_prefix`` and contain ``text`` case-insensitively.
     A cell is removed if any matching column is true. By default, the input
     AnnData object is modified in place and returned. Use ``copy=True`` to
     return a filtered copy without changing the original object.
     """
 
+    if not text:
+        raise ValueError("text must be a non-empty string.")
+
     columns = [
         column
         for column in adata.obs.columns
         if str(column).startswith(annotation_prefix)
-        and ignore_text.lower() in str(column).lower()
+        and text.lower() in str(column).lower()
     ]
     if not columns:
         if verbose:
             print(
-                "No ignore annotation columns found matching "
-                f"'{annotation_prefix}*{ignore_text}*'."
+                "No annotation columns found matching "
+                f"'{annotation_prefix}*{text}*'."
             )
         return adata.copy() if copy else adata
 
@@ -186,10 +189,34 @@ def remove_ignore(
         filtered = adata
 
     if verbose:
-        print("Removed cells in ignore annotations")
-        print(f"Ignore columns: {columns}")
+        print("Removed cells in matching annotations")
+        print(f"Annotation text: {text!r}")
+        print(f"Annotation columns: {columns}")
         print(f"Cells before: {n_before:,}")
         print(f"Cells removed: {n_removed:,}")
         print(f"Cells after: {filtered.n_obs:,}")
 
     return filtered
+
+
+def remove_ignore(
+    adata,
+    *,
+    annotation_prefix: str = "annotation__",
+    ignore_text: str = "Ignore",
+    copy: bool = False,
+    verbose: bool = True,
+):
+    """Remove cells that fall inside annotation columns containing ``ignore_text``.
+
+    This is a convenience wrapper around :func:`remove_annotations` using
+    ``ignore_text="Ignore"`` by default.
+    """
+
+    return remove_annotations(
+        adata,
+        annotation_prefix=annotation_prefix,
+        text=ignore_text,
+        copy=copy,
+        verbose=verbose,
+    )
