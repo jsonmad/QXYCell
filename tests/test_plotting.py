@@ -1,6 +1,7 @@
 import anndata as ad
 import numpy as np
 import pandas as pd
+import pytest
 
 import qxycell as qxy
 
@@ -135,3 +136,51 @@ def test_plot_cell_boundaries_underlay_false_centers_on_plotted_polygons(tmp_pat
     assert bounds["x_min"] == 0
     assert bounds["x_max"] == 10
     assert bounds["x_center"] == 5
+
+
+def test_plot_cn_heatmap_accepts_category_col_alias(tmp_path):
+    obs = pd.DataFrame(
+        {
+            "Sample": ["s1", "s1", "s2", "s2"],
+            "cn": ["A", "B", "A", "B"],
+        },
+        index=[f"cell_{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1)), obs=obs)
+
+    paths = qxy.plot_cn_heatmap(
+        adata,
+        sample_col="Sample",
+        category_col="cn",
+        cluster_rows=False,
+        cluster_cols=False,
+        output_dir=tmp_path,
+        show=False,
+        verbose=False,
+    )
+
+    assert paths["sample"][0].name == "cn_heatmap_by_sample.pdf"
+    assert paths["sample"][0].exists()
+    assert paths["sample"][3].exists()
+
+
+def test_plot_cn_heatmap_rejects_conflicting_category_alias(tmp_path):
+    obs = pd.DataFrame(
+        {
+            "Sample": ["s1", "s1", "s2", "s2"],
+            "cn": ["A", "B", "A", "B"],
+            "other_cn": ["X", "Y", "X", "Y"],
+        },
+        index=[f"cell_{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1)), obs=obs)
+
+    with pytest.raises(ValueError, match="Use either 'cn_col' or 'category_col'"):
+        qxy.plot_cn_heatmap(
+            adata,
+            cn_col="other_cn",
+            category_col="cn",
+            output_dir=tmp_path,
+            show=False,
+            verbose=False,
+        )
