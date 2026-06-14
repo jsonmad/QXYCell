@@ -309,9 +309,12 @@ qxy.plot_cn_heatmap(adata, normalize="both")
 
 # Colour strip above samples grouped by condition
 qxy.plot_cn_heatmap(adata, condition_col="group")
+
+# Use a custom CN/category column
+qxy.plot_cn_heatmap(adata, category_col="cn")
 ```
 
-Reads from `adata.obs["cn"]` and `adata.obs[sample_col]`. Rows and columns are reordered by hierarchical clustering (no dendrogram). Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
+Reads from `adata.obs["cn"]` by default, or `adata.obs[category_col]` when supplied, plus `adata.obs[sample_col]`. Rows and columns are reordered by hierarchical clustering (no dendrogram). Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
 
 ## Colormaps
 

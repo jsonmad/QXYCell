@@ -1806,6 +1806,7 @@ def plot_cn_heatmap(
     adata,
     *,
     cn_col: str = "cn",
+    category_col: "str | None" = None,
     sample_col: str = "Image",
     condition_col: "str | None" = None,
     normalize: str = "sample",
@@ -1833,6 +1834,9 @@ def plot_cn_heatmap(
         AnnData object with ``adata.obs[cn_col]`` and ``adata.obs[sample_col]``.
     cn_col:
         Column in ``adata.obs`` containing CN labels (default ``"cn"``).
+    category_col:
+        Alias for ``cn_col`` for consistency with other plotting functions.
+        If provided, it must not conflict with ``cn_col``.
     sample_col:
         Column in ``adata.obs`` containing sample labels (default ``"Image"``).
     condition_col:
@@ -1875,6 +1879,13 @@ def plot_cn_heatmap(
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
     out_dir = _resolve_plot_dir(adata, output_dir) / "cn_heatmap"
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if category_col is not None:
+        if cn_col != "cn" and category_col != cn_col:
+            raise ValueError(
+                "Use either 'cn_col' or 'category_col', or pass the same value for both."
+            )
+        cn_col = category_col
 
     if cn_col not in adata.obs.columns:
         raise ValueError(
