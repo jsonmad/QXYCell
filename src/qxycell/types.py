@@ -46,6 +46,7 @@ class ClassifierDefinition:
     measurement_column: str | None
     threshold: float | None
     is_simple: bool
+    image: str | None = None
     reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:

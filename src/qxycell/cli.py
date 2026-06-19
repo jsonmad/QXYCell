@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"QXYCell check {status}")
         print(f"Report: {report.output_dir / 'check_report.txt'}")
         print(f"Measurement files: {len(report.measurement_files)}")
-        print(f"Classifier JSON files: {len(report.classifiers)}")
+        print(f"Classifier definitions: {len(report.classifiers)}")
         print(f"GeoJSON files: {len(report.geojson_files)}")
         print(f"Errors: {report.n_errors}; warnings: {report.n_warnings}")
         return 0 if report.ok else 1

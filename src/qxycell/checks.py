@@ -10,8 +10,14 @@ from pathlib import Path
 from typing import Any
 
 from qxycell.classifiers import (
+    compartment_from_measurement_column,
     discover_classifier_files,
+    discover_threshold_files,
+    marker_name_from_measurement_column,
+    measurement_columns_for_threshold_template,
     parse_classifiers,
+    parse_threshold_files,
+    select_threshold_file,
     validate_classifiers,
 )
 from qxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
@@ -69,7 +75,7 @@ class CheckReport:
             f"Errors: {self.n_errors}",
             f"Warnings: {self.n_warnings}",
             f"Measurement files: {len(self.measurement_files)}",
-            f"Classifier JSON files: {len(self.classifiers)}",
+            f"Classifier definitions: {len(self.classifiers)}",
             f"Simple classifiers: {sum(1 for item in self.classifiers if item.is_simple)}",
             f"GeoJSON files: {len(self.geojson_files)}",
             f"Report: {self.report_path}",
@@ -106,18 +112,106 @@ class CheckReport:
         }
 
 
-def _write_csv(path: Path, rows: list[dict[str, Any]], columns: list[str]) -> None:
+def _write_csv(
+    path: Path,
+    rows: list[dict[str, Any]],
+    columns: list[str],
+    *,
+    delimiter: str = ",",
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=columns,
+            extrasaction="ignore",
+            delimiter=delimiter,
+        )
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _write_manual_threshold_template(report: CheckReport) -> Path:
+    """Write a fill-in TSV for manual marker thresholds."""
+
+    template_path = report.output_dir / "tables" / _threshold_template_filename(report.output_dir)
+    images = _unique_measurement_images(report.measurement_files)
+    threshold_lookup = _threshold_lookup(report.classifiers)
+    rows = [
+        {
+            "compartment": compartment_from_measurement_column(column),
+            "marker": marker_name_from_measurement_column(column),
+            "measurement_column": column,
+            **{
+                image: _prefill_threshold(threshold_lookup, image, column)
+                for image in images
+            },
+        }
+        for column in measurement_columns_for_threshold_template(report.measurement_files)
+    ]
+    _write_csv(
+        template_path,
+        rows,
+        ["compartment", "marker", "measurement_column", *images],
+        delimiter="\t",
+    )
+    return template_path
+
+
+def _threshold_template_filename(output_dir: Path) -> str:
+    timestamp = output_dir.name.removeprefix("qxy_outputs_")
+    if timestamp and timestamp != output_dir.name:
+        return f"thresholds_{timestamp}.tsv"
+    return "thresholds.tsv"
+
+
+def _unique_measurement_images(measurement_files: list[MeasurementFile]) -> list[str]:
+    images: list[str] = []
+    for measurement_file in measurement_files:
+        if "Image" not in measurement_file.columns:
+            continue
+        try:
+            with measurement_file.path.open(newline="", errors="replace") as handle:
+                reader = csv.DictReader(handle, delimiter=measurement_file.delimiter)
+                for row in reader:
+                    image = str(row.get("Image", "")).strip()
+                    if image:
+                        images.append(image)
+        except Exception:
+            continue
+    return sorted(dict.fromkeys(images))
+
+
+def _threshold_lookup(
+    classifiers: list[ClassifierDefinition],
+) -> dict[tuple[str | None, str], float]:
+    lookup: dict[tuple[str | None, str], float] = {}
+    for classifier in classifiers:
+        if (
+            not classifier.is_simple
+            or classifier.measurement_column is None
+            or classifier.threshold is None
+        ):
+            continue
+        image = str(classifier.image).strip() if classifier.image else None
+        lookup[(image, classifier.measurement_column)] = classifier.threshold
+    return lookup
+
+
+def _prefill_threshold(
+    lookup: dict[tuple[str | None, str], float],
+    image: str,
+    measurement_column: str,
+) -> str:
+    threshold = lookup.get((image, measurement_column), lookup.get((None, measurement_column)))
+    return "" if threshold is None else str(threshold)
 
 
 def _write_report(report: CheckReport) -> None:
     report.output_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = report.output_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
+    threshold_template_path = _write_manual_threshold_template(report)
 
     (report.output_dir / "check_report.json").write_text(
         json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
@@ -167,9 +261,10 @@ def _write_report(report: CheckReport) -> None:
         f"Warnings: {report.n_warnings}",
         "",
         f"Measurement files: {len(report.measurement_files)}",
-        f"Classifier JSON files: {len(report.classifiers)}",
+        f"Classifier definitions: {len(report.classifiers)}",
         f"  Simple classifiers: {sum(1 for item in report.classifiers if item.is_simple)}",
         f"  Markers: {', '.join(c.name for c in report.classifiers if c.is_simple) or 'none'}",
+        f"  Manual threshold template: {threshold_template_path}",
         f"GeoJSON files: {len(report.geojson_files)}",
         "",
         "Annotations:",
@@ -211,6 +306,7 @@ def _write_report(report: CheckReport) -> None:
             {
                 "path": str(item.path),
                 "name": item.name,
+                "image": item.image or "",
                 "measurement_column": item.measurement_column or "",
                 "threshold": "" if item.threshold is None else item.threshold,
                 "is_simple": item.is_simple,
@@ -218,7 +314,7 @@ def _write_report(report: CheckReport) -> None:
             }
             for item in report.classifiers
         ],
-        ["path", "name", "measurement_column", "threshold", "is_simple", "reason"],
+        ["path", "name", "image", "measurement_column", "threshold", "is_simple", "reason"],
     )
     _write_csv(
         tables_dir / "geojson_report.csv",
@@ -301,6 +397,23 @@ def check(
 
     classifier_paths = discover_classifier_files(project_path)
     classifiers = parse_classifiers(classifier_paths)
+    if not any(classifier.is_simple for classifier in classifiers):
+        threshold_paths = discover_threshold_files(project_path)
+        threshold_path, ignored_threshold_paths = select_threshold_file(threshold_paths)
+        if threshold_path is not None:
+            classifiers = parse_threshold_files([threshold_path])
+            for ignored_path in ignored_threshold_paths:
+                messages.append(
+                    Message(
+                        level="warning",
+                        code="classifiers.threshold_file_ignored",
+                        message=(
+                            "Ignoring manual threshold file because another threshold "
+                            f"file was selected: {threshold_path}"
+                        ),
+                        path=str(ignored_path),
+                    )
+                )
     messages.extend(validate_classifiers(classifiers, measurement_files))
 
     geojson_paths = discover_geojson_files(project_path)
