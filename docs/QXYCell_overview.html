@@ -185,6 +185,7 @@ adata = qxy.run(qupath_project)</code></pre>
     <p>QXYCell currently expects a manually exported QuPath project/export folder containing:</p>
     <pre><code>measurements.csv or measurements.tsv
 *.json  (classifier JSONs — searched anywhere in the project folder)
+thresholds_YYMMDD-HHMM.tsv  (fallback when classifier JSONs are unavailable)
 GeoJSON annotation files</code></pre>
 
     <p>The measurement table must contain standard QuPath columns:</p>
@@ -192,6 +193,8 @@ GeoJSON annotation files</code></pre>
 Object ID
 Centroid X µm
 Centroid Y µm</code></pre>
+
+    <p><code>qxy.check()</code> writes a fill-in manual threshold template at <code>tables/thresholds_YYMMDD-HHMM.tsv</code>. The template includes only mean/median measurement columns, with one row per feature and one threshold column per <code>Image</code>, and prefills thresholds from any matching JSON classifiers. If no usable single-measurement classifier JSONs are available, fill the image threshold columns, save the timestamped threshold file into the QuPath export folder, then rerun <code>qxy.check()</code> or <code>qxy.run()</code>. If multiple threshold files are found, QXYCell uses the most recently modified timestamped <code>thresholds_*.tsv</code>/<code>.csv</code> file and reports ignored files as warnings.</p>
 
     <h2>Outputs</h2>
     <pre><code>qxy_outputs_YYMMDD-HHMM/
@@ -222,24 +225,27 @@ qxy.run(project_dir)</code></pre>
       </div>
       <div class="box">
         <h3><code>run()</code></h3>
-        <p class="small">Performs the conversion. It loads the measurement table, selects marker columns referenced by simple QuPath classifier JSONs (searched across the entire project folder), builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons and TMA core boundaries to cells, and writes the final <code>.h5ad</code>.</p>
+        <p class="small">Performs the conversion. It loads the measurement table, preserves optional core metadata columns such as <code>TMA Core</code> and <code>Parent</code>, selects marker columns referenced by simple QuPath classifier JSONs (searched across the entire project folder), builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons and cell boundary WKT, and writes the final <code>.h5ad</code>.</p>
       </div>
     </div>
 
     <h2>AnnData Layout</h2>
-    <p><code>adata.X</code> contains the raw marker measurement matrix. There is one column per successfully parsed simple classifier JSON.</p>
+    <p><code>adata.X</code> contains the raw marker measurement matrix. There is one column per imported marker definition; image-specific thresholds for the same marker are grouped into one marker column when possible.</p>
     <p><code>adata.obs</code> contains per-cell metadata and computed annotations:</p>
     <pre><code>Image
 Object ID
-Centroid X µm
-Centroid Y µm
+Xµm
+Yµm
 quxy_source_file
 quxy_source_row
 quxy_cell_id
+TMA Core              # Optional measurement metadata when present
+Parent                # Optional measurement metadata when present
+CoreID                # Categorical — added by qxy.assign_core_ids_from_measurements()
 &lt;marker&gt;_pos
 annotation__&lt;label&gt;
 cell_polygon_wkt      # WKT cell boundary polygons when cell GeoJSON is available
-tma_core              # String label; Unassigned if outside all TMA cores or in overlapping cores
+tma_core              # Optional — added by explicit qxy.assign_tma_cores()
 Sample                # Categorical — NaN if unassigned; added by qxy.run() / qxy.assign_samples()
 celltype              # added by qxy.celltype() / qxy.apply_celltypes()
 cn    # Categorical — added by qxy.cn_kmeans()</code></pre>
@@ -264,15 +270,15 @@ threshold
 classifier_json</code></pre>
 
     <p><code>adata.obsm["spatial"]</code> contains cell centroid coordinates from QuPath:</p>
-    <pre><code>Centroid X µm
-Centroid Y µm</code></pre>
+    <pre><code>Xµm
+Yµm</code></pre>
 
     <p><code>adata.uns["qxycell"]</code> contains run metadata, check status, number of classifiers, number of GeoJSON files, and annotation conflict counts.</p>
 
     <h2>Classifier Handling</h2>
-    <p>In v1, QXYCell imports one marker column for each simple QuPath classifier JSON of the form:</p>
+    <p>In v1, QXYCell imports one marker column for each simple threshold definition of the form:</p>
     <pre><code>measurement column &gt;= threshold</code></pre>
-    <p>Classifier JSON files are discovered by searching the entire project folder recursively, so files do not need to be in the standard <code>classifiers/object_classifiers/</code> subfolder. Composite classifiers are detected and skipped with warnings. All classifiers are reported in:</p>
+    <p>Single-measurement QuPath classifier JSON files are discovered by searching the entire project folder recursively, so files do not need to be in the standard <code>classifiers/object_classifiers/</code> subfolder. If no usable JSON classifiers are found, QXYCell falls back to a filled manual threshold TSV/CSV. Composite classifiers and invalid manual threshold rows are detected and skipped with warnings. All classifier definitions are reported in:</p>
     <pre><code>tables/classifier_report.csv</code></pre>
 
     <h2>Cell Type Logic Prompt</h2>
@@ -294,13 +300,16 @@ qxy.cn_kmeans(adata, n_clusters=12)</code></pre>
     <pre><code>qxy.plot_spatial(adata, sample_col="ImageID", category_col="cn")</code></pre>
 
     <h2>Annotation and TMA Core Handling</h2>
-    <p>GeoJSON files are parsed in the same pass for two feature types:</p>
+    <p>For QuPath TMA dearrayer exports, the default CoreID workflow uses measurement metadata rather than GeoJSON core boundaries. When <code>qxy.run()</code> sees optional measurement columns named <code>TMA Core</code> or <code>Parent</code>, it keeps them in <code>adata.obs</code>. Then:</p>
+    <pre><code>qxy.assign_core_ids_from_measurements(adata)</code></pre>
+    <p>creates categorical <code>adata.obs["CoreID"]</code>, using <code>TMA Core</code> first and falling back to <code>Parent</code>.</p>
+    <p>GeoJSON files are also parsed for these feature types:</p>
     <ul>
       <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_ignore()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
-      <li><strong>TMA cores</strong> (<code>objectType: tmaCore</code>) — when present in GeoJSON, core boundaries are extracted and tested against cell centroids. The result is stored as a single <code>adata.obs["tma_core"]</code> column. Cells inside a core receive the core name; cells outside all cores or inside overlapping cores receive <code>Unassigned</code>.</li>
+      <li><strong>TMA core polygons</strong> (<code>objectType: tmaCore</code>) — use the separate <code>qxy.assign_tma_cores()</code> geometry path when core labels need to come from polygon boundaries rather than measurement CSV metadata. The result is stored as <code>adata.obs["tma_core"]</code>.</li>
       <li><strong>Cell polygons</strong> (<code>objectType: cell</code>) — matched to cells by QuPath Object ID and stored as WKT strings in <code>adata.obs["cell_polygon_wkt"]</code>. These can be plotted with <code>qxy.plot_cell_boundaries()</code>.</li>
     </ul>
-    <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation and TMA geometry is applied by spatial containment of cell centroids.</p>
+    <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation and GeoJSON TMA geometry is applied by spatial containment of cell centroids.</p>
     <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels or between annotations and TMA cores are expected geometry and are not flagged. Conflicts are written to:</p>
     <pre><code>run/tables/annotation_conflicts.csv</code></pre>
 

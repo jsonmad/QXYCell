@@ -5,6 +5,8 @@ from qxycell.celltyping import find_latest_celltype_yaml
 from qxycell.celltyping import load_celltype_logic
 from qxycell.checks import CheckReport, check
 from qxycell.geojson import load_cell_polygons
+from qxycell.filtering import assign_annotations
+from qxycell.filtering import assign_core_ids_from_measurements
 from qxycell.filtering import assign_samples
 from qxycell.filtering import remove_annotations
 from qxycell.filtering import remove_ignore
@@ -30,6 +32,8 @@ __all__ = [
     "CheckReport",
     "add_metadata",
     "apply_celltypes",
+    "assign_annotations",
+    "assign_core_ids_from_measurements",
     "assign_samples",
     "assign_tma_cores",
     "celltype",

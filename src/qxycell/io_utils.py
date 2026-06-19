@@ -31,6 +31,24 @@ def _default_h5ad_path(adata=None, output_dir: str | Path | None = None) -> Path
     return output_path / "run" / "h5ad" / _h5ad_filename(output_path)
 
 
+def _prepare_obs_for_h5ad(adata) -> None:
+    index_name = getattr(adata.obs.index, "name", None)
+    if index_name is None or index_name not in adata.obs.columns:
+        return
+
+    index_values = adata.obs.index.astype(str)
+    column_values = adata.obs[index_name].astype(str).to_numpy()
+    if (index_values == column_values).all():
+        adata.obs.index.name = None
+        return
+
+    raise ValueError(
+        f"adata.obs.index.name {index_name!r} also exists as an obs column, "
+        "but the index values do not match that column. Rename the index or "
+        "column before saving."
+    )
+
+
 def save(
     adata,
     path: str | Path | None = None,
@@ -45,6 +63,7 @@ def save(
         output_dir,
     )
     h5ad_path.parent.mkdir(parents=True, exist_ok=True)
+    _prepare_obs_for_h5ad(adata)
     adata.write_h5ad(h5ad_path)
 
     output_path = h5ad_path.parents[2] if h5ad_path.match("*/run/h5ad/*.h5ad") else h5ad_path.parent

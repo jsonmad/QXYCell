@@ -144,7 +144,7 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and TMA core boundaries into AnnData. Classifier JSONs are searched across the entire project folder. TMA cores (<code>tmaCore</code> features) are assigned automatically and stored as <code>adata.obs["tma_core"]</code> with <code>Unassigned</code> outside all cores.</td>
+        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. Classifier JSONs are searched across the entire project folder. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present; collapse them to <code>CoreID</code> with <code>qxy.assign_core_ids_from_measurements()</code>.</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
@@ -185,6 +185,12 @@
         <td>Adds <code>adata.obs["Sample"]</code> and warns on overlapping sample annotations.</td>
       </tr>
       <tr>
+        <td><code>qxy.assign_core_ids_from_measurements</code></td>
+        <td>Assign CoreID from QuPath measurement metadata columns. This is the default TMA CoreID path when <code>qxy.run()</code> preserved <code>TMA Core</code> or <code>Parent</code> from the measurement CSV.</td>
+        <td><code>coreid = qxy.assign_core_ids_from_measurements(adata)</code></td>
+        <td>Adds categorical <code>adata.obs["CoreID"]</code>, using <code>TMA Core</code> first and falling back to <code>Parent</code>.</td>
+      </tr>
+      <tr>
         <td><code>qxy.add_metadata</code></td>
         <td>Add sample-level metadata from CSV, TSV, or DataFrame to <code>adata.obs</code>.</td>
         <td><code>qxy.add_metadata(adata, "metadata.tsv", sample_col="ImageID")</code></td>
@@ -198,7 +204,7 @@
       </tr>
       <tr>
         <td><code>qxy.assign_tma_cores</code></td>
-        <td>Assign cells to TMA cores from an explicit GeoJSON file or folder. Use this when TMA cores are in a separate GeoJSON not co-located with the QuPath project, or when finer control is needed. For TMA cores stored alongside annotations in the project GeoJSON files, <code>qxy.run()</code> assigns <code>tma_core</code> automatically.</td>
+        <td>Assign cells to TMA cores from an explicit GeoJSON file or folder. Use this geometry-based path only when core labels need to come from core boundary polygons rather than measurement CSV metadata.</td>
         <td><code>tma = qxy.assign_tma_cores(adata, "tma.geojson")</code></td>
         <td>Adds <code>tma_core</code> and TMA metadata columns to <code>adata.obs</code>.</td>
       </tr>
@@ -361,7 +367,7 @@ qxy.save(adata)</code></pre>
   <h2>TMA Commands</h2>
 
   <div class="note">
-    <strong>Automatic TMA core assignment:</strong> When QuPath GeoJSON files contain <code>tmaCore</code> features alongside annotations, <code>qxy.run()</code> assigns them automatically. Each cell centroid is tested against core boundaries; the result is stored as <code>adata.obs["tma_core"]</code>. Cells outside all cores, and cells falling inside overlapping cores, are labelled <code>Unassigned</code>.
+    <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, prefer measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present, and <code>qxy.assign_core_ids_from_measurements(adata)</code> writes categorical <code>adata.obs["CoreID"]</code>. Use <code>qxy.assign_tma_cores()</code> only when core IDs need to come from GeoJSON core boundary geometry.
   </div>
 
   <table>
@@ -374,19 +380,24 @@ qxy.save(adata)</code></pre>
     </thead>
     <tbody>
       <tr>
-        <td>Check automatic tma_core assignment from run</td>
-        <td><code>adata.obs["tma_core"].value_counts()</code></td>
-        <td>NaN cells (outside all cores) are excluded automatically.</td>
+        <td>Assign CoreID from measurement metadata</td>
+        <td><code>qxy.assign_core_ids_from_measurements(adata)</code></td>
+        <td>Uses <code>TMA Core</code> first, then <code>Parent</code>. This is the default CoreID workflow for QuPath TMA dearrayer exports.</td>
       </tr>
       <tr>
-        <td>Filter to TMA core cells only</td>
-        <td><code>adata[adata.obs["tma_core"].notna()]</code></td>
-        <td>Excludes cells outside all core boundaries.</td>
+        <td>Check measurement-derived CoreID assignment</td>
+        <td><code>adata.obs["CoreID"].value_counts()</code></td>
+        <td>Missing cells are excluded automatically by pandas counts/grouping.</td>
+      </tr>
+      <tr>
+        <td>Filter to cells with CoreID</td>
+        <td><code>adata[adata.obs["CoreID"].notna()]</code></td>
+        <td>Excludes cells without measurement-derived core IDs.</td>
       </tr>
       <tr>
         <td>Assign TMA cores from an explicit GeoJSON (default image matching)</td>
         <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores.geojson")</code></td>
-        <td>Default <code>sample_col="Image"</code>.</td>
+        <td>Separate geometry-based path; default <code>sample_col="Image"</code>.</td>
       </tr>
       <tr>
         <td>Assign TMA cores using short sample IDs</td>
@@ -862,9 +873,10 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr><td><code>adata.uns</code></td><td>Run metadata and QXYCell summaries.</td></tr>
       <tr><td><code>adata.uns["qxycell"]["output_dir"]</code></td><td>Current QXYCell output folder.</td></tr>
       <tr><td><code>adata.uns["qxycell"]["h5ad_path"]</code></td><td>Current H5AD save path.</td></tr>
-      <tr><td><code>adata.obs["tma_core"].value_counts()</code></td><td>Cells per TMA core (NaN cells excluded automatically).</td></tr>
-      <tr><td><code>adata.obs["tma_core"].cat.categories</code></td><td>List all assigned TMA core names.</td></tr>
-      <tr><td><code>adata[adata.obs["tma_core"].notna()]</code></td><td>Subset to cells inside a TMA core.</td></tr>
+      <tr><td><code>adata.obs["CoreID"].value_counts()</code></td><td>Cells per measurement-derived core ID (NaN cells excluded automatically).</td></tr>
+      <tr><td><code>adata.obs["CoreID"].cat.categories</code></td><td>List assigned CoreID names.</td></tr>
+      <tr><td><code>adata[adata.obs["CoreID"].notna()]</code></td><td>Subset to cells with measurement-derived CoreID.</td></tr>
+      <tr><td><code>adata.obs["tma_core"].value_counts()</code></td><td>Cells per GeoJSON-assigned TMA core after explicit <code>qxy.assign_tma_cores()</code>.</td></tr>
       <tr><td><code>adata.obs["Sample"].value_counts()</code></td><td>Cells per sample (NaN unassigned cells excluded automatically).</td></tr>
       <tr><td><code>adata.obs["celltype"].value_counts()</code></td><td>Cell type counts (after <code>qxy.celltype()</code>).</td></tr>
       <tr><td><code>adata[adata.obs["celltype"] == "T_cell"].copy()</code></td><td>Subset to one cell type.</td></tr>

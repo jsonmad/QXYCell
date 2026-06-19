@@ -22,6 +22,22 @@ def _read_metadata_table(metadata: str | Path | Any):
     return pd.read_csv(path, sep=sep)
 
 
+def _h5ad_safe_metadata_series(values, source_column):
+    import pandas as pd
+    from pandas.api.types import is_bool_dtype, is_numeric_dtype
+
+    if is_bool_dtype(source_column):
+        return values.astype("boolean")
+    if is_numeric_dtype(source_column):
+        return pd.to_numeric(values, errors="coerce")
+    return values.astype("string").astype("category")
+
+
+def _metadata_key_series(values):
+    keys = values.astype("string").str.strip()
+    return keys.fillna("nan")
+
+
 def add_metadata(
     adata,
     metadata: str | Path | Any,
@@ -53,7 +69,7 @@ def add_metadata(
         raise KeyError(f"metadata_sample_col not found in metadata: {metadata_sample_col}")
 
     table = table.copy()
-    table[metadata_sample_col] = table[metadata_sample_col].astype(str).str.strip()
+    table[metadata_sample_col] = _metadata_key_series(table[metadata_sample_col])
     duplicated = table[table[metadata_sample_col].duplicated()][metadata_sample_col].unique().tolist()
     if duplicated:
         raise ValueError(f"Sample metadata contains duplicate keys: {duplicated}")
@@ -64,7 +80,7 @@ def add_metadata(
     if missing_columns:
         raise KeyError(f"Metadata columns not found: {missing_columns}")
 
-    obs_samples = adata.obs[sample_col].astype(str).str.strip()
+    obs_samples = _metadata_key_series(adata.obs[sample_col])
     metadata_indexed = table.set_index(metadata_sample_col, drop=False)
     metadata_samples = set(metadata_indexed.index.astype(str))
     adata_samples = set(obs_samples.unique())
@@ -81,7 +97,8 @@ def add_metadata(
                 "Use overwrite=True to replace it."
             )
         mapping = metadata_indexed[column].to_dict()
-        adata.obs[output_column] = obs_samples.map(mapping)
+        values = obs_samples.map(mapping)
+        adata.obs[output_column] = _h5ad_safe_metadata_series(values, table[column])
         added_columns.append(output_column)
 
     summary = {

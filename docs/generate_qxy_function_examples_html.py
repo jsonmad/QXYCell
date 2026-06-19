@@ -97,6 +97,8 @@ def make_synthetic_project() -> None:
                     "Centroid Y um": cy,
                     "Centroid X \u00b5m": cx,
                     "Centroid Y \u00b5m": cy,
+                    "TMA Core": f"{sample_name}-Core-{(i % 2) + 1}",
+                    "Parent": f"{sample_name}-Fallback-{(i % 3) + 1}",
                     "CD3: Mean": cd3 + rng.normal(0.1, 0.04),
                     "CD8: Mean": cd8 + rng.normal(0.1, 0.04),
                     "PanCK: Mean": panck + rng.normal(0.1, 0.04),
@@ -211,6 +213,7 @@ def build_examples() -> dict:
         verbose=False,
     )
     sample_summary = qxy.assign_samples(adata, overwrite=True, verbose=False)
+    coreid_summary = qxy.assign_core_ids_from_measurements(adata, verbose=False)
     tma_summary = qxy.assign_tma_cores(
         adata,
         PROJECT_DIR,
@@ -319,6 +322,7 @@ def build_examples() -> dict:
         "prompt": prompt,
         "metadata_summary": metadata_summary,
         "sample_summary": sample_summary,
+        "coreid_summary": coreid_summary,
         "tma_summary": tma_summary,
         "n_polygons": n_polygons,
         "celltype_summary": celltype_summary,
@@ -343,13 +347,13 @@ def make_html(examples: dict) -> str:
     adata = examples["adata"]
     report = examples["report"]
     qc_summary = examples["qc_summary"]
-    obs_cols = ["Image", "Object ID", "Sample", "tma_core", "celltype", "cn", "condition"]
+    obs_cols = ["Image", "Object ID", "Sample", "CoreID", "tma_core", "celltype", "cn", "condition"]
     obs_preview = adata.obs[[c for c in obs_cols if c in adata.obs.columns]].head(8).reset_index()
     marker_preview = adata.obs[
         [c for c in adata.obs.columns if c.endswith("_pos")]
     ].head(8).reset_index()
     functions = [
-        ("qxy.run()", "Run the main QuPath export to AnnData pipeline.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
+        ("qxy.run()", "Run the main QuPath export to AnnData pipeline, preserving optional TMA Core and Parent measurement metadata when present.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
         ("qxy.workflow()", "Run the common notebook workflow in one call.", "adata = qxy.workflow(project_dir, sample_metadata=metadata, celltype_logic='celltype_logic.yaml')", f"<p>Workflow result: {examples['workflow_adata'].n_obs} cells after Ignore removal.</p>"),
         (
             "qxy.check()",
@@ -370,9 +374,10 @@ def make_html(examples: dict) -> str:
         ("qxy.load()", "Load an H5AD from a file or QXYCell output folder.", "adata = qxy.load(out_dir)", f"<p>Loaded shape: <code>{examples['loaded_shape']}</code></p>"),
         ("qxy.load_latest()", "Load the newest qxy_outputs_* folder in a base directory.", "adata = qxy.load_latest(base_output_dir)", f"<p>Latest shape: <code>{examples['latest_shape']}</code></p>"),
         ("qxy.assign_samples()", "Create one Sample column from sample annotation labels.", "summary = qxy.assign_samples(adata)", table_html(compact_dict(examples["sample_summary"], ["sample_col", "n_assigned_cells", "n_conflicting_cells"]))),
+        ("qxy.assign_core_ids_from_measurements()", "Create CoreID from QuPath measurement metadata columns such as TMA Core and Parent.", "summary = qxy.assign_core_ids_from_measurements(adata)", table_html(compact_dict(examples["coreid_summary"], ["target_col", "available_source_cols", "n_assigned_cells", "n_unassigned_cells"]))),
         ("qxy.remove_ignore()", "Remove cells in annotation columns containing Ignore.", "clean = qxy.remove_ignore(adata, copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['clean'].n_obs} cells.</p>"),
         ("qxy.remove_annotations()", "Remove cells in annotation columns matching a custom text string.", "clean = qxy.remove_annotations(adata, text='Immune', copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['artifact_clean'].n_obs} cells.</p>"),
-        ("qxy.assign_tma_cores()", "Assign cells to TMA core polygons; cells in overlapping cores remain Unassigned.", "summary = qxy.assign_tma_cores(adata, project_dir, pixel_size_um=1.0)", table_html(compact_dict(examples["tma_summary"], ["n_cores", "n_assigned_cells", "n_unassigned_cells"]))),
+        ("qxy.assign_tma_cores()", "Assign cells to TMA core polygons when core IDs need to come from GeoJSON geometry.", "summary = qxy.assign_tma_cores(adata, project_dir, pixel_size_um=1.0)", table_html(compact_dict(examples["tma_summary"], ["n_cores", "n_assigned_cells", "n_unassigned_cells"]))),
         ("qxy.load_cell_polygons()", "Load cell boundary polygons from GeoJSON into cell_polygon_wkt.", "n = qxy.load_cell_polygons(adata, project_dir, pixel_size_um=1.0)", f"<p>Matched polygons: <code>{examples['n_polygons']}</code></p>"),
         ("qxy.add_metadata()", "Attach sample-level metadata to cells.", "qxy.add_metadata(adata, metadata, sample_col='Sample')", table_html(compact_dict(examples["metadata_summary"], ["n_matched_samples", "added_columns"]))),
         ("qxy.celltype()", "Apply ordered cell type rules.", "summary = qxy.celltype(adata, 'celltype_logic.yaml')", table_html(compact_dict(examples["celltype_summary"], ["n_rules", "unknown_count", "celltype_column"]))),
@@ -553,7 +558,7 @@ def make_html(examples: dict) -> str:
   <div class="metric"><span>Functions</span><strong>{len(functions)}</strong></div>
 </section>
 <section class="note">
-  <p><strong>Annotation rule shown here:</strong> sample annotations collapse into one <code>Sample</code> column; Ignore and other annotations remain boolean <code>annotation__*</code> columns; TMA cores are assigned separately into <code>tma_core</code>.</p>
+  <p><strong>Annotation rule shown here:</strong> sample annotations collapse into one <code>Sample</code> column; Ignore and other annotations remain boolean <code>annotation__*</code> columns; measurement core metadata collapses into <code>CoreID</code>; GeoJSON TMA cores are assigned separately into <code>tma_core</code> only when <code>qxy.assign_tma_cores()</code> is called.</p>
 </section>
 <h2>Example Dataset Preview</h2>
 {table_html(obs_preview)}

@@ -15,6 +15,11 @@ from qxycell.markers import marker_name_from_classifier_name
 from qxycell.measurements import required_columns
 from qxycell.paths import resolve_output_dir
 
+CENTROID_OBS_COLUMN_RENAMES = {
+    "Centroid X µm": "Xµm",
+    "Centroid Y µm": "Yµm",
+}
+
 
 def _import_runtime_dependencies():
     try:
@@ -44,35 +49,86 @@ def _read_measurements(measurement_files, pd):
     return pd.concat(frames, axis=0, ignore_index=True, sort=False)
 
 
-def _unique_marker_names(classifiers: list[ClassifierDefinition]) -> dict[Path, str]:
-    names: dict[Path, str] = {}
-    seen: dict[str, int] = {}
+def _classifier_group_key(classifier: ClassifierDefinition) -> tuple[str, str]:
+    return (str(classifier.name), str(classifier.measurement_column))
+
+
+def _group_simple_classifiers(
+    classifiers: list[ClassifierDefinition],
+) -> list[list[ClassifierDefinition]]:
+    grouped: dict[tuple[str, str], list[ClassifierDefinition]] = {}
     for classifier in classifiers:
-        if not classifier.is_simple:
+        if not classifier.is_simple or classifier.measurement_column is None:
             continue
+        grouped.setdefault(_classifier_group_key(classifier), []).append(classifier)
+    return list(grouped.values())
+
+
+def _unique_marker_names(classifier_groups: list[list[ClassifierDefinition]]) -> dict[int, str]:
+    names: dict[int, str] = {}
+    seen: dict[str, int] = {}
+    for group_index, group in enumerate(classifier_groups):
+        classifier = group[0]
         base = marker_name_from_classifier_name(classifier.name)
         count = seen.get(base, 0)
         seen[base] = count + 1
-        names[classifier.path] = base if count == 0 else f"{base}_{count + 1}"
+        names[group_index] = base if count == 0 else f"{base}_{count + 1}"
     return names
 
 
-def _build_var_dataframe(simple_classifiers, marker_names, pd):
+def _threshold_summary(classifiers: list[ClassifierDefinition]) -> str | float:
+    thresholds = {float(classifier.threshold) for classifier in classifiers if classifier.threshold is not None}
+    images = {classifier.image for classifier in classifiers if classifier.image}
+    if len(thresholds) == 1 and not images:
+        return next(iter(thresholds))
+    if images:
+        return "per_image"
+    return "|".join(str(value) for value in sorted(thresholds))
+
+
+def _build_var_dataframe(classifier_groups, marker_names, pd):
     rows = []
     index = []
-    for classifier in simple_classifiers:
-        marker_name = marker_names[classifier.path]
+    for group_index, group in enumerate(classifier_groups):
+        classifier = group[0]
+        marker_name = marker_names[group_index]
         index.append(marker_name)
         rows.append(
             {
                 "marker_name": marker_name,
                 "classifier_name": classifier.name,
                 "source_measurement_column": classifier.measurement_column,
-                "threshold": classifier.threshold,
-                "classifier_json": str(classifier.path),
+                "threshold": _threshold_summary(group),
+                "classifier_json": "|".join(str(item.path) for item in group),
             }
         )
     return pd.DataFrame(rows, index=index)
+
+
+def _apply_marker_thresholds(adata, classifier_groups, marker_names, image_col: str = "Image") -> int:
+    import numpy as _np
+
+    n_pos_columns = 0
+    for group_index, group in enumerate(classifier_groups):
+        marker_name = marker_names[group_index]
+        values = _np.asarray(adata.X[:, group_index], dtype=float)
+        pos = _np.zeros(adata.n_obs, dtype="int8")
+        fallback_thresholds = [
+            float(classifier.threshold)
+            for classifier in group
+            if classifier.threshold is not None and not classifier.image
+        ]
+        fallback_threshold = fallback_thresholds[-1] if fallback_thresholds else None
+        if fallback_threshold is not None:
+            pos[:] = (values >= fallback_threshold).astype("int8")
+        for classifier in group:
+            if classifier.threshold is None or not classifier.image:
+                continue
+            mask = adata.obs[image_col].astype(str).to_numpy() == str(classifier.image)
+            pos[mask] = (values[mask] >= float(classifier.threshold)).astype("int8")
+        adata.obs[f"{marker_name}_pos"] = pos
+        n_pos_columns += 1
+    return n_pos_columns
 
 
 def _safe_obs_column_name(prefix: str, label: str) -> str:
@@ -317,9 +373,9 @@ def run(
     """Run QXYCell on a manually exported QuPath project.
 
     The v1 pipeline imports one ``adata.X`` column per usable simple measurement
-    classifier JSON, stores only required QuPath identity/spatial columns in
-    ``adata.obs``, and adds classifier positivity calls plus GeoJSON annotation
-    columns when possible.
+    classifier definition, stores required QuPath identity/spatial columns plus
+    available core metadata columns in ``adata.obs``, and adds classifier
+    positivity calls plus GeoJSON annotation columns when possible.
     """
 
     ad, np, pd = _import_runtime_dependencies()
@@ -343,7 +399,7 @@ def run(
         f"({report.n_errors} errors, {report.n_warnings} warnings)"
     )
     log(f"Measurement files: {len(report.measurement_files)}")
-    log(f"Classifier JSON files: {len(report.classifiers)}")
+    log(f"Classifier definitions: {len(report.classifiers)}")
     log(f"Simple classifiers imported: {sum(1 for item in report.classifiers if item.is_simple)}")
     log(f"GeoJSON files: {len(report.geojson_files)}")
 
@@ -364,8 +420,9 @@ def run(
         if column not in measurements.columns:
             raise ValueError(f"Missing required QuPath measurement column: {column}")
 
-    marker_names = _unique_marker_names(simple_classifiers)
-    marker_columns = [classifier.measurement_column for classifier in simple_classifiers]
+    classifier_groups = _group_simple_classifiers(simple_classifiers)
+    marker_names = _unique_marker_names(classifier_groups)
+    marker_columns = [group[0].measurement_column for group in classifier_groups]
     missing_marker_columns = [
         column for column in marker_columns if column not in measurements.columns
     ]
@@ -378,33 +435,39 @@ def run(
     log("Building marker matrix...")
     x = measurements[marker_columns].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy()
 
-    obs_columns = list(required_columns()) + ["quxy_source_file", "quxy_source_row"]
+    optional_obs_columns = [
+        column
+        for column in ("TMA Core", "Parent")
+        if column in measurements.columns
+    ]
+    obs_columns = (
+        list(required_columns())
+        + optional_obs_columns
+        + ["quxy_source_file", "quxy_source_row"]
+    )
     obs = measurements.loc[:, obs_columns].copy()
+    obs = obs.rename(columns=CENTROID_OBS_COLUMN_RENAMES)
     obs["quxy_cell_id"] = (
         obs["Image"].astype(str) + "::" + obs["Object ID"].astype(str)
     )
     obs.index = obs["quxy_cell_id"].astype(str)
 
     spatial = (
-        obs[["Centroid X µm", "Centroid Y µm"]]
+        obs[["Xµm", "Yµm"]]
         .apply(pd.to_numeric, errors="coerce")
         .to_numpy()
     )
     if np.isnan(spatial).any():
         raise ValueError("Centroid X/Y columns contain missing or non-numeric values.")
 
-    var = _build_var_dataframe(simple_classifiers, marker_names, pd)
+    var = _build_var_dataframe(classifier_groups, marker_names, pd)
     adata = ad.AnnData(X=x, obs=obs, var=var)
     adata.var_names = list(var.index)
     adata.obsm["spatial"] = spatial
 
-    for classifier_index, classifier in enumerate(simple_classifiers):
-        marker_name = marker_names[classifier.path]
-        adata.obs[f"{marker_name}_pos"] = (
-            adata.X[:, classifier_index] >= float(classifier.threshold)
-        ).astype("int8")
+    n_pos_columns = _apply_marker_thresholds(adata, classifier_groups, marker_names)
     log(f"Created AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} markers")
-    log(f"Added marker positivity columns: {len(simple_classifiers)}")
+    log(f"Added marker positivity columns: {n_pos_columns}")
 
     log("Mapping GeoJSON annotations...")
     annotation_conflicts = _apply_annotations(
@@ -452,24 +515,11 @@ def run(
     )
     tma_summary = None
     if n_tma_core_features:
-        from qxycell.tma import assign_tma_cores
-
         log(
             "TMA core features detected: "
             f"{n_tma_core_features}. "
-            "Assigning TMA cores with qxy.assign_tma_cores(...)."
-        )
-        tma_summary = assign_tma_cores(
-            adata,
-            Path(project_dir).expanduser().resolve(),
-            pixel_size_um=pixel_size_um,
-            output_dir=output_path,
-            verbose=verbose,
-        )
-        log(
-            "TMA assignment: "
-            f"{tma_summary['n_cores']} cores, "
-            f"{tma_summary['n_assigned_cells']:,}/{tma_summary['n_cells']:,} cells assigned"
+            "Run qxy.assign_tma_cores(...) explicitly if geometry-based TMA "
+            "assignment is needed."
         )
 
     log("Mapping cell segmentation polygons...")

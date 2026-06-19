@@ -1,4 +1,5 @@
 import json
+import os
 
 import anndata as ad
 import numpy as np
@@ -74,6 +75,56 @@ def _write_minimal_run_project(project_dir):
     )
 
 
+def _write_minimal_manual_threshold_project(project_dir):
+    project_dir.mkdir()
+    pd.DataFrame(
+        {
+            "Image": ["img_a.ome.tiff", "img_a.ome.tiff", "img_b.ome.tiff", "img_b.ome.tiff"],
+            "Object ID": ["cell_0", "cell_1", "cell_2", "cell_3"],
+            "Centroid X µm": [5, 25, 5, 25],
+            "Centroid Y µm": [5, 25, 5, 25],
+            "Marker: Mean": [10.0, 1.0, 10.0, 1.0],
+        }
+    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
+    pd.DataFrame(
+        {
+            "marker": ["Marker"],
+            "measurement_column": ["Marker: Mean"],
+            "img_a.ome.tiff": [5],
+            "img_b.ome.tiff": [11],
+        }
+    ).to_csv(project_dir / "thresholds_260615-1234.tsv", sep="\t", index=False)
+
+
+def _write_template_project(project_dir):
+    project_dir.mkdir()
+    pd.DataFrame(
+        {
+            "Image": ["img_a.ome.tiff", "img_b.ome.tiff"],
+            "Object ID": ["cell_0", "cell_1"],
+            "Centroid X µm": [5, 25],
+            "Centroid Y µm": [5, 25],
+            "Cell: CD8 - Cy5: Mean": [8.0, 2.0],
+            "Nucleus: DAPI: Mean": [100.0, 50.0],
+            "Marker: Mean": [10.0, 1.0],
+            "Marker: Median": [9.0, 1.5],
+            "Marker: Area": [100.0, 200.0],
+        }
+    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
+    (project_dir / "marker.json").write_text(
+        json.dumps(
+            {
+                "function": {
+                    "classifier_fun": "ClassifyByMeasurementFunction",
+                    "measurement": "Marker: Mean",
+                    "threshold": 5,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
     geojson_path = _write_geojson(
         tmp_path / "img.geojson",
@@ -103,7 +154,7 @@ def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
     assert "tma_core" not in adata.obs.columns
 
 
-def test_run_auto_assigns_detected_tma_cores(tmp_path):
+def test_run_detects_tma_cores_without_auto_assigning(tmp_path):
     project_dir = tmp_path / "project"
     _write_minimal_run_project(project_dir)
     _write_geojson(
@@ -124,10 +175,102 @@ def test_run_auto_assigns_detected_tma_cores(tmp_path):
         verbose=False,
     )
 
-    assert adata.obs["tma_core"].tolist() == ["core_1", "Unassigned"]
+    assert "Xµm" in adata.obs.columns
+    assert "Yµm" in adata.obs.columns
+    assert "Centroid X µm" not in adata.obs.columns
+    assert "Centroid Y µm" not in adata.obs.columns
+    assert adata.obs["Xµm"].tolist() == [5, 25]
+    assert adata.obs["Yµm"].tolist() == [5, 25]
+    np.testing.assert_array_equal(adata.obsm["spatial"], np.array([[5, 5], [25, 25]]))
+    assert "tma_core" not in adata.obs.columns
     assert adata.uns["qxycell"]["n_tma_core_features"] == 1
-    assert adata.uns["qxycell"]["tma_assignment"]["n_assigned_cells"] == 1
-    assert adata.uns["qxycell_tma"]["n_cores"] == 1
+    assert adata.uns["qxycell"]["tma_assignment"] is None
+    assert "qxycell_tma" not in adata.uns
+
+
+def test_check_writes_manual_threshold_template(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_template_project(project_dir)
+
+    report = check(project_dir, output_dir=tmp_path / "qxy_outputs_260615-1234")
+
+    template_path = report.output_dir / "tables" / "thresholds_260615-1234.tsv"
+    assert template_path.exists()
+    template = pd.read_csv(template_path, sep="\t")
+    assert template.columns.tolist() == [
+        "compartment",
+        "marker",
+        "measurement_column",
+        "img_a.ome.tiff",
+        "img_b.ome.tiff",
+    ]
+    assert template["compartment"].fillna("").tolist() == ["Cell", "", "", "Nucleus"]
+    assert template["marker"].tolist() == ["CD8", "Marker", "Marker", "DAPI"]
+    assert template["measurement_column"].tolist() == [
+        "Cell: CD8 - Cy5: Mean",
+        "Marker: Mean",
+        "Marker: Median",
+        "Nucleus: DAPI: Mean",
+    ]
+    assert template["img_a.ome.tiff"].tolist()[1] == 5.0
+    assert template["img_b.ome.tiff"].tolist()[1] == 5.0
+    assert template[["img_a.ome.tiff", "img_b.ome.tiff"]].iloc[2].isna().tolist() == [
+        True,
+        True,
+    ]
+
+
+def test_run_uses_manual_threshold_tsv_when_simple_json_missing(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_minimal_manual_threshold_project(project_dir)
+
+    adata = run(
+        project_dir,
+        output_dir=tmp_path / "out",
+        pixel_size_um=1.0,
+        verbose=False,
+    )
+
+    assert adata.var_names.tolist() == ["Marker"]
+    assert adata.var.loc["Marker", "source_measurement_column"] == "Marker: Mean"
+    assert adata.var.loc["Marker", "threshold"] == "per_image"
+    assert adata.obs["Marker_pos"].tolist() == [1, 0, 0, 0]
+    assert adata.uns["qxycell"]["n_simple_classifiers"] == 2
+
+
+def test_run_uses_newest_timestamped_threshold_file(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_minimal_manual_threshold_project(project_dir)
+    older = project_dir / "thresholds_260615-1234.tsv"
+    newer = project_dir / "thresholds_260615-1300.tsv"
+    pd.DataFrame(
+        {
+            "marker": ["Marker"],
+            "measurement_column": ["Marker: Mean"],
+            "img_a.ome.tiff": [11],
+            "img_b.ome.tiff": [11],
+        }
+    ).to_csv(newer, sep="\t", index=False)
+    os.utime(older, (1_700_000_000, 1_700_000_000))
+    os.utime(newer, (1_700_000_100, 1_700_000_100))
+
+    report = check(project_dir, output_dir=tmp_path / "out")
+    ignored = [
+        message
+        for message in report.messages
+        if message.code == "classifiers.threshold_file_ignored"
+    ]
+    assert len(ignored) == 1
+    assert ignored[0].path == str(older.resolve())
+
+    adata = run(
+        project_dir,
+        output_dir=tmp_path / "run_out",
+        pixel_size_um=1.0,
+        verbose=False,
+    )
+
+    assert adata.obs["Marker_pos"].tolist() == [0, 0, 0, 0]
 
 
 def test_run_sample_annotations_collapse_to_one_sample_column(tmp_path):
