@@ -138,13 +138,19 @@
     <tbody>
       <tr>
         <td><code>qxy.check</code></td>
-        <td>Inspect and validate a manually exported QuPath project.</td>
+        <td>Inspect and validate a manually exported QuPath project. Existing threshold tables are used as the marker-threshold source; object classifier JSONs are converted into a fresh output threshold table template when available.</td>
         <td><code>report = qxy.check(qupath_project)</code></td>
         <td><code>CheckReport</code> plus check report files in <code>qxy_outputs_YYMMDD-HHMM/</code>.</td>
       </tr>
       <tr>
+        <td><code>qxy.generate_threshold_table</code></td>
+        <td>Create a fresh timestamped threshold table from object classifier JSONs without modifying any existing threshold table.</td>
+        <td><code>path = qxy.generate_threshold_table(qupath_project)</code></td>
+        <td><code>thresholds_YYMMDD-HHMM.tsv</code> under the output <code>tables/</code> folder.</td>
+      </tr>
+      <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, classifier thresholds, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. Classifier JSONs are searched across the entire project folder. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present; collapse them to <code>CoreID</code> with <code>qxy.assign_core_ids_from_measurements()</code>.</td>
+        <td>Import QuPath measurements, threshold-table definitions, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. By default the newest recognized threshold table in the project folder is used; pass <code>threshold_file=</code> to force a specific table. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present; collapse them to <code>CoreID</code> with <code>qxy.assign_core_ids_from_measurements()</code>.</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
@@ -444,9 +450,9 @@ qxy.save(adata)</code></pre>
       </tr>
       <tr>
         <td><code>qxy.cn_kmeans</code></td>
-        <td>Clusters <code>adata.obsm["cn_profile"]</code> into <em>n_clusters</em> CNs using
+        <td>Clusters <code>adata.obsm["cn_profile"]</code> into <em>n_cn</em> CNs using
         MiniBatchKMeans. Cluster IDs are assigned as <code>"N0"</code> … <code>"N{n-1}"</code>.</td>
-        <td><code>qxy.cn_kmeans(adata, n_clusters=12)</code></td>
+        <td><code>qxy.cn_kmeans(adata, n_cn=12)</code></td>
         <td>Adds <code>adata.obs["cn"]</code> as a <code>pd.Categorical</code> and updates
         <code>adata.uns["cn"]</code>.</td>
       </tr>
@@ -494,10 +500,10 @@ qxy.save(adata)</code></pre>
         <td>Column used to separate cells by tissue section for per-image KNN.</td>
       </tr>
       <tr>
-        <td><code>n_clusters</code></td>
+        <td><code>n_cn</code></td>
         <td><code>cn_kmeans</code></td>
         <td><code>12</code></td>
-        <td>Number of CNs to cluster into.</td>
+        <td>Number of CNs to cluster into. <code>n_clusters</code> is still accepted as a legacy alias.</td>
       </tr>
       <tr>
         <td><code>key</code></td>
@@ -524,7 +530,7 @@ qxy.save(adata)</code></pre>
   <h3>CN Workflow</h3>
   <pre><code># After qxy.celltype(adata) has assigned celltype labels:
 qxy.cn_knn(adata, k=12)
-qxy.cn_kmeans(adata, n_clusters=12)
+qxy.cn_kmeans(adata, n_cn=12)
 qxy.cn_name(adata)
 
 # Optional: compact long cell type names before naming

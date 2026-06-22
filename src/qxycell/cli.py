@@ -26,6 +26,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Count measurement table rows during check. Slower for large exports.",
     )
+    check_parser.add_argument(
+        "--threshold-file",
+        default=None,
+        help="Explicit threshold TSV/CSV to validate instead of auto-selecting from the project folder.",
+    )
 
     run_parser = subparsers.add_parser("run", help="Run QXYCell on a QuPath export.")
     run_parser.add_argument("project_dir", help="Path to a manually exported QuPath project folder.")
@@ -47,6 +52,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional YAML file with ordered cell type rules.",
     )
+    run_parser.add_argument(
+        "--threshold-file",
+        default=None,
+        help="Explicit threshold TSV/CSV to use instead of auto-selecting from the project folder.",
+    )
     return parser
 
 
@@ -55,7 +65,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "check":
-        report = check(args.project_dir, output_dir=args.output_dir, count_rows=args.count_rows)
+        report = check(
+            args.project_dir,
+            output_dir=args.output_dir,
+            count_rows=args.count_rows,
+            threshold_file=args.threshold_file,
+        )
         status = "PASS" if report.ok else "FAIL"
         print(f"QXYCell check {status}")
         print(f"Report: {report.output_dir / 'check_report.txt'}")
@@ -71,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
             output_dir=args.output_dir,
             pixel_size_um=args.pixel_size_um,
             celltype_logic=args.celltype_logic,
+            threshold_file=args.threshold_file,
         )
         print("QXYCell run complete")
         print(f"H5AD: {adata.uns['qxycell']['h5ad_path']}")

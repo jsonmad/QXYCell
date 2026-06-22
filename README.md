@@ -69,8 +69,8 @@ Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`
 QXYCell is built around manual QuPath exports. Required files:
 
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
-- **Object classifier JSONs** — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell reads the marker name and positivity threshold from each JSON and creates `<marker>_pos` boolean columns in `adata.obs`.
-- **Manual threshold TSV/CSV** *(fallback)* — if no usable single-measurement classifier JSONs are found, QXYCell looks for a filled manual threshold table such as `thresholds_YYMMDD-HHMM.tsv`.
+- **Threshold TSV/CSV** — the source of truth for marker positivity thresholds. Use a filled table such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`.
+- **Object classifier JSONs** *(template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell can convert these JSONs into a fresh timestamped threshold table, but existing threshold tables remain the active source.
 - **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
 - **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects. These are not assigned by default; call `qxy.assign_tma_cores()` explicitly when geometry-based core assignment is needed.
@@ -81,25 +81,44 @@ Optional measurement columns `TMA Core` and `Parent` are preserved when present
 so they can be collapsed into `CoreID` with
 `qxy.assign_core_ids_from_measurements()`.
 
-`qxy.check()` always writes a fill-in threshold template based on the measurement
+Threshold tables are the source used by `qxy.check()` and `qxy.run()`.
+`qxy.check()` always writes a fill-in threshold table based on the measurement
 columns it finds:
 
 ```text
 qxy_outputs_YYMMDD-HHMM/tables/thresholds_YYMMDD-HHMM.tsv
 ```
 
-The template includes only measurement columns whose names contain `mean` or
+The table includes only measurement columns whose names contain `mean` or
 `median`. Each row is one feature, and each image gets its own threshold
-column. If matching classifier JSONs are found, QXYCell prefills their
-thresholds in the image columns. Use this template when QuPath classifier JSONs
-are not available, or when thresholds need manual editing. Fill in or edit the
-image threshold columns, save the file back into the QuPath export folder with
-the same timestamped filename, such as `thresholds_260615-1234.tsv`, then rerun
-`qxy.check()` or `qxy.run()`.
+column.
+
+When usable object classifier JSONs are present, `qxy.check()` writes a fresh
+timestamped threshold table into the output `tables/` folder. This generated
+table is a template/audit artifact; it does not overwrite any threshold table
+in the QuPath export folder. To generate a fresh threshold table from JSONs
+explicitly, call:
+
+```python
+threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
+```
+
+Object classifier JSONs never modify an existing threshold table. To manually
+edit thresholds, fill in or edit the image threshold columns, save the finished
+file back into the QuPath export folder, then rerun `qxy.check()` or
+`qxy.run()`. By default, `qxy.run()` uses the newest recognized threshold table
+in the QuPath export folder. To force a specific table, pass
+`threshold_file="path/to/thresholds.tsv"` to `qxy.check()` or `qxy.run()`.
 
 If multiple threshold files are found, QXYCell prefers timestamped
 `thresholds_*.tsv`/`.csv` files and uses the most recently modified one.
 Other threshold files are ignored with a warning in the check report.
+
+Recognized manual threshold filenames are `thresholds.tsv`, `thresholds.csv`,
+`manual_thresholds.tsv`, `manual_thresholds.csv`, `marker_thresholds.tsv`,
+`marker_thresholds.csv`, `qxycell_thresholds.tsv`, `qxycell_thresholds.csv`,
+`classifier_thresholds.tsv`, `classifier_thresholds.csv`, and timestamped
+`thresholds_*.tsv` / `thresholds_*.csv`.
 
 ```text
 marker    measurement_column    sample_A.tif    sample_B.tif

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,7 @@ from qxycell.measurements import (
     summarize_measurement_file,
     validate_measurement_files,
 )
-from qxycell.paths import resolve_output_dir
+from qxycell.paths import OUTPUT_TIMESTAMP_FORMAT, resolve_output_dir
 from qxycell.types import ClassifierDefinition, GeoJsonFile, MeasurementFile, Message
 
 
@@ -131,12 +132,12 @@ def _write_csv(
         writer.writerows(rows)
 
 
-def _write_manual_threshold_template(report: CheckReport) -> Path:
-    """Write a fill-in TSV for manual marker thresholds."""
-
-    template_path = report.output_dir / "tables" / _threshold_template_filename(report.output_dir)
-    images = _unique_measurement_images(report.measurement_files)
-    threshold_lookup = _threshold_lookup(report.classifiers)
+def _threshold_table_rows(
+    measurement_files: list[MeasurementFile],
+    classifiers: list[ClassifierDefinition],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    images = _unique_measurement_images(measurement_files)
+    threshold_lookup = _threshold_lookup(classifiers)
     rows = [
         {
             "compartment": compartment_from_measurement_column(column),
@@ -147,22 +148,59 @@ def _write_manual_threshold_template(report: CheckReport) -> Path:
                 for image in images
             },
         }
-        for column in measurement_columns_for_threshold_template(report.measurement_files)
+        for column in measurement_columns_for_threshold_template(measurement_files)
     ]
+    return rows, ["compartment", "marker", "measurement_column", *images]
+
+
+def _write_threshold_table(
+    output_dir: Path,
+    measurement_files: list[MeasurementFile],
+    classifiers: list[ClassifierDefinition],
+    *,
+    always_timestamped: bool,
+) -> Path:
+    """Write a TSV threshold table."""
+
+    template_path = output_dir / "tables" / _threshold_template_filename(
+        output_dir,
+        always_timestamped=always_timestamped,
+    )
+    rows, columns = _threshold_table_rows(measurement_files, classifiers)
     _write_csv(
         template_path,
         rows,
-        ["compartment", "marker", "measurement_column", *images],
+        columns,
         delimiter="\t",
     )
     return template_path
 
 
-def _threshold_template_filename(output_dir: Path) -> str:
+def _write_manual_threshold_template(report: CheckReport) -> Path:
+    """Write a fill-in TSV for manual marker thresholds."""
+
+    return _write_threshold_table(
+        report.output_dir,
+        report.measurement_files,
+        report.classifiers,
+        always_timestamped=True,
+    )
+
+
+def _threshold_template_filename(output_dir: Path, *, always_timestamped: bool) -> str:
     timestamp = output_dir.name.removeprefix("qxy_outputs_")
-    if timestamp and timestamp != output_dir.name:
-        return f"thresholds_{timestamp}.tsv"
-    return "thresholds.tsv"
+    if timestamp == output_dir.name or not timestamp:
+        timestamp = datetime.now().strftime(OUTPUT_TIMESTAMP_FORMAT)
+    filename = f"thresholds_{timestamp}.tsv" if always_timestamped else "thresholds.tsv"
+    path = output_dir / "tables" / filename
+    if not always_timestamped or not path.exists():
+        return filename
+    stem = path.stem
+    suffix = path.suffix
+    counter = 2
+    while (output_dir / "tables" / f"{stem}-{counter}{suffix}").exists():
+        counter += 1
+    return f"{stem}-{counter}{suffix}"
 
 
 def _unique_measurement_images(measurement_files: list[MeasurementFile]) -> list[str]:
@@ -207,11 +245,36 @@ def _prefill_threshold(
     return "" if threshold is None else str(threshold)
 
 
+def _output_threshold_source(report: CheckReport) -> Path | None:
+    tables_dir = report.output_dir / "tables"
+    for classifier in report.classifiers:
+        source = Path(str(classifier.path).split("#", 1)[0])
+        if source.exists() and source.parent == tables_dir:
+            return source
+    return None
+
+
+def _latest_output_threshold_table(output_dir: Path) -> Path | None:
+    tables_dir = output_dir / "tables"
+    candidates = [
+        path
+        for path in tables_dir.glob("thresholds_*.tsv")
+        if path.is_file()
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda path: (path.stat().st_mtime, str(path)))
+
+
 def _write_report(report: CheckReport) -> None:
     report.output_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = report.output_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    threshold_template_path = _write_manual_threshold_template(report)
+    threshold_template_path = _output_threshold_source(report) or _latest_output_threshold_table(
+        report.output_dir
+    )
+    if threshold_template_path is None:
+        threshold_template_path = _write_manual_threshold_template(report)
 
     (report.output_dir / "check_report.json").write_text(
         json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n",
@@ -351,11 +414,44 @@ def _write_report(report: CheckReport) -> None:
     )
 
 
+def generate_threshold_table(
+    project_dir: str | Path,
+    output_dir: str | Path | None = None,
+    *,
+    count_rows: bool = False,
+) -> Path:
+    """Create a fresh timestamped threshold table from object classifier JSONs.
+
+    This function reads measurement columns and object classifier JSON files from
+    ``project_dir``, writes a threshold table under ``output_dir/tables/``, and
+    returns the table path. Existing threshold tables are never modified or used
+    as input here.
+    """
+
+    project_path = Path(project_dir).expanduser().resolve()
+    if not project_path.exists():
+        raise FileNotFoundError(f"Project directory does not exist: {project_path}")
+    output_path = resolve_output_dir(output_dir)
+
+    measurement_files = [
+        summarize_measurement_file(path, count_rows=count_rows)
+        for path in discover_measurement_files(project_path)
+    ]
+    classifiers = parse_classifiers(discover_classifier_files(project_path))
+    return _write_threshold_table(
+        output_path,
+        measurement_files,
+        classifiers,
+        always_timestamped=True,
+    )
+
+
 def check(
     project_dir: str | Path,
     output_dir: str | Path | None = None,
     *,
     count_rows: bool = False,
+    threshold_file: str | Path | None = None,
 ) -> CheckReport:
     """Inspect and validate a manually exported QuPath project folder.
 
@@ -395,25 +491,50 @@ def check(
             )
     messages.extend(validate_measurement_files(measurement_files))
 
-    classifier_paths = discover_classifier_files(project_path)
-    classifiers = parse_classifiers(classifier_paths)
-    if not any(classifier.is_simple for classifier in classifiers):
+    object_classifiers = parse_classifiers(discover_classifier_files(project_path))
+    generated_threshold_path = None
+    if any(classifier.is_simple for classifier in object_classifiers):
+        generated_threshold_path = _write_threshold_table(
+            output_path,
+            measurement_files,
+            object_classifiers,
+            always_timestamped=True,
+        )
+
+    ignored_threshold_paths: list[Path] = []
+    if threshold_file is not None:
+        threshold_path = Path(threshold_file).expanduser().resolve()
+        if not threshold_path.exists():
+            messages.append(
+                Message(
+                    level="error",
+                    code="classifiers.threshold_file_missing",
+                    message=f"Specified threshold file does not exist: {threshold_path}",
+                    path=str(threshold_path),
+                )
+            )
+    else:
         threshold_paths = discover_threshold_files(project_path)
         threshold_path, ignored_threshold_paths = select_threshold_file(threshold_paths)
-        if threshold_path is not None:
-            classifiers = parse_threshold_files([threshold_path])
-            for ignored_path in ignored_threshold_paths:
-                messages.append(
-                    Message(
-                        level="warning",
-                        code="classifiers.threshold_file_ignored",
-                        message=(
-                            "Ignoring manual threshold file because another threshold "
-                            f"file was selected: {threshold_path}"
-                        ),
-                        path=str(ignored_path),
-                    )
+
+    if threshold_path is not None and threshold_path.exists():
+        classifiers = parse_threshold_files([threshold_path])
+        for ignored_path in ignored_threshold_paths:
+            messages.append(
+                Message(
+                    level="warning",
+                    code="classifiers.threshold_file_ignored",
+                    message=(
+                        "Ignoring manual threshold file because another threshold "
+                        f"file was selected: {threshold_path}"
+                    ),
+                    path=str(ignored_path),
                 )
+            )
+    elif generated_threshold_path is not None:
+        classifiers = parse_threshold_files([generated_threshold_path])
+    else:
+        classifiers = object_classifiers
     messages.extend(validate_classifiers(classifiers, measurement_files))
 
     geojson_paths = discover_geojson_files(project_path)

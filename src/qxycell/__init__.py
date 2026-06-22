@@ -3,7 +3,7 @@
 from qxycell.celltyping import apply_celltypes
 from qxycell.celltyping import find_latest_celltype_yaml
 from qxycell.celltyping import load_celltype_logic
-from qxycell.checks import CheckReport, check
+from qxycell.checks import CheckReport, check, generate_threshold_table
 from qxycell.geojson import load_cell_polygons
 from qxycell.filtering import assign_annotations
 from qxycell.filtering import assign_core_ids_from_measurements
@@ -43,6 +43,7 @@ __all__ = [
     "celltype_prompt",
     "check",
     "find_latest_celltype_yaml",
+    "generate_threshold_table",
     "load",
     "load_cell_polygons",
     "load_latest",

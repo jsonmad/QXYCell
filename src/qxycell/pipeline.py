@@ -99,7 +99,7 @@ def _build_var_dataframe(classifier_groups, marker_names, pd):
                 "classifier_name": classifier.name,
                 "source_measurement_column": classifier.measurement_column,
                 "threshold": _threshold_summary(group),
-                "classifier_json": "|".join(str(item.path) for item in group),
+                "threshold_source": "|".join(str(item.path) for item in group),
             }
         )
     return pd.DataFrame(rows, index=index)
@@ -368,14 +368,15 @@ def run(
     fail_on_check_error: bool = True,
     pixel_size_um: float = 0.28,
     celltype_logic: str | Path | dict[str, Any] | None = None,
+    threshold_file: str | Path | None = None,
     verbose: bool = True,
 ) -> Any:
     """Run QXYCell on a manually exported QuPath project.
 
-    The v1 pipeline imports one ``adata.X`` column per usable simple measurement
-    classifier definition, stores required QuPath identity/spatial columns plus
-    available core metadata columns in ``adata.obs``, and adds classifier
-    positivity calls plus GeoJSON annotation columns when possible.
+    The v1 pipeline imports one ``adata.X`` column per usable threshold
+    definition, stores required QuPath identity/spatial columns plus available
+    core metadata columns in ``adata.obs``, and adds marker positivity calls
+    plus GeoJSON annotation columns when possible.
     """
 
     ad, np, pd = _import_runtime_dependencies()
@@ -392,7 +393,7 @@ def run(
     log(f"Project: {Path(project_dir).expanduser().resolve()}")
     log(f"Output: {output_path}")
 
-    report = check(project_dir, output_dir=output_path)
+    report = check(project_dir, output_dir=output_path, threshold_file=threshold_file)
     log(
         "Check: "
         f"{'PASS' if report.ok else 'FAIL'} "
@@ -411,7 +412,7 @@ def run(
 
     simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
     if not simple_classifiers:
-        raise ValueError("No simple classifier JSON files are available for adata.X import.")
+        raise ValueError("No usable threshold definitions are available for adata.X import.")
 
     log("Loading measurement table(s)...")
     measurements = _read_measurements(report.measurement_files, pd)

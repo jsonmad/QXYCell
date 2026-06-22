@@ -157,6 +157,10 @@ def compact_dict(d: dict, keys: list[str]) -> pd.DataFrame:
 
 
 def build_examples() -> dict:
+    threshold_path = qxy.generate_threshold_table(
+        PROJECT_DIR,
+        output_dir=RUN_OUTPUT_DIR / "threshold_example",
+    )
     report = qxy.check(PROJECT_DIR, output_dir=RUN_OUTPUT_DIR, count_rows=True)
     logic = {
         "rules": [
@@ -313,6 +317,7 @@ def build_examples() -> dict:
 
     return {
         "report": report,
+        "threshold_path": threshold_path,
         "adata": adata,
         "clean": clean,
         "artifact_clean": artifact_clean,
@@ -353,11 +358,11 @@ def make_html(examples: dict) -> str:
         [c for c in adata.obs.columns if c.endswith("_pos")]
     ].head(8).reset_index()
     functions = [
-        ("qxy.run()", "Run the main QuPath export to AnnData pipeline, preserving optional TMA Core and Parent measurement metadata when present.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
+        ("qxy.run()", "Run the main QuPath export to AnnData pipeline using the active threshold table, preserving optional TMA Core and Parent measurement metadata when present.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
         ("qxy.workflow()", "Run the common notebook workflow in one call.", "adata = qxy.workflow(project_dir, sample_metadata=metadata, celltype_logic='celltype_logic.yaml')", f"<p>Workflow result: {examples['workflow_adata'].n_obs} cells after Ignore removal.</p>"),
         (
             "qxy.check()",
-            "Inspect the export folder before running.",
+            "Inspect the export folder before running and write a fresh JSON-derived threshold table template when object classifiers are present.",
             "report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)",
             table_html(
                 pd.DataFrame(
@@ -368,6 +373,12 @@ def make_html(examples: dict) -> str:
                     ]
                 )
             ),
+        ),
+        (
+            "qxy.generate_threshold_table()",
+            "Create a fresh timestamped threshold table from object classifier JSONs without modifying existing threshold files.",
+            "threshold_path = qxy.generate_threshold_table(project_dir, output_dir=out_dir)",
+            f"<p><code>{html.escape(str(examples['threshold_path']))}</code></p>",
         ),
         ("qxy.qc()", "Write QC tables for markers, annotations, samples, and cell types.", "qc_summary = qxy.qc(adata, sample_col='Sample', output_dir=out_dir)", table_html(compact_dict(qc_summary, ["output_dir", "n_cells", "sample_col"]))),
         ("qxy.save()", "Save an AnnData object to H5AD.", "h5ad_path = qxy.save(adata, output_dir=out_dir)", f"<p><code>{html.escape(str(examples['saved_path']))}</code></p>"),

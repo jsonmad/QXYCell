@@ -184,8 +184,8 @@ adata = qxy.run(qupath_project)</code></pre>
     <h2>Inputs</h2>
     <p>QXYCell currently expects a manually exported QuPath project/export folder containing:</p>
     <pre><code>measurements.csv or measurements.tsv
-*.json  (classifier JSONs — searched anywhere in the project folder)
-thresholds_YYMMDD-HHMM.tsv  (fallback when classifier JSONs are unavailable)
+thresholds.tsv or thresholds_YYMMDD-HHMM.tsv  (marker threshold source of truth)
+*.json  (object classifier JSONs — used to generate fresh threshold table templates)
 GeoJSON annotation files</code></pre>
 
     <p>The measurement table must contain standard QuPath columns:</p>
@@ -194,7 +194,7 @@ Object ID
 Centroid X µm
 Centroid Y µm</code></pre>
 
-    <p><code>qxy.check()</code> writes a fill-in manual threshold template at <code>tables/thresholds_YYMMDD-HHMM.tsv</code>. The template includes only mean/median measurement columns, with one row per feature and one threshold column per <code>Image</code>, and prefills thresholds from any matching JSON classifiers. If no usable single-measurement classifier JSONs are available, fill the image threshold columns, save the timestamped threshold file into the QuPath export folder, then rerun <code>qxy.check()</code> or <code>qxy.run()</code>. If multiple threshold files are found, QXYCell uses the most recently modified timestamped <code>thresholds_*.tsv</code>/<code>.csv</code> file and reports ignored files as warnings.</p>
+    <p>Threshold tables are the source used by <code>qxy.check()</code> and <code>qxy.run()</code>. When usable single-measurement object classifier JSONs are present, <code>qxy.check()</code> writes a fresh timestamped threshold table at <code>tables/thresholds_YYMMDD-HHMM.tsv</code>. This generated table is a template/audit artifact and does not overwrite threshold files in the QuPath export folder. <code>qxy.run()</code> uses the newest recognized threshold table in the QuPath export folder by default, or a specific table passed with <code>threshold_file=</code>. If no project threshold table exists, the generated output table can be used for the current check/run. You can also create a fresh table explicitly with <code>qxy.generate_threshold_table(project_dir)</code>. Recognized names include <code>thresholds.tsv</code>, <code>manual_thresholds.tsv</code>, <code>marker_thresholds.tsv</code>, <code>qxycell_thresholds.tsv</code>, <code>classifier_thresholds.tsv</code>, their <code>.csv</code> equivalents, and timestamped <code>thresholds_*.tsv</code>/<code>.csv</code> files. If multiple threshold files are found, QXYCell uses the most recently modified timestamped file when available and reports ignored files as warnings.</p>
 
     <h2>Outputs</h2>
     <pre><code>qxy_outputs_YYMMDD-HHMM/
@@ -221,11 +221,11 @@ qxy.run(project_dir)</code></pre>
     <div class="two-col">
       <div class="box">
         <h3><code>check()</code></h3>
-        <p class="small">Performs preflight inspection and validation. It discovers measurement tables, classifier JSONs, and GeoJSON files; checks required measurement columns; parses classifier JSONs; reports unsupported composite classifiers; and writes a validation report.</p>
+        <p class="small">Performs preflight inspection and validation. It discovers measurement tables, threshold tables, object classifier JSONs, and GeoJSON files; checks required measurement columns; writes a fresh JSON-derived threshold table template when possible; and writes a validation report.</p>
       </div>
       <div class="box">
         <h3><code>run()</code></h3>
-        <p class="small">Performs the conversion. It loads the measurement table, preserves optional core metadata columns such as <code>TMA Core</code> and <code>Parent</code>, selects marker columns referenced by simple QuPath classifier JSONs (searched across the entire project folder), builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons and cell boundary WKT, and writes the final <code>.h5ad</code>.</p>
+        <p class="small">Performs the conversion. It loads the measurement table, preserves optional core metadata columns such as <code>TMA Core</code> and <code>Parent</code>, selects marker columns referenced by the active threshold table, builds AnnData, applies marker positivity calls, maps GeoJSON annotation polygons and cell boundary WKT, and writes the final <code>.h5ad</code>.</p>
       </div>
     </div>
 
@@ -267,7 +267,7 @@ annotation__Unclassified</code></pre>
 classifier_name
 source_measurement_column
 threshold
-classifier_json</code></pre>
+threshold_source</code></pre>
 
     <p><code>adata.obsm["spatial"]</code> contains cell centroid coordinates from QuPath:</p>
     <pre><code>Xµm
@@ -278,7 +278,7 @@ Yµm</code></pre>
     <h2>Classifier Handling</h2>
     <p>In v1, QXYCell imports one marker column for each simple threshold definition of the form:</p>
     <pre><code>measurement column &gt;= threshold</code></pre>
-    <p>Single-measurement QuPath classifier JSON files are discovered by searching the entire project folder recursively, so files do not need to be in the standard <code>classifiers/object_classifiers/</code> subfolder. If no usable JSON classifiers are found, QXYCell falls back to a filled manual threshold TSV/CSV. Composite classifiers and invalid manual threshold rows are detected and skipped with warnings. All classifier definitions are reported in:</p>
+    <p>Filled threshold tables are used as the source of truth. Single-measurement QuPath classifier JSON files are discovered by searching the entire project folder recursively and are converted into a fresh timestamped threshold table template when possible. Existing threshold tables in the QuPath export folder are not modified by JSON-derived templates. Composite classifiers and invalid threshold rows are detected and skipped with warnings. All active threshold definitions are reported in:</p>
     <pre><code>tables/classifier_report.csv</code></pre>
 
     <h2>Cell Type Logic Prompt</h2>
@@ -294,7 +294,7 @@ Yµm</code></pre>
     <h2>Cell Neighbourhood Analysis</h2>
     <p>After cell types are assigned, QXYCell can characterise each cell by the composition of its local spatial neighbourhood using <code>qxy.cn_knn</code> and <code>qxy.cn_kmeans</code>:</p>
     <pre><code>qxy.cn_knn(adata, k=12)
-qxy.cn_kmeans(adata, n_clusters=12)</code></pre>
+qxy.cn_kmeans(adata, n_cn=12)</code></pre>
     <p><code>cn_knn</code> builds a k-nearest-neighbour graph per image (to prevent neighbours bleeding across tissue sections), then computes a per-cell composition frequency vector stored as <code>adata.obsm["cn_profile"]</code>. <code>cn_kmeans</code> clusters those profiles into discrete CN types using MiniBatchKMeans, storing labels <code>"N0"</code>…<code>"N{n-1}"</code> as a <code>pd.Categorical</code> in <code>adata.obs["cn"]</code>.</p>
     <p>Cell neighbourhoods can be visualised spatially with:</p>
     <pre><code>qxy.plot_spatial(adata, sample_col="ImageID", category_col="cn")</code></pre>
