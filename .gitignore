@@ -19,6 +19,7 @@ qxy?run/
 qxy_outputs_*/
 outputs/
 *.ipynb
+!notebooks/basic_qxycell_workflow.ipynb
 
 # Project-specific files that should not be committed
 # YAMLs in repo root (celltype logic, scratch files)

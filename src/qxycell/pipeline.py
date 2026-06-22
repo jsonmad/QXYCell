@@ -9,7 +9,7 @@ from typing import Any
 from qxycell.classifiers import ClassifierDefinition
 from qxycell.celltyping import apply_celltypes
 from qxycell.checks import check
-from qxycell.filtering import assign_samples
+from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import _classification_name
 from qxycell.markers import marker_name_from_classifier_name
 from qxycell.measurements import required_columns
@@ -162,7 +162,11 @@ def _image_key(value: str) -> str:
     return stem[:-4] if stem.endswith(".ome") else stem
 
 
-def _load_geojson_features(geojson_files, pixel_size_um: float):
+def _load_geojson_features(
+    geojson_files,
+    pixel_size_um: float,
+    skip_annotation_labels: set[str] | None = None,
+):
     """Load annotation features from GeoJSON files, keyed by image.
 
     Returns:
@@ -199,6 +203,7 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
         return prep(geometry)
 
     annotations_by_image: dict[str, list[dict[str, Any]]] = {}
+    skip_annotation_labels = set(skip_annotation_labels or set())
 
     for geojson_file in geojson_files:
         if not geojson_file.readable:
@@ -220,6 +225,8 @@ def _load_geojson_features(geojson_files, pixel_size_um: float):
                 if prepared is None:
                     continue
                 for label in _annotation_labels(properties):
+                    if label in skip_annotation_labels:
+                        continue
                     prefix = "sample_annotation" if _is_sample_annotation_label(label) else "annotation"
                     annotations_by_image.setdefault(image_key, []).append(
                         {
@@ -316,13 +323,22 @@ def _apply_cell_polygons(adata, geojson_files, pixel_size_um: float) -> int:
     return n_matched
 
 
-def _apply_annotations(adata, geojson_files, pixel_size_um: float):
+def _apply_annotations(
+    adata,
+    geojson_files,
+    pixel_size_um: float,
+    skip_annotation_labels: set[str] | None = None,
+):
     try:
         from shapely.geometry import Point
     except ImportError:
         return []
 
-    annotations_by_image = _load_geojson_features(geojson_files, pixel_size_um=pixel_size_um)
+    annotations_by_image = _load_geojson_features(
+        geojson_files,
+        pixel_size_um=pixel_size_um,
+        skip_annotation_labels=skip_annotation_labels,
+    )
     if not annotations_by_image:
         return []
 
@@ -402,6 +418,10 @@ def run(
     log(f"Measurement files: {len(report.measurement_files)}")
     log(f"Classifier definitions: {len(report.classifiers)}")
     log(f"Simple classifiers imported: {sum(1 for item in report.classifiers if item.is_simple)}")
+    log(
+        "Threshold source: "
+        f"{report.active_threshold_source or report.active_threshold_source_kind}"
+    )
     log(f"GeoJSON files: {len(report.geojson_files)}")
 
     if fail_on_check_error and not report.ok:
@@ -470,11 +490,29 @@ def run(
     log(f"Created AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} markers")
     log(f"Added marker positivity columns: {n_pos_columns}")
 
+    coreid_summary = None
+    matching_geojson_core_labels = set(report.geojson_core_annotation_counts or {})
+    if any(column in adata.obs.columns for column in ("TMA Core", "Parent")):
+        coreid_summary = assign_core_ids_from_measurements(adata, verbose=False)
+        log(
+            "Measurement CoreID assignment: "
+            f"{coreid_summary['n_assigned_cells']:,} assigned, "
+            f"{coreid_summary['n_unassigned_cells']:,} unassigned"
+        )
+        if matching_geojson_core_labels:
+            log(
+                "GeoJSON core-like annotations matched measurement CoreID labels: "
+                f"{len(matching_geojson_core_labels)} label(s). "
+                "Measurement CoreID values were used; matching GeoJSON labels were "
+                "not kept as annotation columns."
+            )
+
     log("Mapping GeoJSON annotations...")
     annotation_conflicts = _apply_annotations(
         adata,
         report.geojson_files,
         pixel_size_um=pixel_size_um,
+        skip_annotation_labels=matching_geojson_core_labels if coreid_summary else set(),
     )
     annotation_cols = [
         column for column in adata.obs.columns if str(column).startswith("annotation__")
@@ -592,8 +630,28 @@ def run(
         "n_measurement_files": int(len(report.measurement_files)),
         "n_classifiers": int(len(report.classifiers)),
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),
+        "threshold_source": str(report.active_threshold_source)
+        if report.active_threshold_source
+        else report.active_threshold_source_kind,
+        "threshold_source_kind": report.active_threshold_source_kind,
+        "generated_threshold_template": str(report.generated_threshold_template)
+        if report.generated_threshold_template
+        else None,
         "n_geojson_files": int(len(report.geojson_files)),
         "n_tma_core_features": int(n_tma_core_features),
+        "n_measurement_core_labels": int(report.n_measurement_core_labels),
+        "n_measurement_core_cells": int(report.n_measurement_core_cells),
+        "n_geojson_core_annotation_features": int(
+            report.n_geojson_core_annotation_features
+        ),
+        "measurement_core_counts": dict(report.measurement_core_counts or {}),
+        "geojson_core_annotation_counts": dict(
+            report.geojson_core_annotation_counts or {}
+        ),
+        "measurement_core_assignment": coreid_summary,
+        "ignored_geojson_core_annotation_labels": sorted(matching_geojson_core_labels)
+        if coreid_summary
+        else [],
         "tma_assignment": tma_summary,
         "n_annotation_conflicts": int(len(annotation_conflicts)),
         "annotation_labels": dict(annotation_label_map),

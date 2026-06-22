@@ -362,12 +362,17 @@ def make_html(examples: dict) -> str:
         ("qxy.workflow()", "Run the common notebook workflow in one call.", "adata = qxy.workflow(project_dir, sample_metadata=metadata, celltype_logic='celltype_logic.yaml')", f"<p>Workflow result: {examples['workflow_adata'].n_obs} cells after Ignore removal.</p>"),
         (
             "qxy.check()",
-            "Inspect the export folder before running and write a fresh JSON-derived threshold table template when object classifiers are present.",
+            "Inspect the export folder before running, report the active threshold source, and write a fresh JSON-derived threshold table template when object classifiers are present.",
             "report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)",
             table_html(
                 pd.DataFrame(
                     [
                         {"metric": "ok", "value": report.ok},
+                        {
+                            "metric": "threshold source",
+                            "value": report.active_threshold_source
+                            or report.active_threshold_source_kind,
+                        },
                         {"metric": "measurement files", "value": len(report.measurement_files)},
                         {"metric": "geojson files", "value": len(report.geojson_files)},
                     ]
@@ -385,7 +390,7 @@ def make_html(examples: dict) -> str:
         ("qxy.load()", "Load an H5AD from a file or QXYCell output folder.", "adata = qxy.load(out_dir)", f"<p>Loaded shape: <code>{examples['loaded_shape']}</code></p>"),
         ("qxy.load_latest()", "Load the newest qxy_outputs_* folder in a base directory.", "adata = qxy.load_latest(base_output_dir)", f"<p>Latest shape: <code>{examples['latest_shape']}</code></p>"),
         ("qxy.assign_samples()", "Create one Sample column from sample annotation labels.", "summary = qxy.assign_samples(adata)", table_html(compact_dict(examples["sample_summary"], ["sample_col", "n_assigned_cells", "n_conflicting_cells"]))),
-        ("qxy.assign_core_ids_from_measurements()", "Create CoreID from QuPath measurement metadata columns such as TMA Core and Parent.", "summary = qxy.assign_core_ids_from_measurements(adata)", table_html(compact_dict(examples["coreid_summary"], ["target_col", "available_source_cols", "n_assigned_cells", "n_unassigned_cells"]))),
+        ("qxy.assign_core_ids_from_measurements()", "Create or refresh CoreID from QuPath measurement metadata columns such as TMA Core and Parent. qxy.run() does this automatically when those columns exist.", "summary = qxy.assign_core_ids_from_measurements(adata)", table_html(compact_dict(examples["coreid_summary"], ["target_col", "available_source_cols", "n_assigned_cells", "n_unassigned_cells"]))),
         ("qxy.remove_ignore()", "Remove cells in annotation columns containing Ignore.", "clean = qxy.remove_ignore(adata, copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['clean'].n_obs} cells.</p>"),
         ("qxy.remove_annotations()", "Remove cells in annotation columns matching a custom text string.", "clean = qxy.remove_annotations(adata, text='Immune', copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['artifact_clean'].n_obs} cells.</p>"),
         ("qxy.assign_tma_cores()", "Assign cells to TMA core polygons when core IDs need to come from GeoJSON geometry.", "summary = qxy.assign_tma_cores(adata, project_dir, pixel_size_um=1.0)", table_html(compact_dict(examples["tma_summary"], ["n_cores", "n_assigned_cells", "n_unassigned_cells"]))),

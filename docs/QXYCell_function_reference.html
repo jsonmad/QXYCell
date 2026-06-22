@@ -138,7 +138,7 @@
     <tbody>
       <tr>
         <td><code>qxy.check</code></td>
-        <td>Inspect and validate a manually exported QuPath project. Existing threshold tables are used as the marker-threshold source; object classifier JSONs are converted into a fresh output threshold table template when available.</td>
+        <td>Inspect and validate a manually exported QuPath project. Existing threshold tables are used as the marker-threshold source; object classifier JSONs are converted into a fresh output threshold table template when available. The report shows the active threshold source separately from the generated template.</td>
         <td><code>report = qxy.check(qupath_project)</code></td>
         <td><code>CheckReport</code> plus check report files in <code>qxy_outputs_YYMMDD-HHMM/</code>.</td>
       </tr>
@@ -150,7 +150,7 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, threshold-table definitions, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. By default the newest recognized threshold table in the project folder is used; pass <code>threshold_file=</code> to force a specific table. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present; collapse them to <code>CoreID</code> with <code>qxy.assign_core_ids_from_measurements()</code>.</td>
+        <td>Import QuPath measurements, threshold-table definitions, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. By default the newest recognized threshold table in the project folder is used; pass <code>threshold_file=</code> to force a specific table. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present and automatically collapsed to <code>CoreID</code>. Matching GeoJSON annotation labels are reported but skipped as annotation columns.</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
@@ -373,7 +373,7 @@ qxy.save(adata)</code></pre>
   <h2>TMA Commands</h2>
 
   <div class="note">
-    <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, prefer measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present, and <code>qxy.assign_core_ids_from_measurements(adata)</code> writes categorical <code>adata.obs["CoreID"]</code>. Use <code>qxy.assign_tma_cores()</code> only when core IDs need to come from GeoJSON core boundary geometry.
+    <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, prefer measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present and writes categorical <code>adata.obs["CoreID"]</code>. If GeoJSON annotation labels match those measurement core IDs, they are reported by <code>qxy.check()</code> and skipped as annotation columns by <code>qxy.run()</code>. Use <code>qxy.assign_tma_cores()</code> only when core IDs need to come from GeoJSON core boundary geometry.
   </div>
 
   <table>
@@ -388,7 +388,7 @@ qxy.save(adata)</code></pre>
       <tr>
         <td>Assign CoreID from measurement metadata</td>
         <td><code>qxy.assign_core_ids_from_measurements(adata)</code></td>
-        <td>Uses <code>TMA Core</code> first, then <code>Parent</code>. This is the default CoreID workflow for QuPath TMA dearrayer exports.</td>
+        <td>Uses <code>TMA Core</code> first, then <code>Parent</code>. This also runs automatically inside <code>qxy.run()</code> when either source column exists.</td>
       </tr>
       <tr>
         <td>Check measurement-derived CoreID assignment</td>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
@@ -41,6 +42,11 @@ class CheckReport:
     classifiers: list[ClassifierDefinition]
     geojson_files: list[GeoJsonFile]
     messages: list[Message]
+    measurement_core_counts: dict[str, int] | None = None
+    geojson_core_annotation_counts: dict[str, int] | None = None
+    active_threshold_source: Path | None = None
+    active_threshold_source_kind: str = "none"
+    generated_threshold_template: Path | None = None
 
     @property
     def ok(self) -> bool:
@@ -55,6 +61,63 @@ class CheckReport:
     @property
     def n_warnings(self) -> int:
         return sum(1 for message in self.messages if message.level == "warning")
+
+    def geojson_object_count(self, object_type: str) -> int:
+        """Return the total count of a GeoJSON objectType across discovered files."""
+
+        target = object_type.lower()
+        total = 0
+        for geojson_file in self.geojson_files:
+            for observed_type, count in geojson_file.object_type_counts.items():
+                if observed_type.lower() == target:
+                    total += int(count)
+        return total
+
+    @property
+    def n_annotation_features(self) -> int:
+        return self.geojson_object_count("annotation")
+
+    @property
+    def n_tma_core_features(self) -> int:
+        return self.geojson_object_count("tmaCore")
+
+    @property
+    def n_cell_features(self) -> int:
+        return self.geojson_object_count("cell")
+
+    @property
+    def n_measurement_core_labels(self) -> int:
+        return len(self.measurement_core_counts or {})
+
+    @property
+    def n_measurement_core_cells(self) -> int:
+        return sum(int(count) for count in (self.measurement_core_counts or {}).values())
+
+    @property
+    def n_geojson_core_annotation_features(self) -> int:
+        return sum(
+            int(count) for count in (self.geojson_core_annotation_counts or {}).values()
+        )
+
+    @property
+    def geojson_tma_core_counts(self) -> dict[str, int]:
+        counts: Counter[str] = Counter(self.geojson_core_annotation_counts or {})
+        for geojson_file in self.geojson_files:
+            for object_type, labels in geojson_file.labels_by_object_type.items():
+                if object_type.lower() != "tmacore":
+                    continue
+                for label, count in labels.items():
+                    if label and label.lower() not in {"", "none", "null"}:
+                        counts[label] += int(count)
+        return dict(sorted(counts.items()))
+
+    @property
+    def n_geojson_tma_core_ids(self) -> int:
+        return len(self.geojson_tma_core_counts)
+
+    @property
+    def n_geojson_tma_core_features(self) -> int:
+        return sum(int(count) for count in self.geojson_tma_core_counts.values())
 
     @property
     def report_path(self) -> Path:
@@ -78,7 +141,12 @@ class CheckReport:
             f"Measurement files: {len(self.measurement_files)}",
             f"Classifier definitions: {len(self.classifiers)}",
             f"Simple classifiers: {sum(1 for item in self.classifiers if item.is_simple)}",
+            f"Threshold source: {_display_threshold_source(self)}",
             f"GeoJSON files: {len(self.geojson_files)}",
+            f"Annotation features: {self.n_annotation_features}",
+            f"Measurement derived TMA CoreIDs: {self.n_measurement_core_labels}",
+            f"GeoJSON derived TMA CoreIDs: {self.n_geojson_tma_core_ids}",
+            f"Cell features: {self.n_cell_features}",
             f"Report: {self.report_path}",
         ]
 
@@ -108,7 +176,26 @@ class CheckReport:
             "n_warnings": self.n_warnings,
             "measurement_files": [item.to_dict() for item in self.measurement_files],
             "classifiers": [item.to_dict() for item in self.classifiers],
+            "active_threshold_source": (
+                str(self.active_threshold_source) if self.active_threshold_source else None
+            ),
+            "active_threshold_source_kind": self.active_threshold_source_kind,
+            "generated_threshold_template": (
+                str(self.generated_threshold_template)
+                if self.generated_threshold_template
+                else None
+            ),
             "geojson_files": [item.to_dict() for item in self.geojson_files],
+            "geojson_object_counts": {
+                "annotation": self.n_annotation_features,
+                "tmaCore": self.n_tma_core_features,
+                "cell": self.n_cell_features,
+            },
+            "measurement_core_counts": dict(self.measurement_core_counts or {}),
+            "geojson_core_annotation_counts": dict(
+                self.geojson_core_annotation_counts or {}
+            ),
+            "geojson_tma_core_counts": self.geojson_tma_core_counts,
             "messages": [item.to_dict() for item in self.messages],
         }
 
@@ -266,12 +353,72 @@ def _latest_output_threshold_table(output_dir: Path) -> Path | None:
     return max(candidates, key=lambda path: (path.stat().st_mtime, str(path)))
 
 
+def _display_threshold_source(report: CheckReport) -> str:
+    if report.active_threshold_source is not None:
+        return str(report.active_threshold_source)
+    if report.active_threshold_source_kind == "object_classifiers":
+        return "object classifier JSON files"
+    if report.active_threshold_source_kind == "none":
+        return "none"
+    return report.active_threshold_source_kind
+
+
+def _valid_core_label(value: Any) -> str:
+    label = str(value).strip()
+    if label.lower() in {"", "nan", "none", "<na>", "na", "null", "unassigned"}:
+        return ""
+    return label
+
+
+def _measurement_core_counts(
+    measurement_files: list[MeasurementFile],
+    source_cols: tuple[str, ...] = ("TMA Core", "Parent"),
+) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for measurement_file in measurement_files:
+        available_cols = [column for column in source_cols if column in measurement_file.columns]
+        if not available_cols:
+            continue
+        try:
+            with measurement_file.path.open(newline="", errors="replace") as handle:
+                reader = csv.DictReader(handle, delimiter=measurement_file.delimiter)
+                for row in reader:
+                    for column in available_cols:
+                        label = _valid_core_label(row.get(column, ""))
+                        if label:
+                            counts[label] += 1
+                            break
+        except Exception:
+            continue
+    return dict(sorted(counts.items()))
+
+
+def _geojson_core_annotation_counts(
+    geojson_files: list[GeoJsonFile],
+    measurement_core_counts: dict[str, int],
+) -> dict[str, int]:
+    measurement_labels = set(measurement_core_counts)
+    if not measurement_labels:
+        return {}
+    counts: Counter[str] = Counter()
+    for geojson_file in geojson_files:
+        for object_type, labels in geojson_file.labels_by_object_type.items():
+            if object_type.lower() != "annotation":
+                continue
+            for label, count in labels.items():
+                if label in measurement_labels:
+                    counts[label] += int(count)
+    return dict(sorted(counts.items()))
+
+
 def _write_report(report: CheckReport) -> None:
     report.output_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = report.output_dir / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
-    threshold_template_path = _output_threshold_source(report) or _latest_output_threshold_table(
-        report.output_dir
+    threshold_template_path = (
+        report.generated_threshold_template
+        or _output_threshold_source(report)
+        or _latest_output_threshold_table(report.output_dir)
     )
     if threshold_template_path is None:
         threshold_template_path = _write_manual_threshold_template(report)
@@ -302,12 +449,27 @@ def _write_report(report: CheckReport) -> None:
                 elif object_type_lower == "cell":
                     _add_label_count(cell_labels, label, count)
 
-    # Categorise labels into known QXYCell roles.
+    measurement_core_counts = report.measurement_core_counts or {}
+    geojson_core_annotation_counts = report.geojson_core_annotation_counts or {}
+    geojson_tma_core_counts = report.geojson_tma_core_counts
+    measurement_only_core_counts = {
+        label: count
+        for label, count in measurement_core_counts.items()
+        if label not in geojson_core_annotation_counts
+    }
+
+    # Categorise labels into known QXYCell roles. Annotation labels matching
+    # measurement core IDs are reported separately because run() prefers the
+    # measurement CoreID source and skips those labels as annotation columns.
     ignore_labels = {k: v for k, v in annotation_labels.items() if "ignore" in k.lower()}
     sample_labels = {k: v for k, v in annotation_labels.items() if "sample" in k.lower()}
     other_labels = {
         k: v for k, v in annotation_labels.items()
-        if k not in ignore_labels and k not in sample_labels and k not in tma_labels
+        if (
+            k not in ignore_labels
+            and k not in sample_labels
+            and k not in geojson_core_annotation_counts
+        )
     }
 
     def _fmt_labels(d: dict[str, int]) -> str:
@@ -327,18 +489,40 @@ def _write_report(report: CheckReport) -> None:
         f"Classifier definitions: {len(report.classifiers)}",
         f"  Simple classifiers: {sum(1 for item in report.classifiers if item.is_simple)}",
         f"  Markers: {', '.join(c.name for c in report.classifiers if c.is_simple) or 'none'}",
-        f"  Manual threshold template: {threshold_template_path}",
+        f"  Active threshold source: {_display_threshold_source(report)}",
+        f"  Generated threshold template: {threshold_template_path}",
         f"GeoJSON files: {len(report.geojson_files)}",
+        "GeoJSON object counts:",
+        f"  Annotation features: {report.n_annotation_features}",
+        f"  QuPath tmaCore objects: {report.n_tma_core_features}",
+        f"  Cell features     : {report.n_cell_features}",
+        "Measurement derived TMA CoreIDs:",
+        f"  Unique CoreIDs    : {report.n_measurement_core_labels}",
+        f"  Assigned cells    : {report.n_measurement_core_cells}",
+        f"  CoreIDs           : {_fmt_labels(measurement_core_counts)}",
+        "GeoJSON derived TMA CoreIDs:",
+        f"  Unique CoreIDs    : {report.n_geojson_tma_core_ids}",
+        f"  GeoJSON features  : {report.n_geojson_tma_core_features}",
+        f"  CoreIDs           : {_fmt_labels(geojson_tma_core_counts)}",
+        f"  Matched measurement CoreIDs: {_fmt_labels(geojson_core_annotation_counts)}",
+        f"  Measurement-only  : {_fmt_labels(measurement_only_core_counts)}",
         "",
         "Annotations:",
         f"  Sample   : {_fmt_labels(sample_labels)}",
         f"  Ignore   : {_fmt_labels(ignore_labels)}",
-        f"  TMA      : {_fmt_labels(tma_labels)}",
         f"  Other    : {_fmt_labels(other_labels)}",
+        f"TMA cores: {_fmt_labels(tma_labels)}",
         f"  Cell labels: {_fmt_labels(cell_labels)}",
         "",
         "Messages:",
     ]
+    if measurement_core_counts and geojson_core_annotation_counts:
+        lines.append(
+            "- INFO tma.measurement_core_ids_preferred: GeoJSON annotation labels "
+            "matching measurement core IDs were found. qxy.run() uses measurement "
+            "CoreID values and does not keep those matching labels as annotation "
+            "columns."
+        )
     if report.messages:
         for message in report.messages:
             suffix = f" [{message.path}]" if message.path else ""
@@ -406,6 +590,23 @@ def _write_report(report: CheckReport) -> None:
             "labels_by_object_type",
             "error",
         ],
+    )
+    _write_csv(
+        tables_dir / "coreid_report.csv",
+        [
+            {
+                "label": label,
+                "measurement_cell_count": measurement_core_counts.get(label, ""),
+                "geojson_core_annotation_count": geojson_core_annotation_counts.get(label, ""),
+                "status": (
+                    "measurement_and_geojson"
+                    if label in geojson_core_annotation_counts
+                    else "measurement_only"
+                ),
+            }
+            for label in sorted(measurement_core_counts)
+        ],
+        ["label", "measurement_cell_count", "geojson_core_annotation_count", "status"],
     )
     _write_csv(
         tables_dir / "validation_messages.csv",
@@ -493,6 +694,8 @@ def check(
 
     object_classifiers = parse_classifiers(discover_classifier_files(project_path))
     generated_threshold_path = None
+    active_threshold_source = None
+    active_threshold_source_kind = "none"
     if any(classifier.is_simple for classifier in object_classifiers):
         generated_threshold_path = _write_threshold_table(
             output_path,
@@ -519,6 +722,8 @@ def check(
 
     if threshold_path is not None and threshold_path.exists():
         classifiers = parse_threshold_files([threshold_path])
+        active_threshold_source = threshold_path
+        active_threshold_source_kind = "manual_threshold_file"
         for ignored_path in ignored_threshold_paths:
             messages.append(
                 Message(
@@ -533,13 +738,29 @@ def check(
             )
     elif generated_threshold_path is not None:
         classifiers = parse_threshold_files([generated_threshold_path])
+        active_threshold_source = generated_threshold_path
+        active_threshold_source_kind = "generated_threshold_template"
     else:
         classifiers = object_classifiers
+        if classifiers:
+            active_threshold_source_kind = "object_classifiers"
     messages.extend(validate_classifiers(classifiers, measurement_files))
+    if generated_threshold_path is None and classifiers:
+        generated_threshold_path = _write_threshold_table(
+            output_path,
+            measurement_files,
+            classifiers,
+            always_timestamped=True,
+        )
 
     geojson_paths = discover_geojson_files(project_path)
     geojson_files = summarize_geojson_files(geojson_paths)
     messages.extend(validate_geojson_files(geojson_files))
+    measurement_core_counts = _measurement_core_counts(measurement_files)
+    geojson_core_annotation_counts = _geojson_core_annotation_counts(
+        geojson_files,
+        measurement_core_counts,
+    )
 
     report = CheckReport(
         project_dir=project_path,
@@ -548,6 +769,11 @@ def check(
         classifiers=classifiers,
         geojson_files=geojson_files,
         messages=messages,
+        measurement_core_counts=measurement_core_counts,
+        geojson_core_annotation_counts=geojson_core_annotation_counts,
+        active_threshold_source=active_threshold_source,
+        active_threshold_source_kind=active_threshold_source_kind,
+        generated_threshold_template=generated_threshold_path,
     )
     _write_report(report)
     return report

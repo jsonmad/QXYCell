@@ -89,8 +89,16 @@ def test_check_uses_existing_threshold_table_instead_of_refreshing_from_json(tmp
     assert len(report.classifiers) == 1
     assert report.classifiers[0].threshold == 0.9
     assert report.classifiers[0].path.name.startswith("thresholds.tsv#")
+    assert report.active_threshold_source == (project_dir / "thresholds.tsv").resolve()
+    assert report.active_threshold_source_kind == "manual_threshold_file"
+    assert "Threshold source: " in str(report)
+    assert str((project_dir / "thresholds.tsv").resolve()) in str(report)
+    report_text = report.report_path.read_text(encoding="utf-8")
+    assert f"Active threshold source: {(project_dir / 'thresholds.tsv').resolve()}" in report_text
+    assert "Generated threshold template:" in report_text
     generated_tables = sorted((output_dir / "tables").glob("thresholds_*.tsv"))
     assert generated_tables
+    assert report.generated_threshold_template == generated_tables[-1]
     assert _read_threshold_cell(generated_tables[-1]) == "0.42"
 
 
@@ -108,6 +116,8 @@ def test_check_generates_and_uses_threshold_table_when_no_table_exists(tmp_path)
     assert report.classifiers[0].threshold == 0.42
     assert "tables" in report.classifiers[0].path.parts
     assert report.classifiers[0].path.name.startswith("thresholds_")
+    assert report.active_threshold_source == report.generated_threshold_template
+    assert report.active_threshold_source_kind == "generated_threshold_template"
     assert len(list((output_dir / "tables").glob("thresholds_*.tsv"))) == 1
 
 
@@ -134,3 +144,34 @@ def test_check_can_use_explicit_threshold_file(tmp_path):
     assert report.ok
     assert report.classifiers[0].threshold == 0.7
     assert report.classifiers[0].path.name.startswith("custom_thresholds.tsv#")
+    assert report.active_threshold_source == explicit.resolve()
+    assert report.active_threshold_source_kind == "manual_threshold_file"
+
+
+def test_check_ignores_blank_manual_threshold_rows_without_warnings(tmp_path):
+    project_dir = tmp_path / "project"
+    output_dir = tmp_path / "output"
+    project_dir.mkdir()
+    _write_measurements(project_dir)
+    (project_dir / "thresholds.tsv").write_text(
+        "compartment\tmarker\tmeasurement_column\tsample_A.tif\n"
+        "Cell\tCD3\tCell: CD3: Mean\t0.9\n"
+        "Cytoplasm\tCD3\tCytoplasm: CD3: Mean\t\n"
+        "Membrane\tCD3\tMembrane: CD3: Mean\t#N/A\n"
+        "Nucleus\tCD3\tNucleus: CD3: Mean\tn/a\n",
+        encoding="utf-8",
+    )
+
+    report = qxy.check(project_dir, output_dir=output_dir)
+
+    invalid_manual_rows = [
+        message
+        for message in report.messages
+        if message.code == "classifiers.unsupported"
+        and "invalid_manual_threshold_row" in message.message
+    ]
+    assert report.ok
+    assert len(report.classifiers) == 1
+    assert report.classifiers[0].measurement_column == "Cell: CD3: Mean"
+    assert report.classifiers[0].threshold == 0.9
+    assert invalid_manual_rows == []

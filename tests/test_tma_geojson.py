@@ -125,6 +125,32 @@ def _write_template_project(project_dir):
     )
 
 
+def _write_measurement_core_project(project_dir):
+    project_dir.mkdir()
+    pd.DataFrame(
+        {
+            "Image": ["img.ome.tiff", "img.ome.tiff"],
+            "Object ID": ["cell_0", "cell_1"],
+            "Centroid X µm": [5, 25],
+            "Centroid Y µm": [5, 25],
+            "Parent": ["A-1", "A-2"],
+            "Marker: Mean": [10.0, 1.0],
+        }
+    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
+    (project_dir / "marker.json").write_text(
+        json.dumps(
+            {
+                "function": {
+                    "classifier_fun": "ClassifyByMeasurementFunction",
+                    "measurement": "Marker: Mean",
+                    "threshold": 5,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
     geojson_path = _write_geojson(
         tmp_path / "img.geojson",
@@ -152,6 +178,74 @@ def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
     assert conflicts == []
     assert bool(adata.obs.loc["img.ome.tiff::cell_0", "annotation__Region"])
     assert "tma_core" not in adata.obs.columns
+
+
+def test_check_counts_measurement_core_ids_and_matching_geojson_annotations(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_measurement_core_project(project_dir)
+    _write_geojson(
+        project_dir / "img.geojson",
+        [
+            _feature(
+                object_type="annotation",
+                name="A-1",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ),
+            _feature(
+                object_type="annotation",
+                name="Region*",
+                coords=[[0, 0], [30, 0], [30, 30], [0, 30], [0, 0]],
+            ),
+        ],
+    )
+
+    report = check(project_dir, output_dir=tmp_path / "check")
+    report_text = report.report_path.read_text(encoding="utf-8")
+    coreid_report = pd.read_csv(report.output_dir / "tables" / "coreid_report.csv")
+
+    assert report.measurement_core_counts == {"A-1": 1, "A-2": 1}
+    assert report.geojson_core_annotation_counts == {"A-1": 1}
+    assert report.geojson_tma_core_counts == {"A-1": 1}
+    assert "Measurement derived TMA CoreIDs: 2" in str(report)
+    assert "GeoJSON derived TMA CoreIDs: 1" in str(report)
+    assert "Unique CoreIDs    : 2" in report_text
+    assert "Matched measurement CoreIDs: A-1 (1)" in report_text
+    assert "Measurement-only  : A-2 (1)" in report_text
+    assert coreid_report.set_index("label").loc["A-1", "status"] == "measurement_and_geojson"
+
+
+def test_run_defaults_to_measurement_coreid_and_suppresses_matching_geojson_labels(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_measurement_core_project(project_dir)
+    _write_geojson(
+        project_dir / "img.geojson",
+        [
+            _feature(
+                object_type="annotation",
+                name="A-1",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ),
+            _feature(
+                object_type="annotation",
+                name="Region*",
+                coords=[[0, 0], [30, 0], [30, 30], [0, 30], [0, 0]],
+            ),
+        ],
+    )
+
+    adata = run(
+        project_dir,
+        output_dir=tmp_path / "out",
+        pixel_size_um=1.0,
+        verbose=False,
+    )
+
+    assert adata.obs["CoreID"].astype(str).tolist() == ["A-1", "A-2"]
+    assert "annotation__A_1" not in adata.obs.columns
+    assert "annotation__Region" in adata.obs.columns
+    assert bool(adata.obs.loc["img.ome.tiff::cell_0", "annotation__Region"])
+    assert adata.uns["qxycell"]["measurement_core_assignment"]["target_col"] == "CoreID"
+    assert adata.uns["qxycell"]["ignored_geojson_core_annotation_labels"] == ["A-1"]
 
 
 def test_run_detects_tma_cores_without_auto_assigning(tmp_path):
@@ -549,6 +643,11 @@ def test_check_report_lists_tma_core_labels_under_tma(tmp_path):
 
     assert "Sample   : sample1 (1)" in report_text
     assert "Ignore   : Ignore* (1)" in report_text
-    assert "TMA      : A-1 (1)" in report_text
+    assert "Annotation features: 2" in report_text
+    assert "QuPath tmaCore objects: 1" in report_text
+    assert "Cell features     : 2" in report_text
+    assert "GeoJSON derived TMA CoreIDs: 1" in str(report)
+    assert "CoreIDs           : A-1 (1)" in report_text
+    assert "TMA cores: A-1 (1)" in report_text
     assert "Other    : none" in report_text
     assert "Cell labels: Ignore* (2)" in report_text

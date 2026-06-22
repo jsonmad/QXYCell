@@ -51,6 +51,7 @@ BASE_THRESHOLD_TEMPLATE_COLUMNS = {
     "cut_off",
 }
 MEASUREMENT_COMPARTMENTS = {"Cell", "Cytoplasm", "Membrane", "Nucleus"}
+MISSING_THRESHOLD_VALUES = {"", "#n/a", "n/a", "na", "nan", "none", "null", "<na>"}
 
 
 def discover_classifier_files(project_dir: str | Path) -> list[Path]:
@@ -177,6 +178,10 @@ def _as_float(value: Any) -> float | None:
         return None
 
 
+def _is_missing_threshold_value(value: Any) -> bool:
+    return str(value).strip().lower() in MISSING_THRESHOLD_VALUES
+
+
 def parse_classifier(path: str | Path) -> ClassifierDefinition:
     """Parse simple QuPath ClassifyByMeasurementFunction classifiers."""
 
@@ -245,6 +250,19 @@ def _get_first(row: dict[str, str], aliases: tuple[str, ...]) -> str | None:
     return None
 
 
+def _row_has_threshold_value(row: dict[str, str]) -> bool:
+    threshold_value = _get_first(row, THRESHOLD_COLUMNS)
+    if threshold_value and not _is_missing_threshold_value(threshold_value):
+        return True
+    for column, value in row.items():
+        column_name = str(column).strip()
+        if column_name.lower() in BASE_THRESHOLD_TEMPLATE_COLUMNS:
+            continue
+        if str(value).strip() and not _is_missing_threshold_value(value):
+            return True
+    return False
+
+
 def parse_threshold_file(path: str | Path) -> list[ClassifierDefinition]:
     """Parse manually entered marker threshold CSV/TSV rows.
 
@@ -263,6 +281,9 @@ def parse_threshold_file(path: str | Path) -> list[ClassifierDefinition]:
             for row_index, row in enumerate(reader, start=2):
                 name = _get_first(row, NAME_COLUMNS)
                 measurement = _get_first(row, MEASUREMENT_COLUMNS)
+                row_has_threshold = _row_has_threshold_value(row)
+                if not row_has_threshold:
+                    continue
                 if not name or not measurement:
                     classifiers.append(
                         ClassifierDefinition(

@@ -57,7 +57,7 @@ Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`
 
 | Location | Contents |
 |---|---|
-| `adata.obs` | Per-cell metadata: `Image`, `Object ID`, `Xµm`, `Yµm`, optional `TMA Core` / `Parent`, `<marker>_pos` boolean columns, `annotation__<label>` boolean columns, `Sample` when sample annotations exist, and `cell_polygon_wkt` when cell GeoJSON is available |
+| `adata.obs` | Per-cell metadata: `Image`, `Object ID`, `Xµm`, `Yµm`, optional `TMA Core` / `Parent`, automatic `CoreID` when measurement core metadata exists, `<marker>_pos` boolean columns, `annotation__<label>` boolean columns, `Sample` when sample annotations exist, and `cell_polygon_wkt` when cell GeoJSON is available |
 | `adata.X` | Marker intensity matrix (cells × markers) |
 | `adata.var` | Marker names and metadata |
 | `adata.obsm["spatial"]` | Cell centroid coordinates in microns, shape `(n_cells, 2)` |
@@ -71,15 +71,14 @@ QXYCell is built around manual QuPath exports. Required files:
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
 - **Threshold TSV/CSV** — the source of truth for marker positivity thresholds. Use a filled table such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`.
 - **Object classifier JSONs** *(template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell can convert these JSONs into a fresh timestamped threshold table, but existing threshold tables remain the active source.
-- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude.
+- **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude. Annotation labels that exactly match measurement-derived core IDs are reported by `qxy.check()` but are not kept as annotation columns by `qxy.run()`, because measurement `CoreID` is preferred.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
 - **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects. These are not assigned by default; call `qxy.assign_tma_cores()` explicitly when geometry-based core assignment is needed.
 
 Required measurement columns: `Image`, `Object ID`, `Centroid X µm`, `Centroid Y µm`.
 These QuPath centroid columns are stored in `adata.obs` as `Xµm` and `Yµm`.
 Optional measurement columns `TMA Core` and `Parent` are preserved when present
-so they can be collapsed into `CoreID` with
-`qxy.assign_core_ids_from_measurements()`.
+and are automatically collapsed into `adata.obs["CoreID"]` by `qxy.run()`.
 
 Threshold tables are the source used by `qxy.check()` and `qxy.run()`.
 `qxy.check()` always writes a fill-in threshold table based on the measurement
@@ -109,6 +108,10 @@ file back into the QuPath export folder, then rerun `qxy.check()` or
 `qxy.run()`. By default, `qxy.run()` uses the newest recognized threshold table
 in the QuPath export folder. To force a specific table, pass
 `threshold_file="path/to/thresholds.tsv"` to `qxy.check()` or `qxy.run()`.
+The compact `CheckReport` summary includes `Threshold source: ...`, and
+`check_report.txt` includes both `Active threshold source: ...` and
+`Generated threshold template: ...` so the source used for marker calls is
+separate from the newly generated template.
 
 If multiple threshold files are found, QXYCell prefers timestamped
 `thresholds_*.tsv`/`.csv` files and uses the most recently modified one.
@@ -395,18 +398,25 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 
 For QuPath TMA dearrayer exports, use measurement-derived core IDs as the
 default CoreID path. `qxy.run()` keeps the optional measurement columns
-`"TMA Core"` and `"Parent"` when they are present, and
-`qxy.assign_core_ids_from_measurements()` collapses them into one
-`adata.obs["CoreID"]` column.
+`"TMA Core"` and `"Parent"` when they are present and automatically collapses
+them into one `adata.obs["CoreID"]` column.
 
 ```python
-coreid = qxy.assign_core_ids_from_measurements(adata)
+adata = qxy.run(project_dir)
+adata.obs["CoreID"].value_counts()
 ```
 
 By default this uses `"TMA Core"` first and then falls back to `"Parent"` for
 cells where `"TMA Core"` is missing. The output is a categorical
 `adata.obs["CoreID"]`, and the summary is stored in
-`adata.uns["qxycell_core_ids_from_measurements"]`.
+`adata.uns["qxycell_core_ids_from_measurements"]` and
+`adata.uns["qxycell"]["measurement_core_assignment"]`.
+
+When annotation GeoJSON contains labels that exactly match these measurement
+core IDs, `qxy.check()` reports them as "GeoJSON derived TMA CoreIDs".
+`qxy.run()` then uses only the measurement `CoreID` values and skips those
+matching GeoJSON labels so they do not appear as ordinary
+`annotation__<core>` columns.
 
 Use GeoJSON-based TMA assignment separately only when the core labels need to
 come from core boundary geometry rather than from the measurement CSV:
@@ -470,7 +480,7 @@ adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
 | `adata.obs["cell_polygon_wkt"]` | `qxy.run()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
 | `adata.obs["Sample"]` | `qxy.run()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
 | `adata.obs["TMA Core"]`, `adata.obs["Parent"]` | `qxy.run()` | Optional QuPath measurement metadata columns when present |
-| `adata.obs["CoreID"]` | `qxy.assign_core_ids_from_measurements()` | Core ID from measurement metadata |
+| `adata.obs["CoreID"]` | `qxy.run()` / `qxy.assign_core_ids_from_measurements()` | Core ID from measurement metadata |
 | `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
 | `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
 | `adata.obs["tma_core"]` | `qxy.assign_tma_cores()` | TMA core label |

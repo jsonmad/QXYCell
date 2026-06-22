@@ -450,7 +450,7 @@
             
             <section class="card">
               <h3>qxy.check()</h3>
-              <p>Inspect the export folder before running and write a fresh JSON-derived threshold table template when object classifiers are present.</p>
+              <p>Inspect the export folder before running, report the active threshold source, and write a fresh JSON-derived threshold table template when object classifiers are present.</p>
               <pre><code>report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
@@ -562,7 +562,7 @@
             
             <section class="card">
               <h3>qxy.assign_core_ids_from_measurements()</h3>
-              <p>Create CoreID from QuPath measurement metadata columns such as TMA Core and Parent.</p>
+              <p>Create or refresh CoreID from QuPath measurement metadata columns such as TMA Core and Parent. qxy.run() does this automatically when those columns exist.</p>
               <pre><code>summary = qxy.assign_core_ids_from_measurements(adata)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
