@@ -58,6 +58,11 @@ def _load_yaml(path: str | Path) -> dict[str, Any]:
         raise ImportError("Cell type logic YAML support requires PyYAML.") from exc
 
     path = Path(path).expanduser().resolve()
+    if path.suffix.lower() not in {".yaml", ".yml"}:
+        raise ValueError(
+            "Cell type logic must be a .yaml or .yml file. "
+            f"Got: {path}"
+        )
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
