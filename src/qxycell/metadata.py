@@ -113,7 +113,7 @@ def add_metadata(
     }
     adata.uns["qxycell_sample_metadata"] = summary
 
-    out_dir = resolve_output_dir(output_dir, adata=adata) / "run" / "tables"
+    out_dir = resolve_output_dir(output_dir, adata=adata) / "tables"
     out_dir.mkdir(parents=True, exist_ok=True)
     summary_path = out_dir / "sample_metadata_summary.tsv"
     applied_path = out_dir / "sample_metadata_applied.tsv"

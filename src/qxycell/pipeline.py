@@ -14,8 +14,8 @@ from qxycell.classifiers import measurement_columns_for_threshold_template
 from qxycell.classifiers import parse_classifiers
 from qxycell.classifiers import select_threshold_file
 from qxycell.celltyping import apply_celltypes
-from qxycell.checks import check
 from qxycell.checks import generate_threshold_table
+from qxycell.checks import inspect_project
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import _classification_name
 from qxycell.markers import marker_name_from_classifier_name
@@ -260,11 +260,11 @@ def apply_thresholds(
         raise KeyError("adata.var must contain 'source_measurement_column'.")
 
     output_path = _threshold_output_dir(adata, output_dir)
-    report = check(project_dir, threshold_file=threshold_file)
+    report = inspect_project(project_dir, threshold_file=threshold_file, output_dir=output_path)
     if not report.ok:
         raise RuntimeError(
-            "QXYCell check failed before thresholding. See "
-            f"{report.report_path}"
+            "QXYCell project validation failed before thresholding. "
+            "Run qxy.check(...) for a detailed report."
         )
 
     simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
@@ -335,7 +335,7 @@ def apply_thresholds(
     adata.uns["qxycell"]["threshold_source_kind"] = summary["threshold_source_kind"]
     adata.uns["qxycell"]["generated_threshold_template"] = summary["generated_threshold_template"]
 
-    tables_dir = output_path / "run" / "tables"
+    tables_dir = output_path / "tables"
     tables_dir.mkdir(parents=True, exist_ok=True)
     pd.DataFrame([summary]).to_csv(tables_dir / "thresholding_summary.csv", index=False)
 
@@ -638,12 +638,13 @@ def run(
     if generated_run_threshold_table is not None and threshold_file is None:
         log(f"Generated threshold table: {generated_run_threshold_table}")
 
-    report = check(
+    report = inspect_project(
         project_dir,
         threshold_file=generated_run_threshold_table or threshold_file,
+        output_dir=output_path,
     )
     log(
-        "Check: "
+        "Validation: "
         f"{'PASS' if report.ok else 'FAIL'} "
         f"({report.n_errors} errors, {report.n_warnings} warnings)"
     )
@@ -658,8 +659,7 @@ def run(
 
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
-            "QXYCell check failed. See "
-            f"{report.report_path}"
+            "QXYCell project validation failed. Run qxy.check(...) for a detailed report."
         )
 
     log("Loading measurement table(s)...")
@@ -852,7 +852,7 @@ def run(
             f"{celltyping_summary['unknown_count']:,} Unknown cells"
         )
 
-    run_dir = output_path / "run"
+    run_dir = output_path
     h5ad_dir = run_dir / "h5ad"
     h5ad_dir.mkdir(parents=True, exist_ok=True)
     _folder_name = output_path.name  # e.g. qxy_outputs_260527-2029
@@ -870,12 +870,12 @@ def run(
         "tables_dir": str(tables_dir),
         "created": datetime.now().isoformat(timespec="seconds"),
         "pixel_size_um": pixel_size_um,
-        "check_output_dir": str(report.output_dir),
-        "check_report_txt": str(report.report_path),
-        "check_report_json": str(report.json_path),
-        "check_ok": bool(report.ok),
-        "check_n_errors": int(report.n_errors),
-        "check_n_warnings": int(report.n_warnings),
+        "check_output_dir": None,
+        "check_report_txt": None,
+        "check_report_json": None,
+        "validation_ok": bool(report.ok),
+        "validation_n_errors": int(report.n_errors),
+        "validation_n_warnings": int(report.n_warnings),
         "n_measurement_files": int(len(report.measurement_files)),
         "n_classifiers": int(len(report.classifiers)),
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),

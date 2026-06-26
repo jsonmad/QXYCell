@@ -28,7 +28,7 @@ def _default_h5ad_path(adata=None, output_dir: str | Path | None = None) -> Path
             if not _has_legacy_parent(h5ad_path):
                 return h5ad_path
     output_path = resolve_output_dir(output_dir, adata=adata)
-    return output_path / "run" / "h5ad" / _h5ad_filename(output_path)
+    return output_path / "h5ad" / _h5ad_filename(output_path)
 
 
 def _prepare_obs_for_h5ad(adata) -> None:
@@ -66,12 +66,17 @@ def save(
     _prepare_obs_for_h5ad(adata)
     adata.write_h5ad(h5ad_path)
 
-    output_path = h5ad_path.parents[2] if h5ad_path.match("*/run/h5ad/*.h5ad") else h5ad_path.parent
+    if h5ad_path.match("*/run/h5ad/*.h5ad"):
+        output_path = h5ad_path.parents[2]
+    elif h5ad_path.match("*/h5ad/*.h5ad"):
+        output_path = h5ad_path.parents[1]
+    else:
+        output_path = h5ad_path.parent
     metadata = adata.uns.setdefault("qxycell", {})
     metadata["output_dir"] = str(output_path)
-    metadata["run_dir"] = str(output_path / "run")
+    metadata["run_dir"] = str(output_path)
     metadata["h5ad_path"] = str(h5ad_path)
-    metadata["tables_dir"] = str(output_path / "run" / "tables")
+    metadata["tables_dir"] = str(output_path / "tables")
 
     if verbose:
         print(f"Saved QXYCell H5AD:\n{h5ad_path}")
@@ -82,12 +87,17 @@ def _resolve_h5ad_input(path_or_output_dir: str | Path) -> Path:
     path = Path(path_or_output_dir).expanduser().resolve()
     if path.is_file():
         return path
-    h5ad_dir = path / "run" / "h5ad"
-    # Try timestamped name first, then fall back to any qxycell*.h5ad in the folder
-    candidates = sorted(h5ad_dir.glob("qxycell*.h5ad")) if h5ad_dir.is_dir() else []
+    h5ad_dirs = [path / "h5ad", path / "run" / "h5ad"]
+    candidates = []
+    for h5ad_dir in h5ad_dirs:
+        if h5ad_dir.is_dir():
+            candidates.extend(sorted(h5ad_dir.glob("qxycell*.h5ad")))
     if candidates:
         return max(candidates, key=lambda p: p.stat().st_mtime)
-    raise FileNotFoundError(f"No QXYCell H5AD found in {h5ad_dir}")
+    raise FileNotFoundError(
+        "No QXYCell H5AD found in "
+        f"{h5ad_dirs[0]} or legacy {h5ad_dirs[1]}"
+    )
 
 
 def load(path_or_output_dir: str | Path):

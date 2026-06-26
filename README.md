@@ -44,7 +44,7 @@ This installs all required dependencies: `anndata`, `colorcet`, `cmcrameri`, `ge
 ```python
 import qxycell as qxy
 
-# Validate your QuPath export before running
+# Optional: validate your QuPath export before running
 report = qxy.check("/path/to/qupath_export")
 
 # Optional: create a threshold table from QuPath object classifiers
@@ -60,8 +60,8 @@ threshold_summary = qxy.threshold(adata, "/path/to/qupath_export")
 celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
 ```
 
-By default, `qxy.check()` and `qxy.run()` write timestamped sibling folders next
-to the QuPath export folder:
+When called, `qxy.check()` writes a timestamped sibling check folder. `qxy.run()`
+writes only a timestamped sibling run folder:
 
 ```text
 qupath_export_check_YYMMDD_HHMM/
@@ -124,7 +124,9 @@ table from object classifier JSONs explicitly, call:
 threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
 ```
 
-`qxy.run()` checks whether a threshold table already exists. If one is found,
+`qxy.run()` does not call `qxy.check()` or write a check report. It inspects the
+project files needed for import and checks whether a threshold table already
+exists. If one is found,
 it is used. If no threshold table is found and usable object classifier JSONs
 are present, `qxy.run()` generates a timestamped threshold table in the sibling
 `thresholds/` folder and then uses that table for validation. Object classifier
@@ -481,7 +483,7 @@ results, and other analysis state already stored on the object.
 By default, QXYCell saves to the active run folder:
 
 ```text
-qupath_export_run_YYMMDD_HHMM/run/h5ad/qxycell.h5ad
+qupath_export_run_YYMMDD_HHMM/h5ad/qxycell.h5ad
 ```
 
 If `adata.uns["qxycell"]["h5ad_path"]` already exists, `qxy.save(adata)` updates

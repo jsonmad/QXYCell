@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import re
 
 import pandas as pd
@@ -57,11 +56,13 @@ def test_run_defaults_to_project_sibling_timestamped_output(tmp_path):
     output_dir = output_dir_from_adata(adata)
     assert output_dir.parent == project_dir.parent
     assert re.fullmatch(r"qupath_dir_run_\d{6}_\d{4}", output_dir.name)
-    assert (output_dir / "run" / "h5ad" / "qxycell.h5ad").exists()
-    assert re.fullmatch(
-        r"qupath_dir_check_\d{6}_\d{4}",
-        Path(adata.uns["qxycell"]["check_output_dir"]).name,
-    )
+    assert (output_dir / "h5ad" / "qxycell.h5ad").exists()
+    assert not (output_dir / "run").exists()
+    assert adata.uns["qxycell"]["check_output_dir"] is None
+    assert adata.uns["qxycell"]["check_report_txt"] is None
+    assert adata.uns["qxycell"]["validation_ok"] is True
+    assert "check_ok" not in adata.uns["qxycell"]
+    assert not any(project_dir.parent.glob("qupath_dir_check_*"))
     assert not (output_dir / "check_report.txt").exists()
     generated_thresholds = list((project_dir.parent / "thresholds").glob("thresholds_*.tsv"))
     assert len(generated_thresholds) == 1

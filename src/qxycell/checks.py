@@ -643,24 +643,17 @@ def generate_threshold_table(
     )
 
 
-def check(
+def inspect_project(
     project_dir: str | Path,
-    output_dir: str | Path | None = None,
     *,
     count_rows: bool = False,
     threshold_file: str | Path | None = None,
+    output_dir: str | Path | None = None,
 ) -> CheckReport:
-    """Inspect and validate a manually exported QuPath project folder.
-
-    The function writes a report folder and returns the same information as a Python object.
-    """
+    """Inspect a manually exported QuPath project folder without writing reports."""
 
     project_path = Path(project_dir).expanduser().resolve()
-    output_path = resolve_output_dir(
-        output_dir,
-        project_dir=project_path,
-        project_output_kind="check",
-    )
+    output_path = Path(output_dir).expanduser().resolve() if output_dir is not None else project_path
     messages: list[Message] = []
 
     if not project_path.exists():
@@ -672,9 +665,7 @@ def check(
                 path=str(project_path),
             )
         )
-        report = CheckReport(project_path, output_path, [], [], [], messages)
-        _write_report(report)
-        return report
+        return CheckReport(project_path, output_path, [], [], [], messages)
 
     measurement_paths = discover_measurement_files(project_path)
     measurement_files: list[MeasurementFile] = []
@@ -759,6 +750,33 @@ def check(
         active_threshold_source=active_threshold_source,
         active_threshold_source_kind=active_threshold_source_kind,
         generated_threshold_template=generated_threshold_path,
+    )
+    return report
+
+
+def check(
+    project_dir: str | Path,
+    output_dir: str | Path | None = None,
+    *,
+    count_rows: bool = False,
+    threshold_file: str | Path | None = None,
+) -> CheckReport:
+    """Inspect and validate a manually exported QuPath project folder.
+
+    The function writes a report folder and returns the same information as a Python object.
+    """
+
+    project_path = Path(project_dir).expanduser().resolve()
+    output_path = resolve_output_dir(
+        output_dir,
+        project_dir=project_path,
+        project_output_kind="check",
+    )
+    report = inspect_project(
+        project_path,
+        count_rows=count_rows,
+        threshold_file=threshold_file,
+        output_dir=output_path,
     )
     _write_report(report)
     return report
