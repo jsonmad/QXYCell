@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import re
 
 import pandas as pd
@@ -43,7 +44,8 @@ def test_check_defaults_to_project_sibling_timestamped_output(tmp_path):
 
     assert report.output_dir.parent == project_dir.parent
     assert re.fullmatch(r"qupath_dir_check_\d{6}_\d{4}", report.output_dir.name)
-    assert report.generated_threshold_template.parent == report.output_dir / "thresholds"
+    assert report.generated_threshold_template is None
+    assert not (report.output_dir / "thresholds").exists()
 
 
 def test_run_defaults_to_project_sibling_timestamped_output(tmp_path):
@@ -56,6 +58,13 @@ def test_run_defaults_to_project_sibling_timestamped_output(tmp_path):
     assert output_dir.parent == project_dir.parent
     assert re.fullmatch(r"qupath_dir_run_\d{6}_\d{4}", output_dir.name)
     assert (output_dir / "run" / "h5ad" / "qxycell.h5ad").exists()
+    assert re.fullmatch(
+        r"qupath_dir_check_\d{6}_\d{4}",
+        Path(adata.uns["qxycell"]["check_output_dir"]).name,
+    )
+    assert not (output_dir / "check_report.txt").exists()
+    generated_thresholds = list((project_dir.parent / "thresholds").glob("thresholds_*.tsv"))
+    assert len(generated_thresholds) == 1
 
 
 def test_generated_project_output_folders_are_discovery_artifacts(tmp_path):

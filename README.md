@@ -47,6 +47,9 @@ import qxycell as qxy
 # Validate your QuPath export before running
 report = qxy.check("/path/to/qupath_export")
 
+# Optional: create a threshold table from QuPath object classifiers
+threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
+
 # Import all cells into an AnnData object
 adata = qxy.run("/path/to/qupath_export")
 
@@ -85,7 +88,7 @@ in `adata.uns["qxycell"]["output_dir"]` when `output_dir` is omitted.
 QXYCell is built around manual QuPath exports. Required files:
 
 - **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
-- **Threshold TSV/CSV** — the source of truth for marker positivity thresholds. Use a filled table such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`.
+- **Threshold TSV/CSV** — the source of truth for marker positivity thresholds. Use a filled table such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`, preferably in a sibling `thresholds/` folder beside the QuPath export folder.
 - **Object classifier JSONs** *(template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell can convert these JSONs into a fresh timestamped threshold table, but existing threshold tables remain the active source.
 - **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude. Annotation labels that exactly match measurement-derived core IDs are reported by `qxy.check()` but are not kept as annotation columns by `qxy.run()`, because measurement `CoreID` is preferred.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
@@ -97,11 +100,14 @@ Optional measurement columns `TMA Core` and `Parent` are preserved when present
 and are automatically collapsed into `adata.obs["CoreID"]` by `qxy.run()`.
 
 Threshold tables are the source used by `qxy.check()` and `qxy.threshold()`.
-`qxy.check()` always writes a fill-in threshold table based on the measurement
-columns it finds:
+Generated threshold tables are always written to a shared `thresholds/` folder
+in the same directory as the QuPath export folder:
 
 ```text
-qupath_export_check_YYMMDD_HHMM/thresholds/thresholds_YYMMDD-HHMM.tsv
+project_parent/
+  qupath_export/
+  thresholds/
+    thresholds_YYMMDD-HHMM.tsv
 ```
 
 The table includes only measurement columns whose names contain `mean` or
@@ -111,26 +117,27 @@ the `marker` value is taken from the classifier JSON filename, not from the
 measurement column text. For example, `aSMA.json` mapped to
 `Cell: #945;SMA - TRITC: Mean` writes marker `aSMA`.
 
-When usable object classifier JSONs are present, `qxy.check()` writes a fresh
-timestamped threshold table into the output `thresholds/` folder. This generated
-table is a template/audit artifact; it does not overwrite any threshold table
-in the QuPath export folder. To generate a fresh threshold table from JSONs
-explicitly, call:
+`qxy.check()` does not generate threshold tables. To generate a fresh threshold
+table from object classifier JSONs explicitly, call:
 
 ```python
 threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
 ```
 
-Object classifier JSONs never modify an existing threshold table. To manually
-edit thresholds, fill in or edit the image threshold columns, save the finished
-file back into the QuPath export folder, then rerun `qxy.check()` or
-`qxy.threshold()`. By default, `qxy.threshold()` uses the newest recognized
-threshold table in the QuPath export folder. To force a specific table, pass
-`threshold_file="path/to/thresholds.tsv"` to `qxy.check()` or `qxy.threshold()`.
-The compact `CheckReport` summary includes `Threshold source: ...`, and
-`check_report.txt` includes both `Active threshold source: ...` and
-`Generated threshold template: ...` so the source used for marker calls is
-separate from the newly generated template.
+`qxy.run()` checks whether a threshold table already exists. If one is found,
+it is used. If no threshold table is found and usable object classifier JSONs
+are present, `qxy.run()` generates a timestamped threshold table in the sibling
+`thresholds/` folder and then uses that table for validation. Object classifier
+JSONs never modify an existing threshold table.
+
+To manually edit thresholds, fill in or edit the image threshold columns, save
+the finished file in the sibling `thresholds/` folder, then rerun `qxy.check()`
+or `qxy.threshold()`. By default, QXYCell uses the newest recognized threshold
+table in the QuPath export folder or sibling `thresholds/` folder. To force a
+specific table, pass `threshold_file="path/to/thresholds.tsv"` to `qxy.check()`,
+`qxy.run()`, or `qxy.threshold()`. The compact `CheckReport` summary includes
+`Threshold source: ...`, and `check_report.txt` includes
+`Active threshold source: ...`.
 
 If multiple threshold files are found, QXYCell prefers timestamped
 `thresholds_*.tsv`/`.csv` files and uses the most recently modified one.

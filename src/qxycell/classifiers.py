@@ -68,17 +68,23 @@ def discover_classifier_files(project_dir: str | Path) -> list[Path]:
 
 
 def discover_threshold_files(project_dir: str | Path) -> list[Path]:
-    """Find manual classifier-threshold CSV/TSV files below a project directory."""
+    """Find manual classifier-threshold CSV/TSV files for a project directory."""
 
     root = Path(project_dir).expanduser().resolve()
-    files = [
-        path
-        for path in root.rglob("*")
-        if path.is_file()
-        and not path.name.startswith(".")
-        and not is_qxy_output_artifact(path, root)
-        and _is_manual_threshold_file(path)
-    ]
+    search_roots = [root]
+    sibling_thresholds = root.parent / "thresholds"
+    if sibling_thresholds.exists():
+        search_roots.append(sibling_thresholds)
+    files = []
+    for search_root in search_roots:
+        files.extend(
+            path
+            for path in search_root.rglob("*")
+            if path.is_file()
+            and not path.name.startswith(".")
+            and not is_qxy_output_artifact(path, root)
+            and _is_manual_threshold_file(path)
+        )
     return sorted(dict.fromkeys(files))
 
 

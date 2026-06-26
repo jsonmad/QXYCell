@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import qxycell as qxy
 from qxycell.checks import check
 from qxycell.geojson import load_cell_polygons, summarize_geojson_file
 from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, apply_thresholds, run
@@ -307,14 +308,14 @@ def test_run_detects_tma_cores_without_auto_assigning(tmp_path):
     assert "qxycell_tma" not in adata.uns
 
 
-def test_check_writes_manual_threshold_template(tmp_path):
+def test_generate_threshold_table_writes_manual_threshold_template(tmp_path):
     project_dir = tmp_path / "project"
     _write_template_project(project_dir)
 
-    report = check(project_dir, output_dir=tmp_path / "qxy_outputs_260615-1234")
+    template_path = qxy.generate_threshold_table(project_dir)
 
-    template_path = report.output_dir / "thresholds" / "thresholds_260615-1234.tsv"
     assert template_path.exists()
+    assert template_path.parent == project_dir.parent / "thresholds"
     template = pd.read_csv(template_path, sep="\t")
     assert template.columns.tolist() == [
         "compartment",

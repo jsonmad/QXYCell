@@ -7,10 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from qxycell.classifiers import ClassifierDefinition
+from qxycell.classifiers import discover_classifier_files
+from qxycell.classifiers import discover_threshold_files
 from qxycell.classifiers import marker_name_from_measurement_column
 from qxycell.classifiers import measurement_columns_for_threshold_template
+from qxycell.classifiers import parse_classifiers
+from qxycell.classifiers import select_threshold_file
 from qxycell.celltyping import apply_celltypes
 from qxycell.checks import check
+from qxycell.checks import generate_threshold_table
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import _classification_name
 from qxycell.markers import marker_name_from_classifier_name
@@ -210,6 +215,20 @@ def _threshold_output_dir(adata, output_dir: str | Path | None = None) -> Path:
     return resolve_output_dir(None, adata=adata)
 
 
+def _ensure_run_threshold_table(project_path: Path, threshold_file: str | Path | None) -> Path | None:
+    """Generate a shared threshold table for run() when no table already exists."""
+
+    if threshold_file is not None:
+        return Path(threshold_file).expanduser().resolve()
+    selected, _ignored = select_threshold_file(discover_threshold_files(project_path))
+    if selected is not None:
+        return None
+    classifiers = parse_classifiers(discover_classifier_files(project_path))
+    if not any(classifier.is_simple for classifier in classifiers):
+        return None
+    return generate_threshold_table(project_path)
+
+
 def apply_thresholds(
     adata,
     project_dir: str | Path | None = None,
@@ -241,11 +260,11 @@ def apply_thresholds(
         raise KeyError("adata.var must contain 'source_measurement_column'.")
 
     output_path = _threshold_output_dir(adata, output_dir)
-    report = check(project_dir, output_dir=output_path, threshold_file=threshold_file)
+    report = check(project_dir, threshold_file=threshold_file)
     if not report.ok:
         raise RuntimeError(
             "QXYCell check failed before thresholding. See "
-            f"{output_path / 'check_report.txt'}"
+            f"{report.report_path}"
         )
 
     simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
@@ -615,7 +634,14 @@ def run(
     log(f"Project: {project_path}")
     log(f"Output: {output_path}")
 
-    report = check(project_dir, output_dir=output_path, threshold_file=threshold_file)
+    generated_run_threshold_table = _ensure_run_threshold_table(project_path, threshold_file)
+    if generated_run_threshold_table is not None and threshold_file is None:
+        log(f"Generated threshold table: {generated_run_threshold_table}")
+
+    report = check(
+        project_dir,
+        threshold_file=generated_run_threshold_table or threshold_file,
+    )
     log(
         "Check: "
         f"{'PASS' if report.ok else 'FAIL'} "
@@ -633,7 +659,7 @@ def run(
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
             "QXYCell check failed. See "
-            f"{output_path / 'check_report.txt'}"
+            f"{report.report_path}"
         )
 
     log("Loading measurement table(s)...")
@@ -844,8 +870,9 @@ def run(
         "tables_dir": str(tables_dir),
         "created": datetime.now().isoformat(timespec="seconds"),
         "pixel_size_um": pixel_size_um,
-        "check_report_txt": str(output_path / "check_report.txt"),
-        "check_report_json": str(output_path / "check_report.json"),
+        "check_output_dir": str(report.output_dir),
+        "check_report_txt": str(report.report_path),
+        "check_report_json": str(report.json_path),
         "check_ok": bool(report.ok),
         "check_n_errors": int(report.n_errors),
         "check_n_warnings": int(report.n_warnings),
