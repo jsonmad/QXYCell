@@ -49,6 +49,12 @@ report = qxy.check("/path/to/qupath_export")
 
 # Import all cells into an AnnData object
 adata = qxy.run("/path/to/qupath_export")
+
+# Apply marker thresholds to create <marker>_pos columns
+threshold_summary = qxy.threshold(adata, "/path/to/qupath_export")
+
+# Apply cell type rules after thresholding
+celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
 ```
 
 Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`.
@@ -57,7 +63,7 @@ Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`
 
 | Location | Contents |
 |---|---|
-| `adata.obs` | Per-cell metadata: `Image`, `Object ID`, `Xµm`, `Yµm`, optional `TMA Core` / `Parent`, automatic `CoreID` when measurement core metadata exists, `<marker>_pos` boolean columns, `annotation__<label>` boolean columns, `Sample` when sample annotations exist, and `cell_polygon_wkt` when cell GeoJSON is available |
+| `adata.obs` | Per-cell metadata: `Image`, `Object ID`, `Xµm`, `Yµm`, optional `TMA Core` / `Parent`, automatic `CoreID` when measurement core metadata exists, `annotation__<label>` boolean columns, `Sample` when sample annotations exist, and `cell_polygon_wkt` when cell GeoJSON is available |
 | `adata.X` | Marker intensity matrix (cells × markers) |
 | `adata.var` | Marker names and metadata |
 | `adata.obsm["spatial"]` | Cell centroid coordinates in microns, shape `(n_cells, 2)` |
@@ -80,7 +86,7 @@ These QuPath centroid columns are stored in `adata.obs` as `Xµm` and `Yµm`.
 Optional measurement columns `TMA Core` and `Parent` are preserved when present
 and are automatically collapsed into `adata.obs["CoreID"]` by `qxy.run()`.
 
-Threshold tables are the source used by `qxy.check()` and `qxy.run()`.
+Threshold tables are the source used by `qxy.check()` and `qxy.threshold()`.
 `qxy.check()` always writes a fill-in threshold table based on the measurement
 columns it finds:
 
@@ -105,9 +111,9 @@ threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
 Object classifier JSONs never modify an existing threshold table. To manually
 edit thresholds, fill in or edit the image threshold columns, save the finished
 file back into the QuPath export folder, then rerun `qxy.check()` or
-`qxy.run()`. By default, `qxy.run()` uses the newest recognized threshold table
-in the QuPath export folder. To force a specific table, pass
-`threshold_file="path/to/thresholds.tsv"` to `qxy.check()` or `qxy.run()`.
+`qxy.threshold()`. By default, `qxy.threshold()` uses the newest recognized
+threshold table in the QuPath export folder. To force a specific table, pass
+`threshold_file="path/to/thresholds.tsv"` to `qxy.check()` or `qxy.threshold()`.
 The compact `CheckReport` summary includes `Threshold source: ...`, and
 `check_report.txt` includes both `Active threshold source: ...` and
 `Generated threshold template: ...` so the source used for marker calls is
@@ -475,7 +481,7 @@ adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
 |---|---|---|
 | `adata.obs["Image"]` | `qxy.run()` | QuPath image name per cell |
 | `adata.obs["Xµm"]`, `adata.obs["Yµm"]` | `qxy.run()` | Cell centroid x/y coordinates in microns |
-| `adata.obs["<marker>_pos"]` | `qxy.run()` | Boolean marker positivity columns |
+| `adata.obs["<marker>_pos"]` | `qxy.threshold()` / `qxy.apply_thresholds()` | Boolean marker positivity columns |
 | `adata.obs["annotation__<label>"]` | `qxy.run()` | Boolean annotation membership columns |
 | `adata.obs["cell_polygon_wkt"]` | `qxy.run()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
 | `adata.obs["Sample"]` | `qxy.run()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
@@ -491,6 +497,7 @@ adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
 | `adata.obsm["cn_profile"]` | `qxy.cn_knn()` | Per-cell local cell type composition (sums to 1) |
 | `adata.uns["qxycell"]` | `qxy.run()` | Run metadata, output paths, colour palettes |
 | `adata.uns["qxycell_annotation_labels"]` | `qxy.run()` | Annotation class → column name map |
+| `adata.uns["qxycell_thresholding"]` | `qxy.threshold()` / `qxy.apply_thresholds()` | Threshold source and positivity-column summary |
 | `adata.uns["qxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
 | `adata.uns["qxycell_core_ids_from_measurements"]` | `qxy.assign_core_ids_from_measurements()` | Measurement-derived CoreID assignment summary |
 | `adata.uns["qxycell_qc"]` | `qxy.qc()` | QC metrics per sample |

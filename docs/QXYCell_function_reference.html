@@ -150,9 +150,15 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, threshold-table definitions, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. By default the newest recognized threshold table in the project folder is used; pass <code>threshold_file=</code> to force a specific table. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present and automatically collapsed to <code>CoreID</code>. Matching GeoJSON annotation labels are reported but skipped as annotation columns.</td>
+        <td>Import QuPath measurements, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and optional measurement core metadata into AnnData. Measurement columns <code>TMA Core</code> and <code>Parent</code> are preserved when present and automatically collapsed to <code>CoreID</code>. Matching GeoJSON annotation labels are reported but skipped as annotation columns. Marker positivity is added later with <code>qxy.threshold()</code>.</td>
         <td><code>adata = qxy.run(qupath_project)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.threshold</code></td>
+        <td>Apply active threshold definitions to an imported AnnData object and create <code>&lt;marker&gt;_pos</code> columns.</td>
+        <td><code>summary = qxy.threshold(adata, qupath_project)</code></td>
+        <td><code>adata.obs["&lt;marker&gt;_pos"]</code> columns and <code>adata.uns["qxycell_thresholding"]</code>.</td>
       </tr>
       <tr>
         <td><code>qxy.celltype_prompt</code></td>
@@ -299,6 +305,7 @@
 qupath_project = "/path/to/qupath_project"
 
 adata = qxy.run(qupath_project)
+qxy.threshold(adata, qupath_project)
 qxy.remove_ignore(adata)
 
 prompt = qxy.celltype_prompt(
@@ -370,7 +377,7 @@ qxy.save(adata)</code></pre>
     </tbody>
   </table>
 
-  <h2>TMA Commands</h2>
+  <h2>TMA CoreID Commands</h2>
 
   <div class="note">
     <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, prefer measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present and writes categorical <code>adata.obs["CoreID"]</code>. If GeoJSON annotation labels match those measurement core IDs, they are reported by <code>qxy.check()</code> and skipped as annotation columns by <code>qxy.run()</code>. Use <code>qxy.assign_tma_cores()</code> only when core IDs need to come from GeoJSON core boundary geometry.

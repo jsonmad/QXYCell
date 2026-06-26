@@ -179,7 +179,12 @@ def build_examples() -> dict:
         PROJECT_DIR,
         output_dir=RUN_OUTPUT_DIR,
         pixel_size_um=1.0,
-        celltype_logic=logic_path,
+        verbose=False,
+    )
+    threshold_summary = qxy.threshold(
+        adata,
+        PROJECT_DIR,
+        output_dir=RUN_OUTPUT_DIR,
         verbose=False,
     )
     celltype_logic_copy = RUN_OUTPUT_DIR / "celltype" / "celltype_logic.yaml"
@@ -318,6 +323,7 @@ def build_examples() -> dict:
     return {
         "report": report,
         "threshold_path": threshold_path,
+        "threshold_summary": threshold_summary,
         "adata": adata,
         "clean": clean,
         "artifact_clean": artifact_clean,
@@ -358,7 +364,8 @@ def make_html(examples: dict) -> str:
         [c for c in adata.obs.columns if c.endswith("_pos")]
     ].head(8).reset_index()
     functions = [
-        ("qxy.run()", "Run the main QuPath export to AnnData pipeline using the active threshold table, preserving optional TMA Core and Parent measurement metadata when present.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
+        ("qxy.run()", "Import QuPath measurements, spatial coordinates, annotation labels, cell polygons, and optional TMA Core and Parent metadata into AnnData without assigning marker positivity or cell types.", "adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)", table_html(obs_preview)),
+        ("qxy.threshold()", "Apply threshold definitions to an imported AnnData object and add <marker>_pos columns.", "summary = qxy.threshold(adata, project_dir, output_dir=out_dir)", table_html(compact_dict(examples["threshold_summary"], ["threshold_source", "n_threshold_definitions", "n_pos_columns"]))),
         ("qxy.workflow()", "Run the common notebook workflow in one call.", "adata = qxy.workflow(project_dir, sample_metadata=metadata, celltype_logic='celltype_logic.yaml')", f"<p>Workflow result: {examples['workflow_adata'].n_obs} cells after Ignore removal.</p>"),
         (
             "qxy.check()",

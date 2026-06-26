@@ -12,7 +12,7 @@ from qxycell.filtering import remove_annotations
 from qxycell.filtering import remove_ignore
 from qxycell.io_utils import load, load_latest, save
 from qxycell.metadata import add_metadata
-from qxycell.pipeline import run
+from qxycell.pipeline import apply_thresholds, run, threshold
 from qxycell.plotting import (
     plot_cell_boundaries,
     plot_cn_heatmap,
@@ -32,6 +32,7 @@ __all__ = [
     "CheckReport",
     "add_metadata",
     "apply_celltypes",
+    "apply_thresholds",
     "assign_annotations",
     "assign_core_ids_from_measurements",
     "assign_samples",
@@ -58,5 +59,6 @@ __all__ = [
     "remove_ignore",
     "run",
     "save",
+    "threshold",
     "workflow",
 ]

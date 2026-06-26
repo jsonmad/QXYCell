@@ -8,7 +8,7 @@ import pytest
 
 from qxycell.checks import check
 from qxycell.geojson import load_cell_polygons, summarize_geojson_file
-from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, run
+from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, apply_thresholds, run
 from qxycell.tma import assign_tma_cores
 
 
@@ -314,7 +314,7 @@ def test_check_writes_manual_threshold_template(tmp_path):
     ]
 
 
-def test_run_uses_manual_threshold_tsv_when_simple_json_missing(tmp_path):
+def test_threshold_uses_manual_threshold_tsv_after_run(tmp_path):
     project_dir = tmp_path / "project"
     _write_minimal_manual_threshold_project(project_dir)
 
@@ -324,11 +324,19 @@ def test_run_uses_manual_threshold_tsv_when_simple_json_missing(tmp_path):
         pixel_size_um=1.0,
         verbose=False,
     )
+    assert not any(column.endswith("_pos") for column in adata.obs.columns)
+    threshold_summary = apply_thresholds(
+        adata,
+        project_dir=project_dir,
+        output_dir=tmp_path / "out",
+        verbose=False,
+    )
 
     assert adata.var_names.tolist() == ["Marker"]
     assert adata.var.loc["Marker", "source_measurement_column"] == "Marker: Mean"
     assert adata.var.loc["Marker", "threshold"] == "per_image"
     assert adata.obs["Marker_pos"].tolist() == [1, 0, 0, 0]
+    assert threshold_summary["n_pos_columns"] == 1
     assert adata.uns["qxycell"]["n_simple_classifiers"] == 2
 
 
@@ -361,6 +369,12 @@ def test_run_uses_newest_timestamped_threshold_file(tmp_path):
         project_dir,
         output_dir=tmp_path / "run_out",
         pixel_size_um=1.0,
+        verbose=False,
+    )
+    apply_thresholds(
+        adata,
+        project_dir=project_dir,
+        output_dir=tmp_path / "run_out",
         verbose=False,
     )
 

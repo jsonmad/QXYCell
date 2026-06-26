@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from qxycell.classifiers import ClassifierDefinition
+from qxycell.classifiers import marker_name_from_measurement_column
+from qxycell.classifiers import measurement_columns_for_threshold_template
 from qxycell.celltyping import apply_celltypes
 from qxycell.checks import check
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
@@ -105,13 +107,49 @@ def _build_var_dataframe(classifier_groups, marker_names, pd):
     return pd.DataFrame(rows, index=index)
 
 
-def _apply_marker_thresholds(adata, classifier_groups, marker_names, image_col: str = "Image") -> int:
+def _unique_marker_names_from_measurement_columns(columns: list[str]) -> dict[int, str]:
+    names: dict[int, str] = {}
+    seen: dict[str, int] = {}
+    for index, column in enumerate(columns):
+        base = marker_name_from_measurement_column(column)
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        names[index] = base if count == 0 else f"{base}_{count + 1}"
+    return names
+
+
+def _build_var_dataframe_from_measurement_columns(marker_columns, marker_names, pd):
+    rows = []
+    index = []
+    for column_index, measurement_column in enumerate(marker_columns):
+        marker_name = marker_names[column_index]
+        index.append(marker_name)
+        rows.append(
+            {
+                "marker_name": marker_name,
+                "classifier_name": "",
+                "source_measurement_column": measurement_column,
+                "threshold": "",
+                "threshold_source": "",
+            }
+        )
+    return pd.DataFrame(rows, index=index)
+
+
+def _apply_marker_thresholds(
+    adata,
+    classifier_groups,
+    marker_names,
+    image_col: str = "Image",
+    marker_indices: list[int] | None = None,
+) -> int:
     import numpy as _np
 
     n_pos_columns = 0
     for group_index, group in enumerate(classifier_groups):
         marker_name = marker_names[group_index]
-        values = _np.asarray(adata.X[:, group_index], dtype=float)
+        marker_index = marker_indices[group_index] if marker_indices is not None else group_index
+        values = _np.asarray(adata.X[:, marker_index], dtype=float)
         pos = _np.zeros(adata.n_obs, dtype="int8")
         fallback_thresholds = [
             float(classifier.threshold)
@@ -129,6 +167,137 @@ def _apply_marker_thresholds(adata, classifier_groups, marker_names, image_col: 
         adata.obs[f"{marker_name}_pos"] = pos
         n_pos_columns += 1
     return n_pos_columns
+
+
+def _threshold_output_dir(adata, output_dir: str | Path | None = None) -> Path:
+    if output_dir is not None:
+        return resolve_output_dir(output_dir, adata=adata)
+    metadata = getattr(adata, "uns", {}).get("qxycell", {})
+    if isinstance(metadata, dict) and metadata.get("output_dir"):
+        return Path(metadata["output_dir"]).expanduser().resolve()
+    return resolve_output_dir(None, adata=adata)
+
+
+def apply_thresholds(
+    adata,
+    project_dir: str | Path | None = None,
+    *,
+    threshold_file: str | Path | None = None,
+    output_dir: str | Path | None = None,
+    image_col: str = "Image",
+    verbose: bool = True,
+) -> dict[str, Any]:
+    """Apply marker threshold definitions to an existing AnnData object.
+
+    This step adds ``<marker>_pos`` columns to ``adata.obs``. It is separate
+    from ``qxy.run()``, which imports measurement intensities, spatial
+    coordinates, and annotation metadata into AnnData.
+    """
+
+    import pandas as pd
+
+    metadata = getattr(adata, "uns", {}).get("qxycell", {})
+    if project_dir is None and isinstance(metadata, dict):
+        project_dir = metadata.get("project_dir")
+    if project_dir is None:
+        raise ValueError(
+            "project_dir is required unless adata.uns['qxycell']['project_dir'] is set."
+        )
+    if image_col not in adata.obs.columns:
+        raise KeyError(f"image_col not found in adata.obs: {image_col}")
+    if "source_measurement_column" not in adata.var.columns:
+        raise KeyError("adata.var must contain 'source_measurement_column'.")
+
+    output_path = _threshold_output_dir(adata, output_dir)
+    report = check(project_dir, output_dir=output_path, threshold_file=threshold_file)
+    if not report.ok:
+        raise RuntimeError(
+            "QXYCell check failed before thresholding. See "
+            f"{output_path / 'check_report.txt'}"
+        )
+
+    simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
+    if not simple_classifiers:
+        raise ValueError("No usable threshold definitions are available.")
+
+    source_columns = adata.var["source_measurement_column"].astype(str).tolist()
+    source_lookup = {column: index for index, column in enumerate(source_columns)}
+    classifier_groups = _group_simple_classifiers(simple_classifiers)
+    matched_groups = []
+    marker_indices = []
+    marker_names: dict[int, str] = {}
+    missing_columns = []
+    for group in classifier_groups:
+        measurement_column = str(group[0].measurement_column)
+        marker_index = source_lookup.get(measurement_column)
+        if marker_index is None:
+            missing_columns.append(measurement_column)
+            continue
+        group_index = len(matched_groups)
+        matched_groups.append(group)
+        marker_indices.append(marker_index)
+        marker_names[group_index] = str(adata.var_names[marker_index])
+
+    if missing_columns:
+        raise ValueError(
+            "Threshold definitions reference measurement columns not present in adata.var: "
+            + ", ".join(sorted(dict.fromkeys(missing_columns)))
+        )
+
+    for column in ("classifier_name", "threshold", "threshold_source"):
+        if column in adata.var.columns:
+            adata.var[column] = adata.var[column].astype("object")
+
+    n_pos_columns = _apply_marker_thresholds(
+        adata,
+        matched_groups,
+        marker_names,
+        image_col=image_col,
+        marker_indices=marker_indices,
+    )
+
+    for group_index, group in enumerate(matched_groups):
+        marker_index = marker_indices[group_index]
+        adata.var.iloc[marker_index, adata.var.columns.get_loc("classifier_name")] = group[0].name
+        adata.var.iloc[marker_index, adata.var.columns.get_loc("threshold")] = _threshold_summary(group)
+        adata.var.iloc[marker_index, adata.var.columns.get_loc("threshold_source")] = "|".join(
+            str(item.path) for item in group
+        )
+
+    summary = {
+        "project_dir": str(Path(project_dir).expanduser().resolve()),
+        "output_dir": str(output_path),
+        "threshold_source": str(report.active_threshold_source)
+        if report.active_threshold_source
+        else report.active_threshold_source_kind,
+        "threshold_source_kind": report.active_threshold_source_kind,
+        "generated_threshold_template": str(report.generated_threshold_template)
+        if report.generated_threshold_template
+        else None,
+        "n_threshold_definitions": len(simple_classifiers),
+        "n_marker_groups": len(matched_groups),
+        "n_pos_columns": n_pos_columns,
+        "pos_columns": [f"{marker_names[index]}_pos" for index in range(len(matched_groups))],
+    }
+    adata.uns["qxycell_thresholding"] = summary
+    adata.uns.setdefault("qxycell", {})["thresholding_applied"] = True
+    adata.uns["qxycell"]["threshold_source"] = summary["threshold_source"]
+    adata.uns["qxycell"]["threshold_source_kind"] = summary["threshold_source_kind"]
+    adata.uns["qxycell"]["generated_threshold_template"] = summary["generated_threshold_template"]
+
+    tables_dir = output_path / "run" / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([summary]).to_csv(tables_dir / "thresholding_summary.csv", index=False)
+
+    if verbose:
+        print(
+            "Applied marker thresholds: "
+            f"{n_pos_columns} positivity columns from {summary['threshold_source']}"
+        )
+    return summary
+
+
+threshold = apply_thresholds
 
 
 def _safe_obs_column_name(prefix: str, label: str) -> str:
@@ -383,16 +552,17 @@ def run(
     *,
     fail_on_check_error: bool = True,
     pixel_size_um: float = 0.28,
-    celltype_logic: str | Path | dict[str, Any] | None = None,
     threshold_file: str | Path | None = None,
+    apply_thresholds: bool = False,
+    celltype_logic: str | Path | dict[str, Any] | None = None,
     verbose: bool = True,
 ) -> Any:
     """Run QXYCell on a manually exported QuPath project.
 
-    The v1 pipeline imports one ``adata.X`` column per usable threshold
-    definition, stores required QuPath identity/spatial columns plus available
-    core metadata columns in ``adata.obs``, and adds marker positivity calls
-    plus GeoJSON annotation columns when possible.
+    The pipeline imports QuPath measurement intensity columns into ``adata.X``
+    and stores required QuPath identity/spatial columns plus available core
+    metadata columns in ``adata.obs``. Marker positivity calls are a separate
+    step via ``qxy.threshold()`` / ``qxy.apply_thresholds()``.
     """
 
     ad, np, pd = _import_runtime_dependencies()
@@ -430,10 +600,6 @@ def run(
             f"{output_path / 'check_report.txt'}"
         )
 
-    simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
-    if not simple_classifiers:
-        raise ValueError("No usable threshold definitions are available for adata.X import.")
-
     log("Loading measurement table(s)...")
     measurements = _read_measurements(report.measurement_files, pd)
     log(f"Loaded cells: {len(measurements):,}")
@@ -441,15 +607,16 @@ def run(
         if column not in measurements.columns:
             raise ValueError(f"Missing required QuPath measurement column: {column}")
 
-    classifier_groups = _group_simple_classifiers(simple_classifiers)
-    marker_names = _unique_marker_names(classifier_groups)
-    marker_columns = [group[0].measurement_column for group in classifier_groups]
+    marker_columns = measurement_columns_for_threshold_template(report.measurement_files)
+    if not marker_columns:
+        raise ValueError("No mean/median measurement columns are available for adata.X import.")
+    marker_names = _unique_marker_names_from_measurement_columns(marker_columns)
     missing_marker_columns = [
         column for column in marker_columns if column not in measurements.columns
     ]
     if missing_marker_columns:
         raise ValueError(
-            "Classifier-referenced measurement columns are missing: "
+            "Measurement columns selected for adata.X are missing: "
             + ", ".join(str(column) for column in missing_marker_columns)
         )
 
@@ -481,14 +648,13 @@ def run(
     if np.isnan(spatial).any():
         raise ValueError("Centroid X/Y columns contain missing or non-numeric values.")
 
-    var = _build_var_dataframe(classifier_groups, marker_names, pd)
+    var = _build_var_dataframe_from_measurement_columns(marker_columns, marker_names, pd)
     adata = ad.AnnData(X=x, obs=obs, var=var)
     adata.var_names = list(var.index)
     adata.obsm["spatial"] = spatial
 
-    n_pos_columns = _apply_marker_thresholds(adata, classifier_groups, marker_names)
     log(f"Created AnnData: {adata.n_obs:,} cells x {adata.n_vars:,} markers")
-    log(f"Added marker positivity columns: {n_pos_columns}")
+    log("Marker positivity columns not added by run(); call qxy.threshold(adata) next.")
 
     coreid_summary = None
     matching_geojson_core_labels = set(report.geojson_core_annotation_counts or {})
@@ -590,8 +756,25 @@ def run(
 
     log("")
 
+    thresholding_summary = None
+    if apply_thresholds:
+        log("Applying marker thresholds...")
+        thresholding_summary = globals()["apply_thresholds"](
+            adata,
+            project_dir=project_dir,
+            threshold_file=threshold_file,
+            output_dir=output_path,
+            verbose=verbose,
+        )
+        log(f"Thresholding: {thresholding_summary['n_pos_columns']} positivity columns")
+
     celltyping_summary = None
     if celltype_logic is not None:
+        if not any(str(column).endswith("_pos") for column in adata.obs.columns):
+            raise ValueError(
+                "celltype_logic requires marker positivity columns. "
+                "Call qxy.threshold(adata, ...) first or pass apply_thresholds=True."
+            )
         log("Applying cell type logic...")
         celltyping_summary = apply_celltypes(
             adata,
@@ -637,6 +820,8 @@ def run(
         "generated_threshold_template": str(report.generated_threshold_template)
         if report.generated_threshold_template
         else None,
+        "thresholding_applied": bool(thresholding_summary is not None),
+        "thresholding": thresholding_summary,
         "n_geojson_files": int(len(report.geojson_files)),
         "n_tma_core_features": int(n_tma_core_features),
         "n_measurement_core_labels": int(report.n_measurement_core_labels),

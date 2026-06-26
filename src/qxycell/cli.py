@@ -50,12 +50,17 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--celltype-logic",
         default=None,
-        help="Optional YAML file with ordered cell type rules.",
+        help="Optional YAML file with ordered cell type rules. Implies --apply-thresholds.",
     )
     run_parser.add_argument(
         "--threshold-file",
         default=None,
-        help="Explicit threshold TSV/CSV to use instead of auto-selecting from the project folder.",
+        help="Explicit threshold TSV/CSV to use when --apply-thresholds is set.",
+    )
+    run_parser.add_argument(
+        "--apply-thresholds",
+        action="store_true",
+        help="Apply threshold definitions after importing AnnData to create <marker>_pos columns.",
     )
     return parser
 
@@ -87,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
             pixel_size_um=args.pixel_size_um,
             celltype_logic=args.celltype_logic,
             threshold_file=args.threshold_file,
+            apply_thresholds=args.apply_thresholds or args.celltype_logic is not None,
         )
         print("QXYCell run complete")
         print(f"H5AD: {adata.uns['qxycell']['h5ad_path']}")

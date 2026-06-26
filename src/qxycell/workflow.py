@@ -26,11 +26,12 @@ def workflow(
     from qxycell.filtering import remove_ignore
     from qxycell.io_utils import save
     from qxycell.metadata import add_metadata
-    from qxycell.pipeline import run
+    from qxycell.pipeline import apply_thresholds, run
     from qxycell.plotting import plot_spatial, plot_stacked_bar
     from qxycell.qc import qc
 
     adata = run(project_dir, output_dir=output_dir, verbose=verbose)
+    apply_thresholds(adata, project_dir=project_dir, output_dir=output_dir, verbose=verbose)
 
     if sample_metadata is not None:
         add_metadata(

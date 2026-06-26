@@ -1724,7 +1724,7 @@ def plot_marker_heatmap(
                         if f"{m}_pos" in adata.obs.columns]
             if not pos_cols:
                 raise ValueError(
-                    "No '_pos' columns found. Run qxy.run() first."
+                    "No '_pos' columns found. Run qxy.threshold(adata, ...) first."
                 )
             display_markers = [c.removesuffix("_pos") for c in pos_cols]
             matrix_df  = adata.obs.groupby(category_col, observed=True)[pos_cols].mean()
