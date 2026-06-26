@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
+from qxycell.discovery import is_qxy_output_artifact
 from qxycell.types import MeasurementFile, Message
 
 REQUIRED_MEASUREMENT_COLUMNS = ("Image", "Object ID", "Centroid X µm", "Centroid Y µm")
@@ -22,6 +23,8 @@ def discover_measurement_files(project_dir: str | Path) -> list[Path]:
     for path in candidates:
         lower = path.name.lower()
         if lower.startswith("."):
+            continue
+        if is_qxy_output_artifact(path, root):
             continue
         if "measurement" in lower or lower in {"detections.tsv", "detections.csv"}:
             filtered.append(path)

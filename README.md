@@ -57,7 +57,17 @@ threshold_summary = qxy.threshold(adata, "/path/to/qupath_export")
 celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
 ```
 
-Both functions write outputs to a timestamped folder: `qxy_outputs_YYMMDD-HHMM/`.
+By default, `qxy.check()` and `qxy.run()` write timestamped sibling folders next
+to the QuPath export folder:
+
+```text
+qupath_export_check_YYMMDD_HHMM/
+qupath_export_run_YYMMDD_HHMM/
+```
+
+Downstream functions such as `qxy.threshold()`, `qxy.add_metadata()`,
+`qxy.celltype()`, plotting, and `qxy.save()` reuse the active run folder stored
+in `adata.uns["qxycell"]["output_dir"]` when `output_dir` is omitted.
 
 **`qxy.run()` populates the AnnData as follows:**
 
@@ -91,15 +101,18 @@ Threshold tables are the source used by `qxy.check()` and `qxy.threshold()`.
 columns it finds:
 
 ```text
-qxy_outputs_YYMMDD-HHMM/tables/thresholds_YYMMDD-HHMM.tsv
+qupath_export_check_YYMMDD_HHMM/thresholds/thresholds_YYMMDD-HHMM.tsv
 ```
 
 The table includes only measurement columns whose names contain `mean` or
 `median`. Each row is one feature, and each image gets its own threshold
-column.
+column. When a usable object classifier JSON maps to that measurement column,
+the `marker` value is taken from the classifier JSON filename, not from the
+measurement column text. For example, `aSMA.json` mapped to
+`Cell: #945;SMA - TRITC: Mean` writes marker `aSMA`.
 
 When usable object classifier JSONs are present, `qxy.check()` writes a fresh
-timestamped threshold table into the output `tables/` folder. This generated
+timestamped threshold table into the output `thresholds/` folder. This generated
 table is a template/audit artifact; it does not overwrite any threshold table
 in the QuPath export folder. To generate a fresh threshold table from JSONs
 explicitly, call:
@@ -164,7 +177,8 @@ Generate per-sample QC tables and an HTML report:
 qc = qxy.qc(adata, sample_col="Image")
 ```
 
-Results stored in `adata.uns["qxycell_qc"]`. HTML report and TSV tables written to `qxy_outputs_YYMMDD-HHMM/qc/`.
+Results stored in `adata.uns["qxycell_qc"]`. HTML report and TSV tables are
+written to the active output folder under `qc/`.
 
 ## Metadata
 
@@ -202,7 +216,9 @@ prompt = qxy.celltype_prompt(adata)
 print(prompt)
 ```
 
-This prints the prompt, saves it to `qxy_outputs_YYMMDD-HHMM/celltype/`, and returns the string. After editing and saving a YAML logic file in that folder, apply it:
+This prints the prompt, saves it to the active output folder under `celltype/`,
+and returns the string. After editing and saving a YAML logic file in that
+folder, apply it:
 
 ```python
 summary = qxy.celltype(adata)
@@ -234,7 +250,7 @@ Auto-assign descriptive names to CN clusters from their composition profiles:
 label_table = qxy.cn_name(adata)
 ```
 
-Labels are derived from `adata.obsm["cn_profile"]` using a priority rule: clusters where one cell type dominates (≥ 50 %) are labelled `<type> hi`; mixed clusters show the top two contributors (e.g. `CD8 T/Macrophage`). Renames values in `adata.obs["cn"]` (string). Label map stored in `adata.uns["cn"]["label_map"]`. Summary saved to `qxy_outputs_YYMMDD-HHMM/cn/cn_labels.csv`.
+Labels are derived from `adata.obsm["cn_profile"]` using a priority rule: clusters where one cell type dominates (≥ 50 %) are labelled `<type> hi`; mixed clusters show the top two contributors (e.g. `CD8 T/Macrophage`). Renames values in `adata.obs["cn"]` (string). Label map stored in `adata.uns["cn"]["label_map"]`. Summary saved to the active output folder under `cn/cn_labels.csv`.
 
 Optionally shorten long cell type names before labelling:
 
@@ -259,6 +275,9 @@ qxy.plot_spatial(adata, samples=["sample_A", "sample_B"])
 # Fixed square window (microns)
 qxy.plot_spatial(adata, fixed_window_um=11500)
 
+# Cell-distribution centering instead of the default bounding-box center
+qxy.plot_spatial(adata, center_method="median")
+
 # Figure panel aspect from selected sample X/Y extent
 qxy.plot_spatial(adata, auto_figsize=True)
 
@@ -275,7 +294,10 @@ Use a short image label column (`ImageID`) instead of the full QuPath `Image` na
 qxy.plot_spatial(adata, sample_col="ImageID")
 ```
 
-Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Colour palette cached in `adata.uns["qxycell"]["palettes"]`.
+Reads from `adata.obsm["spatial"]` and `adata.obs[category_col]`. Spatial plots
+default to bounding-box centering (`center_method="bbox"`) so each sample is
+framed by its full X/Y extent rather than by an asymmetric cell-density median.
+Colour palette cached in `adata.uns["qxycell"]["palettes"]`.
 
 Plot cell boundary polygons instead of centroid dots when
 `adata.obs["cell_polygon_wkt"]` is available:
@@ -452,7 +474,7 @@ results, and other analysis state already stored on the object.
 By default, QXYCell saves to the active run folder:
 
 ```text
-qxy_outputs_YYMMDD-HHMM/run/h5ad/qxycell_YYMMDD-HHMM.h5ad
+qupath_export_run_YYMMDD_HHMM/run/h5ad/qxycell.h5ad
 ```
 
 If `adata.uns["qxycell"]["h5ad_path"]` already exists, `qxy.save(adata)` updates
@@ -463,7 +485,7 @@ that same file. Pass `output_dir=` or `path=` to save somewhere else.
 qxy.save(adata)
 
 # Save to a chosen output folder
-qxy.save(adata, output_dir="qxy_outputs_manual")
+qxy.save(adata, output_dir="my_qxy_output")
 
 # Save to an exact file path
 qxy.save(adata, path="my_analysis.h5ad")
@@ -472,7 +494,7 @@ qxy.save(adata, path="my_analysis.h5ad")
 adata = qxy.load_latest()
 
 # Reload a specific file
-adata = qxy.load("path/to/qxycell_YYMMDD-HHMM.h5ad")
+adata = qxy.load("path/to/qxycell.h5ad")
 ```
 
 ## AnnData structure summary

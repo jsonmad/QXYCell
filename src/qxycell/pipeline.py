@@ -136,6 +136,38 @@ def _build_var_dataframe_from_measurement_columns(marker_columns, marker_names, 
     return pd.DataFrame(rows, index=index)
 
 
+def _marker_name_lookup_by_measurement_column(
+    classifiers: list[ClassifierDefinition],
+) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for classifier in classifiers:
+        if not classifier.is_simple or classifier.measurement_column is None:
+            continue
+        lookup.setdefault(
+            str(classifier.measurement_column),
+            marker_name_from_classifier_name(classifier.name),
+        )
+    return lookup
+
+
+def _unique_marker_names_for_measurement_columns(
+    columns: list[str],
+    classifiers: list[ClassifierDefinition],
+) -> dict[int, str]:
+    classifier_marker_lookup = _marker_name_lookup_by_measurement_column(classifiers)
+    names: dict[int, str] = {}
+    seen: dict[str, int] = {}
+    for index, column in enumerate(columns):
+        base = classifier_marker_lookup.get(
+            str(column),
+            marker_name_from_measurement_column(column),
+        )
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        names[index] = base if count == 0 else f"{base}_{count + 1}"
+    return names
+
+
 def _apply_marker_thresholds(
     adata,
     classifier_groups,
@@ -225,7 +257,6 @@ def apply_thresholds(
     classifier_groups = _group_simple_classifiers(simple_classifiers)
     matched_groups = []
     marker_indices = []
-    marker_names: dict[int, str] = {}
     missing_columns = []
     for group in classifier_groups:
         measurement_column = str(group[0].measurement_column)
@@ -236,13 +267,13 @@ def apply_thresholds(
         group_index = len(matched_groups)
         matched_groups.append(group)
         marker_indices.append(marker_index)
-        marker_names[group_index] = str(adata.var_names[marker_index])
 
     if missing_columns:
         raise ValueError(
             "Threshold definitions reference measurement columns not present in adata.var: "
             + ", ".join(sorted(dict.fromkeys(missing_columns)))
         )
+    marker_names = _unique_marker_names(matched_groups)
 
     for column in ("classifier_name", "threshold", "threshold_source"):
         if column in adata.var.columns:
@@ -567,7 +598,12 @@ def run(
 
     ad, np, pd = _import_runtime_dependencies()
 
-    output_path = resolve_output_dir(output_dir)
+    project_path = Path(project_dir).expanduser().resolve()
+    output_path = resolve_output_dir(
+        output_dir,
+        project_dir=project_path,
+        project_output_kind="run",
+    )
     log_lines: list[str] = []
 
     def log(message: str) -> None:
@@ -576,7 +612,7 @@ def run(
             print(message)
 
     log("QXYCell run started")
-    log(f"Project: {Path(project_dir).expanduser().resolve()}")
+    log(f"Project: {project_path}")
     log(f"Output: {output_path}")
 
     report = check(project_dir, output_dir=output_path, threshold_file=threshold_file)
@@ -610,7 +646,10 @@ def run(
     marker_columns = measurement_columns_for_threshold_template(report.measurement_files)
     if not marker_columns:
         raise ValueError("No mean/median measurement columns are available for adata.X import.")
-    marker_names = _unique_marker_names_from_measurement_columns(marker_columns)
+    marker_names = _unique_marker_names_for_measurement_columns(
+        marker_columns,
+        report.classifiers,
+    )
     missing_marker_columns = [
         column for column in marker_columns if column not in measurements.columns
     ]
@@ -798,7 +837,7 @@ def run(
     tables_dir.mkdir(parents=True, exist_ok=True)
 
     adata.uns["qxycell"] = {
-        "project_dir": str(Path(project_dir).expanduser().resolve()),
+        "project_dir": str(project_path),
         "output_dir": str(output_path),
         "run_dir": str(run_dir),
         "h5ad_path": str(h5ad_path),

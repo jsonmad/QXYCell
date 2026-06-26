@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from qxycell.discovery import is_qxy_output_artifact
 from qxycell.types import ClassifierDefinition, Message, MeasurementFile
 
 
@@ -75,6 +76,7 @@ def discover_threshold_files(project_dir: str | Path) -> list[Path]:
         for path in root.rglob("*")
         if path.is_file()
         and not path.name.startswith(".")
+        and not is_qxy_output_artifact(path, root)
         and _is_manual_threshold_file(path)
     ]
     return sorted(dict.fromkeys(files))

@@ -125,6 +125,31 @@ def _write_template_project(project_dir):
     )
 
 
+def _write_alias_classifier_project(project_dir):
+    project_dir.mkdir()
+    pd.DataFrame(
+        {
+            "Image": ["img_a.ome.tiff", "img_a.ome.tiff"],
+            "Object ID": ["cell_0", "cell_1"],
+            "Centroid X µm": [5, 25],
+            "Centroid Y µm": [5, 25],
+            "Cell: #945;SMA - TRITC: Mean": [10.0, 1.0],
+        }
+    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
+    (project_dir / "aSMA.json").write_text(
+        json.dumps(
+            {
+                "function": {
+                    "classifier_fun": "ClassifyByMeasurementFunction",
+                    "measurement": "Cell: #945;SMA - TRITC: Mean",
+                    "threshold": 5,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _write_measurement_core_project(project_dir):
     project_dir.mkdir()
     pd.DataFrame(
@@ -288,7 +313,7 @@ def test_check_writes_manual_threshold_template(tmp_path):
 
     report = check(project_dir, output_dir=tmp_path / "qxy_outputs_260615-1234")
 
-    template_path = report.output_dir / "tables" / "thresholds_260615-1234.tsv"
+    template_path = report.output_dir / "thresholds" / "thresholds_260615-1234.tsv"
     assert template_path.exists()
     template = pd.read_csv(template_path, sep="\t")
     assert template.columns.tolist() == [
@@ -299,7 +324,7 @@ def test_check_writes_manual_threshold_template(tmp_path):
         "img_b.ome.tiff",
     ]
     assert template["compartment"].fillna("").tolist() == ["Cell", "", "", "Nucleus"]
-    assert template["marker"].tolist() == ["CD8", "Marker", "Marker", "DAPI"]
+    assert template["marker"].tolist() == ["CD8", "marker", "Marker", "DAPI"]
     assert template["measurement_column"].tolist() == [
         "Cell: CD8 - Cy5: Mean",
         "Marker: Mean",
@@ -338,6 +363,29 @@ def test_threshold_uses_manual_threshold_tsv_after_run(tmp_path):
     assert adata.obs["Marker_pos"].tolist() == [1, 0, 0, 0]
     assert threshold_summary["n_pos_columns"] == 1
     assert adata.uns["qxycell"]["n_simple_classifiers"] == 2
+
+
+def test_run_and_threshold_use_classifier_filename_for_marker_name(tmp_path):
+    project_dir = tmp_path / "project"
+    _write_alias_classifier_project(project_dir)
+
+    adata = run(
+        project_dir,
+        output_dir=tmp_path / "out",
+        pixel_size_um=1.0,
+        verbose=False,
+    )
+    threshold_summary = apply_thresholds(
+        adata,
+        project_dir=project_dir,
+        output_dir=tmp_path / "out",
+        verbose=False,
+    )
+
+    assert adata.var_names.tolist() == ["aSMA"]
+    assert adata.var.loc["aSMA", "source_measurement_column"] == "Cell: #945;SMA - TRITC: Mean"
+    assert adata.obs["aSMA_pos"].tolist() == [1, 0]
+    assert threshold_summary["pos_columns"] == ["aSMA_pos"]
 
 
 def test_run_uses_newest_timestamped_threshold_file(tmp_path):

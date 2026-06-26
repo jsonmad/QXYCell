@@ -37,7 +37,7 @@ def _strip_label_count(label: str) -> str:
 def _valid_measurement_core_values(series: pd.Series) -> pd.Series:
     text = series.astype("string").str.strip()
     invalid = text.isna() | text.str.lower().isin(
-        {"", "nan", "none", "<na>", "na", "null", "unassigned"}
+        {"", "nan", "none", "<na>", "na", "null", "unassigned", "root object (image)"}
     )
     return text.mask(invalid, pd.NA)
 
@@ -54,9 +54,8 @@ def assign_core_ids_from_measurements(
 ) -> dict[str, object]:
     """Assign TMA core IDs from QuPath measurement metadata columns.
 
-    QXYCell uses this as the preferred CoreID path when QuPath exported core
-    metadata such as ``"TMA Core"`` or ``"Parent"``. GeoJSON core assignment is
-    available separately through :func:`qxycell.tma.assign_tma_cores`.
+    QXYCell uses this as the CoreID path when QuPath exported core metadata
+    such as ``"TMA Core"`` or ``"Parent"``.
     """
 
     if not target_col:

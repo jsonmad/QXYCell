@@ -138,6 +138,40 @@ def test_plot_cell_boundaries_underlay_false_centers_on_plotted_polygons(tmp_pat
     assert bounds["x_center"] == 5
 
 
+def test_plot_spatial_defaults_to_bbox_centering(tmp_path):
+    obs = pd.DataFrame(
+        {
+            "Sample": ["s1", "s1", "s1"],
+            "celltype": ["A", "A", "B"],
+        },
+        index=["cell_0", "cell_1", "cell_2"],
+    )
+    adata = ad.AnnData(X=np.zeros((3, 1)), obs=obs)
+    adata.obsm["spatial"] = np.array(
+        [
+            [0, 0],
+            [10, 0],
+            [100, 100],
+        ],
+        dtype=float,
+    )
+
+    paths = qxy.plot_spatial(
+        adata,
+        sample_col="Sample",
+        output_dir=tmp_path,
+        scale_bar=False,
+        save_pdf=False,
+        show=False,
+        verbose=False,
+    )
+
+    bounds = paths["sample_bounds"]["s1"]
+    assert paths["center_method"] == "bbox"
+    assert bounds["x_center"] == 50
+    assert bounds["y_center"] == 50
+
+
 def test_plot_cn_heatmap_accepts_category_col_alias(tmp_path):
     obs = pd.DataFrame(
         {

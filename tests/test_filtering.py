@@ -119,20 +119,20 @@ def test_assign_annotations_rejects_missing_labels():
 def test_assign_core_ids_from_measurements_prefers_tma_core_then_parent():
     obs = pd.DataFrame(
         {
-            "TMA Core": ["G-1", "", pd.NA, "Unassigned"],
-            "Parent": ["fallback_ignored", "H-2", "I-3", "J-4"],
+            "TMA Core": ["G-1", "", pd.NA, "Unassigned", "Root object (Image)"],
+            "Parent": ["fallback_ignored", "H-2", "I-3", "J-4", "K-5"],
         },
-        index=["cell_0", "cell_1", "cell_2", "cell_3"],
+        index=["cell_0", "cell_1", "cell_2", "cell_3", "cell_4"],
     )
-    adata = ad.AnnData(X=np.zeros((4, 1)), obs=obs)
+    adata = ad.AnnData(X=np.zeros((5, 1)), obs=obs)
 
     summary = qxy.assign_core_ids_from_measurements(adata, verbose=False)
 
     assert adata.obs["CoreID"].astype(object).where(
         adata.obs["CoreID"].notna(), None
-    ).tolist() == ["G-1", "H-2", "I-3", "J-4"]
+    ).tolist() == ["G-1", "H-2", "I-3", "J-4", "K-5"]
     assert summary["available_source_cols"] == ["TMA Core", "Parent"]
-    assert summary["n_assigned_cells"] == 4
+    assert summary["n_assigned_cells"] == 5
     assert summary["n_unassigned_cells"] == 0
 
 

@@ -23,6 +23,7 @@ from qxycell.classifiers import (
     validate_classifiers,
 )
 from qxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
+from qxycell.markers import marker_name_from_classifier_name
 from qxycell.measurements import (
     discover_measurement_files,
     summarize_measurement_file,
@@ -225,10 +226,14 @@ def _threshold_table_rows(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     images = _unique_measurement_images(measurement_files)
     threshold_lookup = _threshold_lookup(classifiers)
+    marker_lookup = _marker_lookup_by_measurement_column(classifiers)
     rows = [
         {
             "compartment": compartment_from_measurement_column(column),
-            "marker": marker_name_from_measurement_column(column),
+            "marker": marker_lookup.get(
+                column,
+                marker_name_from_measurement_column(column),
+            ),
             "measurement_column": column,
             **{
                 image: _prefill_threshold(threshold_lookup, image, column)
@@ -240,6 +245,20 @@ def _threshold_table_rows(
     return rows, ["compartment", "marker", "measurement_column", *images]
 
 
+def _marker_lookup_by_measurement_column(
+    classifiers: list[ClassifierDefinition],
+) -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    for classifier in classifiers:
+        if not classifier.is_simple or classifier.measurement_column is None:
+            continue
+        lookup.setdefault(
+            str(classifier.measurement_column),
+            marker_name_from_classifier_name(classifier.name),
+        )
+    return lookup
+
+
 def _write_threshold_table(
     output_dir: Path,
     measurement_files: list[MeasurementFile],
@@ -249,7 +268,8 @@ def _write_threshold_table(
 ) -> Path:
     """Write a TSV threshold table."""
 
-    template_path = output_dir / "tables" / _threshold_template_filename(
+    thresholds_dir = output_dir / "thresholds"
+    template_path = thresholds_dir / _threshold_template_filename(
         output_dir,
         always_timestamped=always_timestamped,
     )
@@ -279,13 +299,14 @@ def _threshold_template_filename(output_dir: Path, *, always_timestamped: bool) 
     if timestamp == output_dir.name or not timestamp:
         timestamp = datetime.now().strftime(OUTPUT_TIMESTAMP_FORMAT)
     filename = f"thresholds_{timestamp}.tsv" if always_timestamped else "thresholds.tsv"
-    path = output_dir / "tables" / filename
+    thresholds_dir = output_dir / "thresholds"
+    path = thresholds_dir / filename
     if not always_timestamped or not path.exists():
         return filename
     stem = path.stem
     suffix = path.suffix
     counter = 2
-    while (output_dir / "tables" / f"{stem}-{counter}{suffix}").exists():
+    while (thresholds_dir / f"{stem}-{counter}{suffix}").exists():
         counter += 1
     return f"{stem}-{counter}{suffix}"
 
@@ -333,19 +354,19 @@ def _prefill_threshold(
 
 
 def _output_threshold_source(report: CheckReport) -> Path | None:
-    tables_dir = report.output_dir / "tables"
+    thresholds_dir = report.output_dir / "thresholds"
     for classifier in report.classifiers:
         source = Path(str(classifier.path).split("#", 1)[0])
-        if source.exists() and source.parent == tables_dir:
+        if source.exists() and source.parent == thresholds_dir:
             return source
     return None
 
 
 def _latest_output_threshold_table(output_dir: Path) -> Path | None:
-    tables_dir = output_dir / "tables"
+    thresholds_dir = output_dir / "thresholds"
     candidates = [
         path
-        for path in tables_dir.glob("thresholds_*.tsv")
+        for path in thresholds_dir.glob("thresholds_*.tsv")
         if path.is_file()
     ]
     if not candidates:
@@ -365,7 +386,16 @@ def _display_threshold_source(report: CheckReport) -> str:
 
 def _valid_core_label(value: Any) -> str:
     label = str(value).strip()
-    if label.lower() in {"", "nan", "none", "<na>", "na", "null", "unassigned"}:
+    if label.lower() in {
+        "",
+        "nan",
+        "none",
+        "<na>",
+        "na",
+        "null",
+        "unassigned",
+        "root object (image)",
+    }:
         return ""
     return label
 
@@ -632,7 +662,11 @@ def generate_threshold_table(
     project_path = Path(project_dir).expanduser().resolve()
     if not project_path.exists():
         raise FileNotFoundError(f"Project directory does not exist: {project_path}")
-    output_path = resolve_output_dir(output_dir)
+    output_path = resolve_output_dir(
+        output_dir,
+        project_dir=project_path,
+        project_output_kind="check",
+    )
 
     measurement_files = [
         summarize_measurement_file(path, count_rows=count_rows)
@@ -660,7 +694,11 @@ def check(
     """
 
     project_path = Path(project_dir).expanduser().resolve()
-    output_path = resolve_output_dir(output_dir)
+    output_path = resolve_output_dir(
+        output_dir,
+        project_dir=project_path,
+        project_output_kind="check",
+    )
     messages: list[Message] = []
 
     if not project_path.exists():

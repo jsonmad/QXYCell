@@ -104,5 +104,8 @@ def load_latest(base_dir: str | Path = "."):
 
     latest = latest_timestamped_output_dir(base_dir)
     if latest is None:
-        raise FileNotFoundError(f"No qxy_outputs_YYMMDD-HHMM folders found in {Path(base_dir).resolve()}")
+        raise FileNotFoundError(
+            "No qxy_outputs_YYMMDD-HHMM or *_run_YYMMDD_HHMM folders found in "
+            f"{Path(base_dir).resolve()}"
+        )
     return load(latest)

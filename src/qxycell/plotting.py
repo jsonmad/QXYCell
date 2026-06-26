@@ -502,7 +502,7 @@ def plot_spatial(
     colors: dict[str, str] | None = None,
     palette: dict[str, str] | list[str] | tuple[str, ...] | str | None = None,
     fixed_window_um: float | None = None,
-    center_method: str = "median",
+    center_method: str = "bbox",
     point_size: float = 4.0,
     underlay_size: float = 2.0,
     underlay_color: str = "#bdbdbd",
@@ -526,8 +526,9 @@ def plot_spatial(
 
     Set ``sample_col`` to use a shortened image label column such as ``ImageID``
     instead of the default QuPath ``Image`` column. By default, all selected
-    samples are plotted in a shared centered window based on the largest sample
-    x/y extent around each sample's median cell coordinate. Pass
+    samples are plotted in a shared centered window based on each sample's
+    spatial bounding box. Pass ``center_method="median"`` or ``"mean"`` to
+    center on cell-distribution summaries instead. Pass
     ``fixed_window_um`` to force a square fixed-size window. Pass
     ``auto_figsize=True`` to derive the plot panel aspect ratio from the
     selected samples' shared spatial X/Y extent instead of using a fixed square

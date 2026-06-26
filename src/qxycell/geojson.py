@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from qxycell.discovery import is_qxy_output_artifact
 from qxycell.types import GeoJsonFile, Message
 
 if TYPE_CHECKING:
@@ -17,7 +18,11 @@ def discover_geojson_files(project_dir: str | Path) -> list[Path]:
     """Find exported QuPath GeoJSON files."""
 
     root = Path(project_dir).expanduser().resolve()
-    files = [path for path in root.rglob("*.geojson") if not path.name.startswith(".")]
+    files = [
+        path
+        for path in root.rglob("*.geojson")
+        if not path.name.startswith(".") and not is_qxy_output_artifact(path, root)
+    ]
     return sorted(dict.fromkeys(files))
 
 
@@ -160,7 +165,7 @@ def load_cell_polygons(
         ) from exc
 
     project_path = Path(project_dir).expanduser().resolve()
-    geojson_paths = sorted(p for p in project_path.rglob("*.geojson") if not p.name.startswith("."))
+    geojson_paths = discover_geojson_files(project_path)
 
     # Build lookup: object_id → shapely geometry
     # Object IDs in QuPath are UUIDs and are globally unique across images,

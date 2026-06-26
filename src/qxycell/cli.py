@@ -19,7 +19,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output folder for check reports. Defaults to qxy_outputs_YYMMDD-HHMM.",
+        help="Output folder for check reports. Defaults to <project-name>_check_YYMMDD_HHMM beside project_dir.",
     )
     check_parser.add_argument(
         "--count-rows",
@@ -39,7 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output folder for QXYCell reports and AnnData. Defaults to qxy_outputs_YYMMDD-HHMM.",
+        help="Output folder for QXYCell reports and AnnData. Defaults to <project-name>_run_YYMMDD_HHMM beside project_dir.",
     )
     run_parser.add_argument(
         "--pixel-size-um",
