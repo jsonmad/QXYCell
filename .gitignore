@@ -11,6 +11,7 @@ build/
 
 # Local notes
 INSTALL_NOTES.md
+README_MAC_INSTALL.md
 
 # Local QuXYCell outputs
 quxycell_output*/
