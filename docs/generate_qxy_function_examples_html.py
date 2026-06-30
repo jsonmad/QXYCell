@@ -223,13 +223,6 @@ def build_examples() -> dict:
     )
     sample_summary = qxy.assign_samples(adata, overwrite=True, verbose=False)
     coreid_summary = qxy.assign_core_ids_from_measurements(adata, verbose=False)
-    tma_summary = qxy.assign_tma_cores(
-        adata,
-        PROJECT_DIR,
-        pixel_size_um=1.0,
-        output_dir=RUN_OUTPUT_DIR,
-        verbose=False,
-    )
     n_polygons = qxy.load_cell_polygons(
         adata,
         PROJECT_DIR,
@@ -334,7 +327,6 @@ def build_examples() -> dict:
         "metadata_summary": metadata_summary,
         "sample_summary": sample_summary,
         "coreid_summary": coreid_summary,
-        "tma_summary": tma_summary,
         "n_polygons": n_polygons,
         "celltype_summary": celltype_summary,
         "apply_celltypes_summary": apply_celltypes_summary,
@@ -358,7 +350,7 @@ def make_html(examples: dict) -> str:
     adata = examples["adata"]
     report = examples["report"]
     qc_summary = examples["qc_summary"]
-    obs_cols = ["Image", "Object ID", "Sample", "CoreID", "tma_core", "celltype", "cn", "condition"]
+    obs_cols = ["Image", "Object ID", "Sample", "CoreID", "celltype", "cn", "condition"]
     obs_preview = adata.obs[[c for c in obs_cols if c in adata.obs.columns]].head(8).reset_index()
     marker_preview = adata.obs[
         [c for c in adata.obs.columns if c.endswith("_pos")]
@@ -400,7 +392,6 @@ def make_html(examples: dict) -> str:
         ("qxy.assign_core_ids_from_measurements()", "Create or refresh CoreID from QuPath measurement metadata columns such as TMA Core and Parent. qxy.run() does this automatically when those columns exist.", "summary = qxy.assign_core_ids_from_measurements(adata)", table_html(compact_dict(examples["coreid_summary"], ["target_col", "available_source_cols", "n_assigned_cells", "n_unassigned_cells"]))),
         ("qxy.remove_ignore()", "Remove cells in annotation columns containing Ignore.", "clean = qxy.remove_ignore(adata, copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['clean'].n_obs} cells.</p>"),
         ("qxy.remove_annotations()", "Remove cells in annotation columns matching a custom text string.", "clean = qxy.remove_annotations(adata, text='Immune', copy=True)", f"<p>Before: {adata.n_obs} cells. After copy: {examples['artifact_clean'].n_obs} cells.</p>"),
-        ("qxy.assign_tma_cores()", "Assign cells to TMA core polygons when core IDs need to come from GeoJSON geometry.", "summary = qxy.assign_tma_cores(adata, project_dir, pixel_size_um=1.0)", table_html(compact_dict(examples["tma_summary"], ["n_cores", "n_assigned_cells", "n_unassigned_cells"]))),
         ("qxy.load_cell_polygons()", "Load cell boundary polygons from GeoJSON into cell_polygon_wkt.", "n = qxy.load_cell_polygons(adata, project_dir, pixel_size_um=1.0)", f"<p>Matched polygons: <code>{examples['n_polygons']}</code></p>"),
         ("qxy.add_metadata()", "Attach sample-level metadata to cells.", "qxy.add_metadata(adata, metadata, sample_col='Sample')", table_html(compact_dict(examples["metadata_summary"], ["n_matched_samples", "added_columns"]))),
         ("qxy.celltype()", "Apply ordered cell type rules.", "summary = qxy.celltype(adata, 'celltype_logic.yaml')", table_html(compact_dict(examples["celltype_summary"], ["n_rules", "unknown_count", "celltype_column"]))),
@@ -581,7 +572,7 @@ def make_html(examples: dict) -> str:
   <div class="metric"><span>Functions</span><strong>{len(functions)}</strong></div>
 </section>
 <section class="note">
-  <p><strong>Annotation rule shown here:</strong> sample annotations collapse into one <code>Sample</code> column; Ignore and other annotations remain boolean <code>annotation__*</code> columns; measurement core metadata collapses into <code>CoreID</code>; GeoJSON TMA cores are assigned separately into <code>tma_core</code> only when <code>qxy.assign_tma_cores()</code> is called.</p>
+  <p><strong>Annotation rule shown here:</strong> sample annotations collapse into one <code>Sample</code> column; Ignore and other annotations remain boolean <code>annotation__*</code> columns; measurement core metadata collapses into <code>CoreID</code>. GeoJSON TMA core objects are reported but are not used for core assignment.</p>
 </section>
 <h2>Example Dataset Preview</h2>
 {table_html(obs_preview)}

@@ -251,7 +251,6 @@ CoreID                # Categorical — added by qxy.assign_core_ids_from_measur
 &lt;marker&gt;_pos        # added by qxy.threshold()
 annotation__&lt;label&gt;
 cell_polygon_wkt      # WKT cell boundary polygons when cell GeoJSON is available
-tma_core              # Optional — added by explicit qxy.assign_tma_cores()
 Sample                # Categorical — NaN if unassigned; added by qxy.run() / qxy.assign_samples()
 celltype              # added by qxy.celltype() / qxy.apply_celltypes()
 cn    # Categorical — added by qxy.cn_kmeans()</code></pre>
@@ -311,10 +310,10 @@ qxy.cn_kmeans(adata, n_cn=12)</code></pre>
     <p>GeoJSON files are also parsed for these feature types:</p>
     <ul>
       <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_ignore()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
-      <li><strong>TMA core polygons</strong> (<code>objectType: tmaCore</code>) — use the separate <code>qxy.assign_tma_cores()</code> geometry path when core labels need to come from polygon boundaries rather than measurement CSV metadata. The result is stored as <code>adata.obs["tma_core"]</code>.</li>
+      <li><strong>TMA core polygons</strong> (<code>objectType: tmaCore</code>) — reported by <code>qxy.check()</code> and <code>qxy.run()</code>, but not used for core assignment. QXYCell uses measurement-derived <code>adata.obs["CoreID"]</code>.</li>
       <li><strong>Cell polygons</strong> (<code>objectType: cell</code>) — matched to cells by QuPath Object ID and stored as WKT strings in <code>adata.obs["cell_polygon_wkt"]</code>. These can be plotted with <code>qxy.plot_cell_boundaries()</code>.</li>
     </ul>
-    <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation and GeoJSON TMA geometry is applied by spatial containment of cell centroids.</p>
+    <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation geometry is applied by spatial containment of cell centroids.</p>
     <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels or between annotations and TMA cores are expected geometry and are not flagged. Conflicts are written to:</p>
     <pre><code>run/tables/annotation_conflicts.csv</code></pre>
 

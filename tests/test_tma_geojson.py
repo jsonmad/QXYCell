@@ -10,7 +10,6 @@ import qxycell as qxy
 from qxycell.checks import check
 from qxycell.geojson import load_cell_polygons, summarize_geojson_file
 from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, apply_thresholds, run
-from qxycell.tma import assign_tma_cores
 
 
 def _feature(*, object_type, name, coords, classification=None):
@@ -579,92 +578,6 @@ def test_load_cell_polygons_defaults_to_obs_wkt_column(tmp_path):
         False,
     ]
     assert "cell_polygons" not in adata.obsm
-
-
-def test_assign_tma_cores_leaves_overlap_cells_unassigned(tmp_path):
-    geojson_path = _write_geojson(
-        tmp_path / "img.geojson",
-        [
-            _feature(
-                object_type="tmaCore",
-                name="core_1",
-                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
-            ),
-            _feature(
-                object_type="tmaCore",
-                name="core_2",
-                coords=[[5, 0], [15, 0], [15, 10], [5, 10], [5, 0]],
-            ),
-        ],
-    )
-    adata = _adata_for_img([(2, 5), (7, 5), (12, 5)])
-
-    summary = assign_tma_cores(
-        adata,
-        geojson_path,
-        pixel_size_um=1.0,
-        output_dir=tmp_path / "out",
-        verbose=False,
-    )
-
-    assert adata.obs["tma_core"].tolist() == ["core_1", "Unassigned", "core_2"]
-    assert summary["n_overlapping_core_pairs"] == 1
-    assert summary["n_ambiguous_overlap_cells"] == 1
-    assert summary["n_assigned_cells"] == 2
-
-
-def test_assign_tma_cores_ignores_non_tma_annotation_features_by_default(tmp_path):
-    geojson_path = _write_geojson(
-        tmp_path / "img.geojson",
-        [
-            _feature(
-                object_type="annotation",
-                name="Ignore*",
-                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
-            ),
-            _feature(
-                object_type="tmaCore",
-                name="core_1",
-                coords=[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]],
-            ),
-        ],
-    )
-    adata = _adata_for_img([(5, 5), (25, 25)])
-
-    summary = assign_tma_cores(
-        adata,
-        geojson_path,
-        pixel_size_um=1.0,
-        output_dir=tmp_path / "out",
-        verbose=False,
-    )
-
-    assert summary["n_cores"] == 1
-    assert adata.obs["tma_core"].tolist() == ["Unassigned", "core_1"]
-
-
-def test_assign_tma_cores_includes_boundary_points(tmp_path):
-    geojson_path = _write_geojson(
-        tmp_path / "img.geojson",
-        [
-            _feature(
-                object_type="tmaCore",
-                name="core_1",
-                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
-            )
-        ],
-    )
-    adata = _adata_for_img([(0, 5)])
-
-    assign_tma_cores(
-        adata,
-        geojson_path,
-        pixel_size_um=1.0,
-        output_dir=tmp_path / "out",
-        verbose=False,
-    )
-
-    assert adata.obs["tma_core"].tolist() == ["core_1"]
 
 
 def test_check_report_lists_tma_core_labels_under_tma(tmp_path):

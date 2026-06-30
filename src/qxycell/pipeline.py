@@ -788,8 +788,7 @@ def run(
         log(
             "TMA core features detected: "
             f"{n_tma_core_features}. "
-            "Run qxy.assign_tma_cores(...) explicitly if geometry-based TMA "
-            "assignment is needed."
+            "Measurement-derived CoreID remains the TMA core source."
         )
 
     log("Mapping cell segmentation polygons...")

@@ -215,12 +215,6 @@
         <td>QC TSV tables and <code>qc_report.html</code>.</td>
       </tr>
       <tr>
-        <td><code>qxy.assign_tma_cores</code></td>
-        <td>Assign cells to TMA cores from an explicit GeoJSON file or folder. Use this geometry-based path only when core labels need to come from core boundary polygons rather than measurement CSV metadata.</td>
-        <td><code>tma = qxy.assign_tma_cores(adata, "tma.geojson")</code></td>
-        <td>Adds <code>tma_core</code> and TMA metadata columns to <code>adata.obs</code>.</td>
-      </tr>
-      <tr>
         <td><code>qxy.plot_stacked_bar</code></td>
         <td>Plot stacked cell type frequencies per sample or group.</td>
         <td><code>qxy.plot_stacked_bar(adata, sample_col="ImageID")</code></td>
@@ -380,7 +374,7 @@ qxy.save(adata)</code></pre>
   <h2>TMA CoreID Commands</h2>
 
   <div class="note">
-    <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, prefer measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present and writes categorical <code>adata.obs["CoreID"]</code>. If GeoJSON annotation labels match those measurement core IDs, they are reported by <code>qxy.check()</code> and skipped as annotation columns by <code>qxy.run()</code>. Use <code>qxy.assign_tma_cores()</code> only when core IDs need to come from GeoJSON core boundary geometry.
+    <strong>Default CoreID assignment:</strong> For QuPath TMA dearrayer exports, use measurement metadata. <code>qxy.run()</code> preserves <code>TMA Core</code> and <code>Parent</code> when present and writes categorical <code>adata.obs["CoreID"]</code>. If GeoJSON annotation labels match those measurement core IDs, they are reported by <code>qxy.check()</code> and skipped as annotation columns by <code>qxy.run()</code>. GeoJSON <code>tmaCore</code> objects are reported but are not used for core assignment.
   </div>
 
   <table>
@@ -406,21 +400,6 @@ qxy.save(adata)</code></pre>
         <td>Filter to cells with CoreID</td>
         <td><code>adata[adata.obs["CoreID"].notna()]</code></td>
         <td>Excludes cells without measurement-derived core IDs.</td>
-      </tr>
-      <tr>
-        <td>Assign TMA cores from an explicit GeoJSON (default image matching)</td>
-        <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores.geojson")</code></td>
-        <td>Separate geometry-based path; default <code>sample_col="Image"</code>.</td>
-      </tr>
-      <tr>
-        <td>Assign TMA cores using short sample IDs</td>
-        <td><code>qxy.assign_tma_cores(adata, "geojson/tma_cores/", sample_col="ImageID")</code></td>
-        <td>GeoJSON filename stems should match <code>ImageID</code> values.</td>
-      </tr>
-      <tr>
-        <td>Use a custom output column</td>
-        <td><code>qxy.assign_tma_cores(adata, "tma.geojson", core_col="core_id")</code></td>
-        <td>Stores core assignment in <code>adata.obs["core_id"]</code>.</td>
       </tr>
     </tbody>
   </table>
@@ -889,7 +868,6 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr><td><code>adata.obs["CoreID"].value_counts()</code></td><td>Cells per measurement-derived core ID (NaN cells excluded automatically).</td></tr>
       <tr><td><code>adata.obs["CoreID"].cat.categories</code></td><td>List assigned CoreID names.</td></tr>
       <tr><td><code>adata[adata.obs["CoreID"].notna()]</code></td><td>Subset to cells with measurement-derived CoreID.</td></tr>
-      <tr><td><code>adata.obs["tma_core"].value_counts()</code></td><td>Cells per GeoJSON-assigned TMA core after explicit <code>qxy.assign_tma_cores()</code>.</td></tr>
       <tr><td><code>adata.obs["Sample"].value_counts()</code></td><td>Cells per sample (NaN unassigned cells excluded automatically).</td></tr>
       <tr><td><code>adata.obs["celltype"].value_counts()</code></td><td>Cell type counts (after <code>qxy.celltype()</code>).</td></tr>
       <tr><td><code>adata[adata.obs["celltype"] == "T_cell"].copy()</code></td><td>Subset to one cell type.</td></tr>

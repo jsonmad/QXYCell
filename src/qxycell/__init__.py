@@ -23,7 +23,6 @@ from qxycell.plotting import (
 from qxycell.prompts import celltype_prompt
 from qxycell.qc import qc
 from qxycell.neighbourhoods import cn_knn, cn_kmeans, cn_name
-from qxycell.tma import assign_tma_cores
 from qxycell.workflow import workflow
 
 celltype = apply_celltypes
@@ -36,7 +35,6 @@ __all__ = [
     "assign_annotations",
     "assign_core_ids_from_measurements",
     "assign_samples",
-    "assign_tma_cores",
     "celltype",
     "cn_knn",
     "cn_kmeans",

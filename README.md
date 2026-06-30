@@ -92,7 +92,7 @@ QXYCell is built around manual QuPath exports. Required files:
 - **Object classifier JSONs** *(template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. QXYCell can convert these JSONs into a fresh timestamped threshold table, but existing threshold tables remain the active source.
 - **Annotation GeoJSON** — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude. Annotation labels that exactly match measurement-derived core IDs are reported by `qxy.check()` but are not kept as annotation columns by `qxy.run()`, because measurement `CoreID` is preferred.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
-- **TMA core GeoJSON** *(optional)* — TMA core boundaries for TMA projects. These are not assigned by default; call `qxy.assign_tma_cores()` explicitly when geometry-based core assignment is needed.
+- **TMA core GeoJSON** *(optional)* — TMA core boundary objects are reported by `qxy.check()` but are not used for core assignment. QXYCell uses measurement-derived `CoreID` values from `TMA Core` / `Parent`.
 
 Required measurement columns: `Image`, `Object ID`, `Centroid X µm`, `Centroid Y µm`.
 These QuPath centroid columns are stored in `adata.obs` as `Xµm` and `Yµm`.
@@ -455,23 +455,6 @@ core IDs, `qxy.check()` reports them as "GeoJSON derived TMA CoreIDs".
 matching GeoJSON labels so they do not appear as ordinary
 `annotation__<core>` columns.
 
-Use GeoJSON-based TMA assignment separately only when the core labels need to
-come from core boundary geometry rather than from the measurement CSV:
-
-```python
-tma = qxy.assign_tma_cores(
-    adata,
-    "geojson/tma_cores.geojson",
-    sample_col="Image",
-)
-```
-
-Adds `adata.obs["tma_core"]` (string core label, `Unassigned` for unassigned
-cells). Cells whose centroids fall inside overlapping TMA cores are left as
-`Unassigned` rather than assigned arbitrarily. Summary stored in
-`adata.uns["qxycell_tma"]`. GeoJSON files are matched to `adata.obs[sample_col]`
-using the filename stem.
-
 ## Save and load
 
 `qxy.save(adata)` writes the current AnnData object to a compressed `.h5ad`
@@ -520,7 +503,6 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.obs["CoreID"]` | `qxy.run()` / `qxy.assign_core_ids_from_measurements()` | Core ID from measurement metadata |
 | `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
 | `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
-| `adata.obs["tma_core"]` | `qxy.assign_tma_cores()` | TMA core label |
 | `adata.obs[*metadata cols*]` | `qxy.add_metadata()` | Sample metadata broadcast to all cells |
 | `adata.X` | `qxy.run()` | Marker intensity matrix (cells × markers) |
 | `adata.var` | `qxy.run()` | Marker names and metadata |
@@ -535,7 +517,6 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.uns["qxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
 | `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
-| `adata.uns["qxycell_tma"]` | `qxy.assign_tma_cores()` | TMA assignment summary |
 
 ## Workflow shortcut
 
