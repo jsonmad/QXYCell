@@ -17,6 +17,22 @@ def _resolve_plot_dir(adata, output_dir: str | Path | None) -> Path:
     return resolve_output_dir(adata=adata) / "plots"
 
 
+def _resolve_project_dir(adata, project_dir: str | Path | None) -> Path:
+    """Resolve a QuPath project folder, falling back to AnnData run metadata."""
+    if project_dir is None:
+        metadata = getattr(adata, "uns", {}).get("qxycell", {})
+        if isinstance(metadata, dict):
+            project_dir = metadata.get("project_dir")
+    if project_dir is None:
+        raise ValueError(
+            "project_dir is required unless adata.uns['qxycell']['project_dir'] is set."
+        )
+    resolved = Path(project_dir).expanduser().resolve()
+    if not resolved.is_dir():
+        raise FileNotFoundError(f"QuPath project directory does not exist: {resolved}")
+    return resolved
+
+
 def _require_plotting():
     try:
         import matplotlib.pyplot as plt
@@ -303,9 +319,11 @@ def plot_stacked_bar(
     x_axis_label: str | None = None,
     y_axis_label: str | None = None,
     dpi: int = 600,
+    save_png: bool = False,
+    save_pdf: bool = True,
     show: bool = True,
     verbose: bool = True,
-) -> dict[str, Path]:
+) -> dict[str, Path | None]:
     """Create a generic stacked bar plot from AnnData cell annotations.
 
     Frequencies are computed per sample column, with optional aggregation by
@@ -320,6 +338,8 @@ def plot_stacked_bar(
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    if not save_png and not save_pdf:
+        raise ValueError("At least one of save_png or save_pdf must be True.")
     output_dir = _resolve_plot_dir(adata, output_dir) / "stacked_bar"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -462,8 +482,10 @@ def plot_stacked_bar(
     )
     fig_path = output_dir / f"{prefix}.png"
     pdf_path = output_dir / f"{prefix}.pdf"
-    fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
-    fig.savefig(pdf_path, dpi=dpi, bbox_inches="tight")
+    if save_png:
+        fig.savefig(fig_path, dpi=dpi, bbox_inches="tight")
+    if save_pdf:
+        fig.savefig(pdf_path, dpi=dpi, bbox_inches="tight")
     if show:
         plt.show()
     plt.close(fig)
@@ -474,20 +496,275 @@ def plot_stacked_bar(
     freq_sample.to_csv(per_image_path)
 
     if verbose:
-        print(f"Saved stacked bar plot: {fig_path}")
+        if save_png:
+            print(f"Saved stacked bar plot: {fig_path}")
+        if save_pdf:
+            print(f"Saved stacked bar plot: {pdf_path}")
         print(f"Saved stacked bar table: {table_path}")
 
     return {
-        "png": fig_path,
-        "pdf": pdf_path,
+        "png": fig_path if save_png else None,
+        "pdf": pdf_path if save_pdf else None,
         "table": table_path,
         "per_image_table": per_image_path,
+    }
+
+
+def plot_annotation_polygons(
+    adata,
+    project_dir: str | Path | None = None,
+    *,
+    image_col: str = "Image",
+    images: Iterable[str] | None = None,
+    output_dir: str | Path | None = None,
+    pixel_size_um: float | None = None,
+    colors: dict[str, str] | None = None,
+    cell_underlay: bool = True,
+    underlay_bins: int = 384,
+    underlay_cmap: str = "Greys",
+    underlay_alpha: float = 0.45,
+    fill: bool = False,
+    fill_alpha: float = 0.20,
+    boundary_linewidth: float = 1.0,
+    flip_y: bool = True,
+    figsize: tuple[float, float] = (10.0, 10.0),
+    dpi: int = 300,
+    show: bool = True,
+    verbose: bool = True,
+) -> dict[str, object]:
+    """Plot QuPath annotation GeoJSON polygons in one figure per image.
+
+    Annotation geometry is reloaded from ``project_dir`` because ``qxy.run()``
+    stores per-cell annotation membership in AnnData, not the original polygon
+    coordinates. When ``project_dir`` is omitted, the original run folder is
+    read from ``adata.uns["qxycell"]["project_dir"]``. Coordinates are scaled
+    using the run's stored ``pixel_size_um`` unless explicitly overridden.
+    By default, cell locations are shown beneath boundary-only polygons as a
+    coarse 2D density raster. Pass ``fill=True`` to add translucent polygon
+    fills. The raster avoids drawing millions of individual cell points.
+    """
+    import json
+
+    plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    try:
+        from matplotlib.collections import PatchCollection
+        from matplotlib.patches import Patch, Polygon as MplPolygon
+        from shapely import affinity
+        from shapely.geometry import shape
+    except ImportError as exc:
+        raise ImportError(
+            "plot_annotation_polygons requires matplotlib and shapely."
+        ) from exc
+
+    from qxycell.geojson import discover_geojson_files
+
+    project_path = _resolve_project_dir(adata, project_dir)
+    metadata = getattr(adata, "uns", {}).get("qxycell", {})
+    if pixel_size_um is None:
+        pixel_size_um = float(metadata.get("pixel_size_um", 0.28)) if isinstance(metadata, dict) else 0.28
+    pixel_size_um = float(pixel_size_um)
+
+    def image_key(value: object) -> str:
+        stem = Path(str(value)).stem
+        return stem[:-4] if stem.endswith(".ome") else stem
+
+    def annotation_label(properties: dict) -> str:
+        classification = properties.get("classification")
+        if isinstance(classification, dict) and classification.get("name"):
+            return str(classification["name"])
+        if classification not in (None, ""):
+            return str(classification)
+        return str(properties.get("name") or "Unclassified")
+
+    display_by_key: dict[str, str] = {}
+    if image_col in adata.obs.columns:
+        for value in adata.obs[image_col].astype(str).unique():
+            display_by_key[image_key(value)] = str(value)
+    selected_keys = None if images is None else {image_key(value) for value in images}
+
+    if cell_underlay:
+        if image_col not in adata.obs.columns:
+            raise KeyError(f"Image column not found in adata.obs: {image_col!r}.")
+        if "spatial" not in adata.obsm:
+            raise KeyError("Spatial coordinates not found in adata.obsm['spatial'].")
+        if int(underlay_bins) < 2:
+            raise ValueError("underlay_bins must be at least 2.")
+
+    cell_positions_by_key: dict[str, object] = {}
+    if cell_underlay:
+        all_image_keys = adata.obs[image_col].astype(str).map(image_key).to_numpy()
+        spatial = np.asarray(adata.obsm["spatial"])
+        for key in set(all_image_keys):
+            if selected_keys is not None and key not in selected_keys:
+                continue
+            positions = spatial[all_image_keys == key, :2].astype(float, copy=True)
+            if flip_y:
+                positions[:, 1] *= -1.0
+            cell_positions_by_key[key] = positions
+
+    polygons_by_image: dict[str, list[tuple[str, object, str]]] = {}
+    for path in discover_geojson_files(project_path):
+        key = image_key(path.name)
+        if selected_keys is not None and key not in selected_keys:
+            continue
+        try:
+            data = json.loads(path.read_text(errors="replace"))
+        except Exception:
+            continue
+        features = data.get("features", []) if isinstance(data, dict) else []
+        for feature in features:
+            if not isinstance(feature, dict):
+                continue
+            properties = feature.get("properties") or {}
+            if not isinstance(properties, dict):
+                properties = {}
+            if str(properties.get("objectType") or "").lower() != "annotation":
+                continue
+            geometry_data = feature.get("geometry")
+            if not geometry_data:
+                continue
+            try:
+                geometry = shape(geometry_data)
+                if geometry.is_empty or geometry.geom_type not in {"Polygon", "MultiPolygon"}:
+                    continue
+                if pixel_size_um != 1.0:
+                    geometry = affinity.scale(
+                        geometry, xfact=pixel_size_um, yfact=pixel_size_um, origin=(0, 0)
+                    )
+                if not geometry.is_valid:
+                    geometry = geometry.buffer(0)
+                if geometry.is_empty:
+                    continue
+            except Exception:
+                continue
+            polygons_by_image.setdefault(key, []).append(
+                (annotation_label(properties), geometry, str(path))
+            )
+
+    if not polygons_by_image:
+        raise ValueError(f"No annotation polygons found under {project_path}.")
+
+    labels = sorted({label for entries in polygons_by_image.values() for label, _, _ in entries})
+    supplied_colors = dict(colors or {})
+    missing_labels = [label for label in labels if label not in supplied_colors]
+    generated = _glasbey_colors(len(missing_labels))
+    color_lookup = dict(supplied_colors)
+    color_lookup.update(dict(zip(missing_labels, generated, strict=True)))
+
+    plot_dir = _resolve_plot_dir(adata, output_dir) / "annotation_polygons"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    figure_paths: list[Path] = []
+    counts: dict[str, int] = {}
+    sources: dict[str, list[str]] = {}
+    underlay_keys: list[str] = []
+
+    for key in sorted(polygons_by_image):
+        entries = polygons_by_image[key]
+        fig, ax = plt.subplots(figsize=figsize)
+        positions = cell_positions_by_key.get(key)
+        if positions is not None and len(positions):
+            finite = np.isfinite(positions).all(axis=1)
+            positions = positions[finite]
+            if len(positions):
+                x_min, y_min = positions.min(axis=0)
+                x_max, y_max = positions.max(axis=0)
+                if x_max > x_min and y_max > y_min:
+                    density, x_edges, y_edges = np.histogram2d(
+                        positions[:, 0],
+                        positions[:, 1],
+                        bins=int(underlay_bins),
+                        range=[[x_min, x_max], [y_min, y_max]],
+                    )
+                    density = np.log1p(density.T)
+                    density = np.ma.masked_where(density == 0, density)
+                    ax.imshow(
+                        density,
+                        extent=[x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]],
+                        origin="lower",
+                        cmap=underlay_cmap,
+                        alpha=underlay_alpha,
+                        interpolation="nearest",
+                        zorder=0,
+                    )
+                    underlay_keys.append(key)
+        for label in labels:
+            patches = []
+            for entry_label, geometry, _ in entries:
+                if entry_label != label:
+                    continue
+                parts = [geometry] if geometry.geom_type == "Polygon" else list(geometry.geoms)
+                for part in parts:
+                    coords = np.asarray(part.exterior.coords)
+                    if flip_y:
+                        coords = coords.copy()
+                        coords[:, 1] *= -1.0
+                    patches.append(MplPolygon(coords, closed=True))
+            if patches:
+                collection = PatchCollection(
+                    patches,
+                    facecolor=color_lookup[label] if fill else "none",
+                    edgecolor=color_lookup[label],
+                    alpha=fill_alpha if fill else 1.0,
+                    linewidth=boundary_linewidth,
+                    zorder=2,
+                )
+                ax.add_collection(collection)
+
+        ax.autoscale_view()
+        ax.set_aspect("equal")
+        ax.set_xlabel("X (µm)")
+        ax.set_ylabel("Y (µm)")
+        display_name = display_by_key.get(key, key)
+        ax.set_title(display_name)
+        handles = [
+            Patch(
+                facecolor=color_lookup[label] if fill else "none",
+                edgecolor=color_lookup[label],
+                alpha=fill_alpha if fill else 1.0,
+                label=label,
+            )
+            for label in labels
+            if any(entry_label == label for entry_label, _, _ in entries)
+        ]
+        if handles:
+            ax.legend(handles=handles, loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+        fig.tight_layout()
+
+        prefix = f"annotation_polygons_{_safe_name(display_name)}"
+        png_path = plot_dir / f"{prefix}.png"
+        fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
+        figure_paths.append(png_path)
+        if show:
+            plt.show()
+        plt.close(fig)
+        counts[display_name] = len(entries)
+        sources[display_name] = sorted({source for _, _, source in entries})
+        if verbose:
+            print(f"Saved annotation polygon plot: {png_path}")
+
+    return {
+        "figures": figure_paths,
+        "project_dir": project_path,
+        "pixel_size_um": pixel_size_um,
+        "polygon_counts": counts,
+        "sources": sources,
+        "colors": color_lookup,
+        "cell_underlay": bool(cell_underlay),
+        "fill": bool(fill),
+        "fill_alpha": float(fill_alpha),
+        "underlay_bins": int(underlay_bins),
+        "underlay_images": sorted(
+            display_by_key.get(key, key)
+            for key in underlay_keys
+        ),
+        "flip_y": bool(flip_y),
     }
 
 
 def plot_spatial(
     adata,
     *,
+    underlay_adata=None,
     category_col: str = "celltype",
     sample_col: str = "Image",
     subset_col: str | None = None,
@@ -495,6 +772,7 @@ def plot_spatial(
     samples: Iterable[str] | None = None,
     celltypes: Iterable[str] | None = None,
     images: Iterable[str] | None = None,
+    include_missing_samples: bool = False,
     spatial_key: str | None = None,
     output_dir: str | Path | None = None,
     filename_prefix: str | None = None,
@@ -517,14 +795,18 @@ def plot_spatial(
     legend_width: float = 2.2,
     combined: bool = False,
     save_individual: bool = True,
-    save_pdf: bool = True,
+    save_png: bool = True,
+    save_pdf: bool = False,
     max_cols: int = 3,
     show: bool = True,
     verbose: bool = True,
 ) -> dict[str, object]:
     """Create spatial cell type plots with a grey all-cell underlay.
 
-    Set ``sample_col`` to use a shortened image label column such as ``ImageID``
+    Set ``underlay_adata`` to a second AnnData object when the grey all-cell
+    underlay should come from a fuller dataset than the coloured overlay. Both
+    objects must use the same spatial coordinate system and ``sample_col``
+    labels. Set ``sample_col`` to use a shortened image label column such as ``ImageID``
     instead of the default QuPath ``Image`` column. By default, all selected
     samples are plotted in a shared centered window based on each sample's
     spatial bounding box. Pass ``center_method="median"`` or ``"mean"`` to
@@ -532,14 +814,25 @@ def plot_spatial(
     ``fixed_window_um`` to force a square fixed-size window. Pass
     ``auto_figsize=True`` to derive the plot panel aspect ratio from the
     selected samples' shared spatial X/Y extent instead of using a fixed square
-    ``figsize`` panel. Set ``save_pdf=False`` for very large scatter plots when
-    a vector PDF would be slow or unnecessarily large. By default the y-axis is
-    flipped across the horizontal centre line to match image-viewer orientation;
-    pass ``flip_y=False`` to use the raw coordinate orientation.
+    ``figsize`` panel. Use ``save_png`` and ``save_pdf`` to produce PNG only,
+    PDF only, or both. Set ``save_pdf=False`` for very large scatter plots when
+    a vector PDF would be slow or unnecessarily large. By default the y-axis
+    is flipped across the horizontal centre line to match image-viewer
+    orientation; pass ``flip_y=False`` to use the raw coordinate orientation.
+    Cells where ``adata.obs[sample_col]`` is missing are excluded by default;
+    pass ``include_missing_samples=True`` to plot them as a ``"nan"`` sample.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    if not save_png and not save_pdf:
+        raise ValueError("At least one of save_png or save_pdf must be True.")
     spatial_key = _resolve_spatial_key(adata, spatial_key)
+    underlay_source = adata if underlay_adata is None else underlay_adata
+    underlay_spatial_key = _resolve_spatial_key(underlay_source, spatial_key)
+    if sample_col not in underlay_source.obs.columns:
+        raise KeyError(
+            f"sample_col not found in underlay_adata.obs: {sample_col}"
+        )
     output_dir = _resolve_plot_dir(adata, output_dir) / "spatial_celltypes"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -552,10 +845,20 @@ def plot_spatial(
         samples=samples if samples is not None else images,
         categories=celltypes,
     )
+    missing_sample_mask = adata.obs[sample_col].isna()
+    n_missing_sample_cells = int(missing_sample_mask.sum())
+    if not include_missing_samples and n_missing_sample_cells:
+        obs_plot = obs_plot.loc[~missing_sample_mask.reindex(obs_plot.index).fillna(False)]
     if obs_plot.empty:
         raise ValueError("No cells available for spatial plotting after filtering.")
 
-    all_samples = sorted(adata.obs[sample_col].astype(str).unique().tolist())
+    available_sample_mask = (
+        ~missing_sample_mask
+        if not include_missing_samples
+        else pd.Series(True, index=adata.obs.index)
+    )
+    available_sample_values = adata.obs.loc[available_sample_mask, sample_col]
+    all_samples = sorted(available_sample_values.astype(str).unique().tolist())
     if samples is not None:
         selected_samples = list(samples)
     elif images is not None:
@@ -577,11 +880,11 @@ def plot_spatial(
 
     sample_bounds = {}
     for sample in selected_samples:
-        sample_mask = adata.obs[sample_col].astype(str) == sample
+        sample_mask = underlay_source.obs[sample_col].astype(str) == sample
         if not sample_mask.any():
             continue
         sample_positions = np.flatnonzero(sample_mask.to_numpy())
-        sample_coords = adata.obsm[spatial_key][sample_positions, :]
+        sample_coords = underlay_source.obsm[underlay_spatial_key][sample_positions, :]
         x_min = float(np.min(sample_coords[:, 0]))
         x_max = float(np.max(sample_coords[:, 0]))
         y_min = float(np.min(sample_coords[:, 1]))
@@ -653,6 +956,10 @@ def plot_spatial(
         sub_obs = adata.obs.iloc[image_positions]
         coords = adata.obsm[spatial_key][image_positions, :]
 
+        underlay_image_mask = underlay_source.obs[sample_col].astype(str) == image
+        underlay_positions = np.flatnonzero(underlay_image_mask.to_numpy())
+        underlay_coords = underlay_source.obsm[underlay_spatial_key][underlay_positions, :]
+
         plot_mask = sub_obs.index.isin(obs_plot.index)
         if not plot_mask.any():
             return False
@@ -666,13 +973,17 @@ def plot_spatial(
         centered_coords = coords.copy()
         centered_coords[:, 0] = centered_coords[:, 0] - bounds["x_center"]
         centered_coords[:, 1] = centered_coords[:, 1] - bounds["y_center"]
+        centered_underlay_coords = underlay_coords.copy()
+        centered_underlay_coords[:, 0] -= bounds["x_center"]
+        centered_underlay_coords[:, 1] -= bounds["y_center"]
         if flip_y:
             centered_coords[:, 1] *= -1.0
+            centered_underlay_coords[:, 1] *= -1.0
         plot_coords = centered_coords[plot_mask, :]
 
         ax.scatter(
-            centered_coords[:, 0],
-            centered_coords[:, 1],
+            centered_underlay_coords[:, 0],
+            centered_underlay_coords[:, 1],
             s=underlay_size,
             c=underlay_color,
             alpha=underlay_alpha,
@@ -751,20 +1062,23 @@ def plot_spatial(
                 prefix = f"{save_prefix}_{_safe_name(image)}"
             else:
                 prefix = filename_prefix or "_".join(prefix_parts)
-            fig_path = output_dir / f"{prefix}.png"
-            fig.savefig(fig_path, dpi=dpi)
+            saved_paths = []
+            if save_png:
+                png_path = output_dir / f"{prefix}.png"
+                fig.savefig(png_path, dpi=dpi)
+                saved_paths.append(png_path)
             if save_pdf:
                 pdf_path = output_dir / f"{prefix}.pdf"
                 fig.savefig(pdf_path, dpi=dpi)
+                saved_paths.append(pdf_path)
             if show:
                 plt.show()
             plt.close(fig)
-            fig_paths.append(fig_path)
-            if save_pdf:
-                fig_paths.append(pdf_path)
+            fig_paths.extend(saved_paths)
 
             if verbose:
-                print(f"Saved spatial plot: {fig_path}")
+                for saved_path in saved_paths:
+                    print(f"Saved spatial plot: {saved_path}")
 
     combined_paths: list[Path] = []
     if combined:
@@ -815,20 +1129,23 @@ def plot_spatial(
             if subset_value:
                 prefix_parts.append(_safe_name(subset_value))
             prefix = save_prefix or filename_prefix or "_".join(prefix_parts)
-            fig_path = output_dir / f"{prefix}.png"
-            fig.savefig(fig_path, dpi=dpi)
+            saved_paths = []
+            if save_png:
+                png_path = output_dir / f"{prefix}.png"
+                fig.savefig(png_path, dpi=dpi)
+                saved_paths.append(png_path)
             if save_pdf:
                 pdf_path = output_dir / f"{prefix}.pdf"
                 fig.savefig(pdf_path, dpi=dpi)
+                saved_paths.append(pdf_path)
             if show:
                 plt.show()
             plt.close(fig)
-            combined_paths.append(fig_path)
-            if save_pdf:
-                combined_paths.append(pdf_path)
+            combined_paths.extend(saved_paths)
             fig_paths.extend(combined_paths)
             if verbose:
-                print(f"Saved combined spatial plot: {fig_path}")
+                for saved_path in saved_paths:
+                    print(f"Saved combined spatial plot: {saved_path}")
 
     return {
         "figures": fig_paths,
@@ -838,6 +1155,14 @@ def plot_spatial(
         "auto_figsize": bool(auto_figsize),
         "flip_y": bool(flip_y),
         "center_method": center_method,
+        "save_png": bool(save_png),
+        "save_pdf": bool(save_pdf),
+        "underlay_adata_is_plot_adata": underlay_source is adata,
+        "underlay_n_obs": int(underlay_source.n_obs),
+        "include_missing_samples": bool(include_missing_samples),
+        "n_missing_sample_cells_excluded": (
+            0 if include_missing_samples else n_missing_sample_cells
+        ),
         "sample_bounds": sample_bounds,
     }
 
@@ -885,6 +1210,7 @@ def plot_cell_boundaries(
     dpi: int = 600,
     legend_width: float = 2.2,
     save_individual: bool = True,
+    save_png: bool = True,
     save_pdf: bool = False,
     show: bool = True,
     verbose: bool = True,
@@ -905,6 +1231,8 @@ def plot_cell_boundaries(
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    if not save_png and not save_pdf:
+        raise ValueError("At least one of save_png or save_pdf must be True.")
     try:
         from matplotlib.collections import PatchCollection
         from matplotlib.patches import Polygon as MplPolygon
@@ -1255,20 +1583,23 @@ def plot_cell_boundaries(
                 prefix = f"{save_prefix}_{_safe_name(image)}"
             else:
                 prefix = filename_prefix or "_".join(prefix_parts)
-            fig_path = output_dir / f"{prefix}.png"
-            fig.savefig(fig_path, dpi=dpi)
+            saved_paths = []
+            if save_png:
+                png_path = output_dir / f"{prefix}.png"
+                fig.savefig(png_path, dpi=dpi)
+                saved_paths.append(png_path)
             if save_pdf:
                 pdf_path = output_dir / f"{prefix}.pdf"
                 fig.savefig(pdf_path, dpi=dpi)
+                saved_paths.append(pdf_path)
             if show:
                 plt.show()
             plt.close(fig)
-            fig_paths.append(fig_path)
-            if save_pdf:
-                fig_paths.append(pdf_path)
+            fig_paths.extend(saved_paths)
 
             if verbose:
-                print(f"Saved cell boundary plot: {fig_path}")
+                for saved_path in saved_paths:
+                    print(f"Saved cell boundary plot: {saved_path}")
 
     return {
         "figures": fig_paths,
@@ -1290,7 +1621,7 @@ def plot_cell_boundaries(
 #   "double" → 180 mm (two journal columns / full page width)
 #   "auto"   → tile-based (explicit opt-in only)
 #
-# Saved formats: PDF (vector), SVG (vector), TIFF (dpi-raster, default 300)
+# Available formats: PNG/TIFF (raster) and PDF/SVG (vector). PDF is default.
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -1535,10 +1866,21 @@ def _build_heatmap_figure(
 
     # ── 4. Main heatmap ─────────────────────────────────────────────────────
     ax_h = fig.add_axes([x0, y0, w_c, h_c])
-    im = ax_h.imshow(
-        matrix, aspect="auto", cmap=cmap,
-        vmin=vmin, vmax=vmax, interpolation="nearest",
+    # Draw each tile as a vector path. Unlike imshow(), pcolormesh does not
+    # embed the heatmap core as a bitmap in PDF/SVG output, so it stays sharp
+    # when enlarged for publication layouts.
+    im = ax_h.pcolormesh(
+        np.arange(n_c + 1) - 0.5,
+        np.arange(n_r + 1) - 0.5,
+        matrix,
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
+        shading="flat",
+        edgecolors="none",
     )
+    ax_h.set_xlim(-0.5, n_c - 0.5)
+    ax_h.set_ylim(n_r - 0.5, -0.5)
     # Col labels (bottom)
     ax_h.set_xticks(range(n_c))
     ax_h.set_xticklabels(col_labels, rotation=90, ha="center", fontsize=7)
@@ -1648,11 +1990,18 @@ def plot_marker_heatmap(
     annotate: bool = False,
     row_strip: bool = False,
     dpi: int = 600,
+    save_png: bool = False,
+    save_pdf: bool = True,
+    save_svg: bool = False,
+    save_tiff: bool = False,
     output_dir: "str | Path | None" = None,
     show: bool = True,
     verbose: bool = True,
 ) -> "dict[str, list]":
-    """Plot a heatmap of marker expression per cell type (or any category).
+    """Legacy combined marker heatmap entry point.
+
+    New code should call :func:`plot_marker_positivity_heatmap` or
+    :func:`plot_marker_intensity_heatmap` so the plotted quantity is explicit.
 
     Rows are clustered by hierarchical clustering (no dendrogram shown).
     Columns (markers) are also clustered independently.
@@ -1665,8 +2014,10 @@ def plot_marker_heatmap(
     category_col:
         Column in ``adata.obs`` to group cells by (default ``"celltype"``).
     markers:
-        List of marker names to include. Defaults to all markers in
-        ``adata.var_names``.
+        List of marker names to include. By default, uses only markers with a
+        corresponding ``adata.obs["<marker>_pos"]`` column, i.e. markers
+        actually applied from the active threshold table. Pass an explicit
+        list to override this selection.
     values:
         ``"positivity"`` — mean fraction of cells positive (from ``_pos``
         columns in ``adata.obs``); colormap defaults to ``"cividis"``,
@@ -1691,8 +2042,8 @@ def plot_marker_heatmap(
     annotate:
         Write values inside each cell (default True).
     dpi:
-        Resolution for the TIFF output (default 300). PDF and SVG are
-        vector formats and ignore this parameter.
+        Resolution for optional PNG and TIFF output. PDF and SVG are vector
+        formats and ignore this parameter.
     output_dir:
         Folder to save plots. Defaults to the QXYCell output folder.
     show:
@@ -1705,6 +2056,8 @@ def plot_marker_heatmap(
     dict mapping mode → ``[pdf_path, svg_path, tif_path, csv_path]``.
     """
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    if not any((save_png, save_pdf, save_svg, save_tiff)):
+        raise ValueError("At least one heatmap figure format must be enabled.")
     out_dir = _resolve_plot_dir(adata, output_dir) / "marker_heatmap"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1715,7 +2068,19 @@ def plot_marker_heatmap(
     # so the row strip uses the same colours as plot_spatial / plot_stacked_bar.
     _cat_palette = _get_category_palette(adata, category_col) if row_strip else None
 
-    marker_names = list(markers) if markers is not None else list(adata.var_names)
+    if markers is not None:
+        marker_names = list(markers)
+    else:
+        marker_names = [
+            str(marker)
+            for marker in adata.var_names
+            if f"{marker}_pos" in adata.obs.columns
+        ]
+        if not marker_names:
+            raise ValueError(
+                "No thresholded markers found. Run qxy.threshold(adata, ...) first, "
+                "or pass markers=[...] explicitly to plot unthresholded intensities."
+            )
     modes = ["positivity", "intensity"] if values == "both" else [values]
     saved: dict[str, list] = {}
 
@@ -1785,22 +2150,128 @@ def plot_marker_heatmap(
         )
 
         prefix   = f"marker_heatmap_{mode}"
+        png_path = out_dir / f"{prefix}.png"
         pdf_path = out_dir / f"{prefix}.pdf"
         svg_path = out_dir / f"{prefix}.svg"
         tif_path = out_dir / f"{prefix}.tif"
         csv_path = out_dir / f"{prefix}.csv"
-        fig.savefig(pdf_path, bbox_inches="tight")
-        fig.savefig(svg_path, bbox_inches="tight", format="svg")
-        fig.savefig(tif_path, dpi=dpi, bbox_inches="tight", format="tiff")
+        figure_paths = []
+        if save_png:
+            fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
+            figure_paths.append(png_path)
+        if save_pdf:
+            fig.savefig(pdf_path, bbox_inches="tight")
+            figure_paths.append(pdf_path)
+        if save_svg:
+            fig.savefig(svg_path, bbox_inches="tight", format="svg")
+            figure_paths.append(svg_path)
+        if save_tiff:
+            fig.savefig(tif_path, dpi=dpi, bbox_inches="tight", format="tiff")
+            figure_paths.append(tif_path)
         out_df.to_csv(csv_path)
         if show:
             plt.show()
         plt.close(fig)
-        saved[mode] = [pdf_path, svg_path, tif_path, csv_path]
+        saved[mode] = [*figure_paths, csv_path]
         if verbose:
-            print(f"Saved marker heatmap ({mode}): {pdf_path.parent}/")
+            print(f"Saved marker heatmap ({mode}): {out_dir}/")
 
     return saved
+
+
+def plot_marker_positivity_heatmap(
+    adata,
+    *,
+    category_col: str = "celltype",
+    markers: "list[str] | None" = None,
+    cluster_rows: bool = True,
+    cluster_cols: bool = True,
+    width: str = "single",
+    cmap: "str | None" = None,
+    annotate: bool = False,
+    row_strip: bool = False,
+    dpi: int = 600,
+    save_png: bool = False,
+    save_pdf: bool = True,
+    save_svg: bool = False,
+    save_tiff: bool = False,
+    output_dir: "str | Path | None" = None,
+    show: bool = True,
+    verbose: bool = True,
+) -> "dict[str, list]":
+    """Plot fraction-positive markers by cell type or another category.
+
+    Values are category-wise means of ``adata.obs["<marker>_pos"]`` and
+    therefore range from 0 to 1. Marker thresholds must have been applied with
+    :func:`qxycell.threshold` first.
+    """
+    return plot_marker_heatmap(
+        adata,
+        category_col=category_col,
+        markers=markers,
+        values="positivity",
+        cluster_rows=cluster_rows,
+        cluster_cols=cluster_cols,
+        width=width,
+        cmap=cmap,
+        annotate=annotate,
+        row_strip=row_strip,
+        dpi=dpi,
+        save_png=save_png,
+        save_pdf=save_pdf,
+        save_svg=save_svg,
+        save_tiff=save_tiff,
+        output_dir=output_dir,
+        show=show,
+        verbose=verbose,
+    )
+
+
+def plot_marker_intensity_heatmap(
+    adata,
+    *,
+    category_col: str = "celltype",
+    markers: "list[str] | None" = None,
+    cluster_rows: bool = True,
+    cluster_cols: bool = True,
+    width: str = "single",
+    cmap: "str | None" = None,
+    annotate: bool = False,
+    row_strip: bool = False,
+    dpi: int = 600,
+    save_png: bool = False,
+    save_pdf: bool = True,
+    save_svg: bool = False,
+    save_tiff: bool = False,
+    output_dir: "str | Path | None" = None,
+    show: bool = True,
+    verbose: bool = True,
+) -> "dict[str, list]":
+    """Plot Z-scored mean marker intensity by cell type or another category.
+
+    Intensities come from ``adata.X``. Unless ``markers`` is supplied, only
+    markers actually applied by thresholding are included.
+    """
+    return plot_marker_heatmap(
+        adata,
+        category_col=category_col,
+        markers=markers,
+        values="intensity",
+        cluster_rows=cluster_rows,
+        cluster_cols=cluster_cols,
+        width=width,
+        cmap=cmap,
+        annotate=annotate,
+        row_strip=row_strip,
+        dpi=dpi,
+        save_png=save_png,
+        save_pdf=save_pdf,
+        save_svg=save_svg,
+        save_tiff=save_tiff,
+        output_dir=output_dir,
+        show=show,
+        verbose=verbose,
+    )
 
 
 def plot_cn_heatmap(
@@ -1809,6 +2280,7 @@ def plot_cn_heatmap(
     cn_col: str = "cn",
     category_col: "str | None" = None,
     sample_col: str = "Image",
+    include_missing_samples: bool = False,
     condition_col: "str | None" = None,
     normalize: str = "sample",
     cluster_rows: bool = True,
@@ -1818,6 +2290,10 @@ def plot_cn_heatmap(
     annotate: bool = False,
     row_strip: bool = False,
     dpi: int = 600,
+    save_png: bool = False,
+    save_pdf: bool = True,
+    save_svg: bool = False,
+    save_tiff: bool = False,
     output_dir: "str | Path | None" = None,
     show: bool = True,
     verbose: bool = True,
@@ -1840,6 +2316,10 @@ def plot_cn_heatmap(
         If provided, it must not conflict with ``cn_col``.
     sample_col:
         Column in ``adata.obs`` containing sample labels (default ``"Image"``).
+    include_missing_samples:
+        Include cells whose sample label is missing (default False). Missing
+        values and blank/``"nan"``/``"none"``/``"<NA>"`` labels are excluded
+        by default.
     condition_col:
         Optional column in ``adata.obs`` mapping samples to experimental
         conditions. When provided, a coloured annotation strip is drawn above
@@ -1865,7 +2345,7 @@ def plot_cn_heatmap(
     annotate:
         Write values inside each cell (default True).
     dpi:
-        Resolution for the TIFF output (default 300). PDF and SVG ignore this.
+        Resolution for optional PNG and TIFF output. PDF and SVG ignore this.
     output_dir:
         Folder to save plots. Defaults to the QXYCell output folder.
     show:
@@ -1878,6 +2358,8 @@ def plot_cn_heatmap(
     dict mapping normalize mode → ``[pdf_path, svg_path, tif_path, csv_path]``.
     """
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
+    if not any((save_png, save_pdf, save_svg, save_tiff)):
+        raise ValueError("At least one heatmap figure format must be enabled.")
     out_dir = _resolve_plot_dir(adata, output_dir) / "cn_heatmap"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1901,6 +2383,19 @@ def plot_cn_heatmap(
     modes = ["sample", "cn"] if normalize == "both" else [normalize]
     saved: dict[str, list] = {}
 
+    obs_plot = adata.obs.copy()
+    sample_text = obs_plot[sample_col].astype("string").str.strip()
+    missing_sample_mask = (
+        sample_text.isna()
+        | sample_text.str.lower().fillna("").isin({"", "nan", "none", "<na>"})
+    )
+    if not include_missing_samples:
+        obs_plot = obs_plot.loc[~missing_sample_mask].copy()
+    if obs_plot.empty:
+        raise ValueError(
+            f"No cells have usable sample labels in adata.obs[{sample_col!r}]."
+        )
+
     # Pre-build (or retrieve) the shared CN palette so the row strip uses the
     # same colours as plot_stacked_bar(category_col="cn") and plot_spatial(category_col="cn").
     _cn_palette = _get_category_palette(adata, cn_col) if row_strip else None
@@ -1908,8 +2403,8 @@ def plot_cn_heatmap(
     for mode in modes:
         norm_arg = "columns" if mode == "sample" else "index"
         ct = pd.crosstab(
-            adata.obs[cn_col].astype(str),
-            adata.obs[sample_col].astype(str),
+            obs_plot[cn_col].astype(str),
+            obs_plot[sample_col].astype(str),
             normalize=norm_arg,
         )
         matrix     = ct.values.astype(float)
@@ -1929,7 +2424,7 @@ def plot_cn_heatmap(
         col_strips: list = []
         if condition_col is not None:
             cond_lookup = (
-                adata.obs[[sample_col, condition_col]]
+                obs_plot[[sample_col, condition_col]]
                 .drop_duplicates(subset=[sample_col])
                 .set_index(sample_col)[condition_col]
             )
@@ -1949,19 +2444,30 @@ def plot_cn_heatmap(
         )
 
         prefix   = f"cn_heatmap_by_{mode}"
+        png_path = out_dir / f"{prefix}.png"
         pdf_path = out_dir / f"{prefix}.pdf"
         svg_path = out_dir / f"{prefix}.svg"
         tif_path = out_dir / f"{prefix}.tif"
         csv_path = out_dir / f"{prefix}.csv"
-        fig.savefig(pdf_path, bbox_inches="tight")
-        fig.savefig(svg_path, bbox_inches="tight", format="svg")
-        fig.savefig(tif_path, dpi=dpi, bbox_inches="tight", format="tiff")
+        figure_paths = []
+        if save_png:
+            fig.savefig(png_path, dpi=dpi, bbox_inches="tight")
+            figure_paths.append(png_path)
+        if save_pdf:
+            fig.savefig(pdf_path, bbox_inches="tight")
+            figure_paths.append(pdf_path)
+        if save_svg:
+            fig.savefig(svg_path, bbox_inches="tight", format="svg")
+            figure_paths.append(svg_path)
+        if save_tiff:
+            fig.savefig(tif_path, dpi=dpi, bbox_inches="tight", format="tiff")
+            figure_paths.append(tif_path)
         out_df.to_csv(csv_path)
         if show:
             plt.show()
         plt.close(fig)
-        saved[mode] = [pdf_path, svg_path, tif_path, csv_path]
+        saved[mode] = [*figure_paths, csv_path]
         if verbose:
-            print(f"Saved CN heatmap (normalize='{mode}'): {pdf_path.parent}/")
+            print(f"Saved CN heatmap (normalize='{mode}'): {out_dir}/")
 
     return saved

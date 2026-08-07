@@ -2,10 +2,40 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from anndata import AnnData
+
+
+_WINDOWS_RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    *(f"COM{i}" for i in range(1, 10)),
+    *(f"LPT{i}" for i in range(1, 10)),
+}
+
+
+def _windows_safe_cn_label(value: object) -> str:
+    """Return a readable CN label safe for Windows names and path handling."""
+
+    label = str(value).strip()
+    label = re.sub(r"[\\/]+", " + ", label)
+    label = re.sub(r'[<>:"|?*\x00-\x1f]', "-", label)
+    while ".." in label:
+        label = label.replace("..", ".")
+    label = re.sub(r"\s+", " ", label).strip(" .")
+    label = re.sub(r"\s*\+\s*", " + ", label)
+    label = re.sub(r"\s*-\s*", "-", label)
+    label = label.strip(" .")
+    if not label:
+        label = "CN"
+    if label.split(".", 1)[0].upper() in _WINDOWS_RESERVED_NAMES:
+        label = f"CN_{label}"
+    return label
 
 
 def cn_knn(
@@ -322,7 +352,10 @@ def cn_name(
         top2_n = display_types[top2_i] if top2_i is not None else ""
         return f"{top1_n}/{top2_n} mix" if top2_n else f"{top1_n} mix"
 
-    raw_labels = {cn_id: _label(composition[cn_id]) for cn_id in cn_ids}
+    raw_labels = {
+        cn_id: _windows_safe_cn_label(_label(composition[cn_id]))
+        for cn_id in cn_ids
+    }
 
     # --- disambiguate duplicate labels ---
     seen: dict[str, int] = {}

@@ -7,19 +7,21 @@ from pathlib import Path
 from typing import Any
 
 from qxycell.classifiers import ClassifierDefinition
+from qxycell.classifiers import classifier_threshold_conflicts
 from qxycell.classifiers import discover_classifier_files
 from qxycell.classifiers import discover_threshold_files
 from qxycell.classifiers import marker_name_from_measurement_column
 from qxycell.classifiers import measurement_columns_for_threshold_template
 from qxycell.classifiers import parse_classifiers
 from qxycell.classifiers import select_threshold_file
+from qxycell.classifiers import unresolved_threshold_conflicts
 from qxycell.celltyping import apply_celltypes
 from qxycell.checks import generate_threshold_table
 from qxycell.checks import inspect_project
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import _classification_name
 from qxycell.markers import marker_name_from_classifier_name
-from qxycell.measurements import required_columns
+from qxycell.measurements import MEASUREMENT_TEXT_ENCODING, required_columns
 from qxycell.paths import resolve_output_dir
 
 CENTROID_OBS_COLUMN_RENAMES = {
@@ -46,7 +48,12 @@ def _read_measurements(measurement_files, pd):
     frames = []
     source_columns = []
     for measurement_file in measurement_files:
-        frame = pd.read_csv(measurement_file.path, sep=measurement_file.delimiter, low_memory=False)
+        frame = pd.read_csv(
+            measurement_file.path,
+            sep=measurement_file.delimiter,
+            low_memory=False,
+            encoding=MEASUREMENT_TEXT_ENCODING,
+        )
         frame["quxy_source_file"] = str(measurement_file.path)
         frame["quxy_source_row"] = range(1, len(frame) + 1)
         frames.append(frame)
@@ -56,14 +63,14 @@ def _read_measurements(measurement_files, pd):
     return pd.concat(frames, axis=0, ignore_index=True, sort=False)
 
 
-def _classifier_group_key(classifier: ClassifierDefinition) -> tuple[str, str]:
-    return (str(classifier.name), str(classifier.measurement_column))
+def _classifier_group_key(classifier: ClassifierDefinition) -> str:
+    return str(classifier.measurement_column)
 
 
 def _group_simple_classifiers(
     classifiers: list[ClassifierDefinition],
 ) -> list[list[ClassifierDefinition]]:
-    grouped: dict[tuple[str, str], list[ClassifierDefinition]] = {}
+    grouped: dict[str, list[ClassifierDefinition]] = {}
     for classifier in classifiers:
         if not classifier.is_simple or classifier.measurement_column is None:
             continue
@@ -215,18 +222,72 @@ def _threshold_output_dir(adata, output_dir: str | Path | None = None) -> Path:
     return resolve_output_dir(None, adata=adata)
 
 
-def _ensure_run_threshold_table(project_path: Path, threshold_file: str | Path | None) -> Path | None:
-    """Generate a shared threshold table for run() when no table already exists."""
+def _ensure_run_threshold_table(
+    project_path: Path,
+    output_path: Path,
+    threshold_file: str | Path | None,
+) -> Path | None:
+    """Generate an output-local threshold table for run() when no table exists."""
 
     if threshold_file is not None:
         return Path(threshold_file).expanduser().resolve()
-    selected, _ignored = select_threshold_file(discover_threshold_files(project_path))
+    selected, _ignored = select_threshold_file(
+        discover_threshold_files(project_path, output_dir=output_path)
+    )
     if selected is not None:
         return None
     classifiers = parse_classifiers(discover_classifier_files(project_path))
     if not any(classifier.is_simple for classifier in classifiers):
         return None
-    return generate_threshold_table(project_path)
+    return generate_threshold_table(project_path, output_dir=output_path)
+
+
+def _stale_column_name(existing_columns, column: str) -> str:
+    base = f"{column}__stale_celltype"
+    if base not in existing_columns:
+        return base
+    counter = 2
+    while f"{base}-{counter}" in existing_columns:
+        counter += 1
+    return f"{base}-{counter}"
+
+
+def _archive_celltyping_after_threshold_update(adata) -> dict[str, str]:
+    """Rename stale cell type outputs after marker positivity is recalculated."""
+
+    archived_columns: dict[str, str] = {}
+    previous = getattr(adata, "uns", {}).get("qxycell_celltyping", {})
+    candidate_columns = ["celltype"]
+    if isinstance(previous, dict):
+        for key in ("celltype_column",):
+            value = previous.get(key)
+            if value:
+                candidate_columns.append(str(value))
+        for key in ("feature_columns", "derived_feature_columns"):
+            values = previous.get(key) or []
+            if isinstance(values, (list, tuple)):
+                candidate_columns.extend(str(value) for value in values if value)
+
+    for column in dict.fromkeys(candidate_columns):
+        if column in adata.obs.columns:
+            stale_column = _stale_column_name(adata.obs.columns, column)
+            adata.obs.rename(columns={column: stale_column}, inplace=True)
+            archived_columns[column] = stale_column
+
+    previous_summary = adata.uns.pop("qxycell_celltyping", None)
+    if archived_columns:
+        stale_summaries = adata.uns.setdefault("qxycell_stale_celltyping", [])
+        if isinstance(stale_summaries, list):
+            stale_summaries.append(
+                {
+                    "created": datetime.now().isoformat(timespec="seconds"),
+                    "reason": "thresholds_reapplied",
+                    "columns": archived_columns,
+                    "previous_summary": previous_summary,
+                }
+            )
+    adata.uns.setdefault("qxycell", {})["celltyping_applied"] = False
+    return archived_columns
 
 
 def apply_thresholds(
@@ -267,6 +328,32 @@ def apply_thresholds(
             "Run qxy.check(...) for a detailed report."
         )
 
+    if report.active_threshold_source_kind == "object_classifiers":
+        conflicts = classifier_threshold_conflicts(report.classifiers)
+        if conflicts:
+            measurements = ", ".join(
+                str(item["measurement_column"]) for item in conflicts
+            )
+            raise ValueError(
+                "Conflicting object-classifier thresholds must be resolved in a "
+                "threshold table before application. Generate a table with "
+                "qxy.generate_threshold_table(...), fill every image value for: "
+                + measurements
+            )
+    if report.active_threshold_source is not None:
+        unresolved = unresolved_threshold_conflicts(report.active_threshold_source)
+        if unresolved:
+            details = "; ".join(
+                f"{item['marker'] or item['measurement_column']}: "
+                + ", ".join(item["missing_images"])
+                for item in unresolved
+            )
+            raise ValueError(
+                "Threshold table contains unresolved classifier conflicts. "
+                "Enter a threshold for every listed image before applying: "
+                + details
+            )
+
     simple_classifiers = [classifier for classifier in report.classifiers if classifier.is_simple]
     if not simple_classifiers:
         raise ValueError("No usable threshold definitions are available.")
@@ -293,6 +380,15 @@ def apply_thresholds(
             + ", ".join(sorted(dict.fromkeys(missing_columns)))
         )
     marker_names = _unique_marker_names(matched_groups)
+    active_pos_columns = [
+        f"{marker_names[index]}_pos" for index in range(len(matched_groups))
+    ]
+    previous_thresholding = adata.uns.get("qxycell_thresholding", {})
+    previous_pos_columns = (
+        previous_thresholding.get("pos_columns", [])
+        if isinstance(previous_thresholding, dict)
+        else []
+    )
 
     for column in ("classifier_name", "threshold", "threshold_source"):
         if column in adata.var.columns:
@@ -305,6 +401,14 @@ def apply_thresholds(
         image_col=image_col,
         marker_indices=marker_indices,
     )
+    stale_pos_columns = [
+        column
+        for column in previous_pos_columns
+        if column in adata.obs.columns and column not in active_pos_columns
+    ]
+    if stale_pos_columns:
+        adata.obs.drop(columns=stale_pos_columns, inplace=True)
+    stale_celltype_columns = _archive_celltyping_after_threshold_update(adata)
 
     for group_index, group in enumerate(matched_groups):
         marker_index = marker_indices[group_index]
@@ -327,7 +431,8 @@ def apply_thresholds(
         "n_threshold_definitions": len(simple_classifiers),
         "n_marker_groups": len(matched_groups),
         "n_pos_columns": n_pos_columns,
-        "pos_columns": [f"{marker_names[index]}_pos" for index in range(len(matched_groups))],
+        "pos_columns": active_pos_columns,
+        "stale_celltype_columns": stale_celltype_columns,
     }
     adata.uns["qxycell_thresholding"] = summary
     adata.uns.setdefault("qxycell", {})["thresholding_applied"] = True
@@ -610,9 +715,10 @@ def run(
     """Run QXYCell on a manually exported QuPath project.
 
     The pipeline imports QuPath measurement intensity columns into ``adata.X``
-    and stores required QuPath identity/spatial columns plus available core
-    metadata columns in ``adata.obs``. Marker positivity calls are a separate
-    step via ``qxy.threshold()`` / ``qxy.apply_thresholds()``.
+    and stores required identity/spatial columns plus available annotation and
+    core metadata in ``adata.obs``. Thresholding is off by default and can be
+    enabled with ``apply_thresholds=True``. Cell typing is applied only when
+    ``celltype_logic`` is supplied. ``run()`` never generates an LLM prompt.
     """
 
     ad, np, pd = _import_runtime_dependencies()
@@ -634,7 +740,11 @@ def run(
     log(f"Project: {project_path}")
     log(f"Output: {output_path}")
 
-    generated_run_threshold_table = _ensure_run_threshold_table(project_path, threshold_file)
+    generated_run_threshold_table = _ensure_run_threshold_table(
+        project_path,
+        output_path,
+        threshold_file,
+    )
     if generated_run_threshold_table is not None and threshold_file is None:
         log(f"Generated threshold table: {generated_run_threshold_table}")
 
@@ -656,6 +766,13 @@ def run(
         f"{report.active_threshold_source or report.active_threshold_source_kind}"
     )
     log(f"GeoJSON files: {len(report.geojson_files)}")
+    log(f"Conflicting classifier channels: {len(report.classifier_conflicts)}")
+    for conflict in report.classifier_conflicts:
+        candidates = ", ".join(
+            f"{item['classifier_name']}={item['threshold']}"
+            for item in conflict["candidates"]
+        )
+        log(f"  {conflict['measurement_column']}: {candidates}")
 
     if fail_on_check_error and not report.ok:
         raise RuntimeError(
@@ -688,11 +805,7 @@ def run(
     log("Building marker matrix...")
     x = measurements[marker_columns].apply(pd.to_numeric, errors="coerce").fillna(0.0).to_numpy()
 
-    optional_obs_columns = [
-        column
-        for column in ("TMA Core", "Parent")
-        if column in measurements.columns
-    ]
+    optional_obs_columns = ["TMA Core"] if "TMA Core" in measurements.columns else []
     obs_columns = (
         list(required_columns())
         + optional_obs_columns
@@ -722,28 +835,20 @@ def run(
     log("Marker positivity columns not added by run(); call qxy.threshold(adata) next.")
 
     coreid_summary = None
-    matching_geojson_core_labels = set(report.geojson_core_annotation_counts or {})
-    if any(column in adata.obs.columns for column in ("TMA Core", "Parent")):
+    if "TMA Core" in adata.obs.columns:
         coreid_summary = assign_core_ids_from_measurements(adata, verbose=False)
         log(
             "Measurement CoreID assignment: "
             f"{coreid_summary['n_assigned_cells']:,} assigned, "
             f"{coreid_summary['n_unassigned_cells']:,} unassigned"
         )
-        if matching_geojson_core_labels:
-            log(
-                "GeoJSON core-like annotations matched measurement CoreID labels: "
-                f"{len(matching_geojson_core_labels)} label(s). "
-                "Measurement CoreID values were used; matching GeoJSON labels were "
-                "not kept as annotation columns."
-            )
 
     log("Mapping GeoJSON annotations...")
     annotation_conflicts = _apply_annotations(
         adata,
         report.geojson_files,
         pixel_size_um=pixel_size_um,
-        skip_annotation_labels=matching_geojson_core_labels if coreid_summary else set(),
+        skip_annotation_labels=set(),
     )
     annotation_cols = [
         column for column in adata.obs.columns if str(column).startswith("annotation__")
@@ -777,6 +882,52 @@ def run(
             f"{sample_summary['n_conflicting_cells']:,} ambiguous"
         )
 
+    annotation_assignment_summary = []
+    for planned in report.annotation_assignments:
+        source_label = str(planned["source_annotation"])
+        destination_column = str(planned["destination_column"])
+        assignment_type = str(planned["assignment_type"])
+        if assignment_type == "categorical_value":
+            n_assigned = (
+                int((adata.obs[destination_column].astype("string") == source_label).sum())
+                if destination_column in adata.obs.columns
+                else 0
+            )
+            destination_value = source_label
+        else:
+            n_assigned = (
+                int(adata.obs[destination_column].fillna(False).astype(bool).sum())
+                if destination_column in adata.obs.columns
+                else 0
+            )
+            destination_value = True
+        annotation_assignment_summary.append(
+            {
+                **planned,
+                "destination_value": destination_value,
+                "n_assigned_cells": n_assigned,
+            }
+        )
+
+    log("Annotation assignment details:")
+    if annotation_assignment_summary:
+        for assignment in annotation_assignment_summary:
+            source = assignment["source_annotation"]
+            n_features = assignment["n_geojson_features"]
+            destination = assignment["destination_column"]
+            n_cells = assignment["n_assigned_cells"]
+            if assignment["assignment_type"] == "categorical_value":
+                result = f'adata.obs["{destination}"] = "{source}"'
+            else:
+                result = f'adata.obs["{destination}"] = True'
+            log(
+                f"  {source} ({n_features} GeoJSON feature"
+                f"{'s' if n_features != 1 else ''}) -> {result}: "
+                f"{n_cells:,} cells"
+            )
+    else:
+        log("  none")
+
     n_tma_core_features = sum(
         count
         for geojson_file in report.geojson_files
@@ -788,7 +939,7 @@ def run(
         log(
             "TMA core features detected: "
             f"{n_tma_core_features}. "
-            "Measurement-derived CoreID remains the TMA core source."
+            "These GeoJSON objects are not used to create CoreID values."
         )
 
     log("Mapping cell segmentation polygons...")
@@ -831,6 +982,11 @@ def run(
             verbose=verbose,
         )
         log(f"Thresholding: {thresholding_summary['n_pos_columns']} positivity columns")
+    else:
+        log(
+            "Thresholds applied: no — definitions were discovered, but run() was called "
+            "with apply_thresholds=False"
+        )
 
     celltyping_summary = None
     if celltype_logic is not None:
@@ -850,6 +1006,22 @@ def run(
             f"{celltyping_summary['n_rules']} rules, "
             f"{celltyping_summary['unknown_count']:,} Unknown cells"
         )
+    else:
+        log("Cell typing applied: no — no celltype_logic was supplied")
+
+    if thresholding_summary is not None:
+        log(
+            "Thresholds applied: yes — "
+            f"{thresholding_summary['n_pos_columns']} adata.obs positivity columns from "
+            f"{thresholding_summary['threshold_source']}"
+        )
+    if celltyping_summary is not None:
+        log(
+            "Cell typing applied: yes — "
+            f"adata.obs[{celltyping_summary['celltype_column']!r}] from "
+            f"{celltyping_summary['logic_source']}"
+        )
+    log("LLM prompt generated: no — run() does not call qxy.celltype_prompt()")
 
     run_dir = output_path
     h5ad_dir = run_dir / "h5ad"
@@ -878,6 +1050,17 @@ def run(
         "n_measurement_files": int(len(report.measurement_files)),
         "n_classifiers": int(len(report.classifiers)),
         "n_simple_classifiers": int(sum(1 for item in report.classifiers if item.is_simple)),
+        "classifier_conflicts": {
+            f"{item['measurement_column']}|{item.get('image') or 'global'}": {
+                "measurement_column": item["measurement_column"],
+                "image": item.get("image") or "",
+                "n_definitions": int(item["n_definitions"]),
+                "classifier_names": list(item["classifier_names"]),
+                "thresholds": [float(value) for value in item["thresholds"]],
+                "sources": list(item["sources"]),
+            }
+            for item in report.classifier_conflicts
+        },
         "threshold_source": str(report.active_threshold_source)
         if report.active_threshold_source
         else report.active_threshold_source_kind,
@@ -886,6 +1069,11 @@ def run(
         if report.generated_threshold_template
         else None,
         "thresholding_applied": bool(thresholding_summary is not None),
+        "threshold_application_source": (
+            thresholding_summary.get("threshold_source")
+            if thresholding_summary is not None
+            else None
+        ),
         "thresholding": thresholding_summary,
         "n_geojson_files": int(len(report.geojson_files)),
         "n_tma_core_features": int(n_tma_core_features),
@@ -899,14 +1087,28 @@ def run(
             report.geojson_core_annotation_counts or {}
         ),
         "measurement_core_assignment": coreid_summary,
-        "ignored_geojson_core_annotation_labels": sorted(matching_geojson_core_labels)
-        if coreid_summary
-        else [],
+        "ignored_geojson_core_annotation_labels": [],
         "tma_assignment": tma_summary,
         "n_annotation_conflicts": int(len(annotation_conflicts)),
         "annotation_labels": dict(annotation_label_map),
+        "annotation_assignments": {
+            str(item["source_annotation"]): {
+                key: value
+                for key, value in item.items()
+                if key != "source_annotation"
+            }
+            for item in annotation_assignment_summary
+        },
         "sample_assignment": sample_summary_for_uns if sample_summary is not None else None,
         "celltyping_applied": bool(celltyping_summary is not None),
+        "celltype_logic_source": (
+            celltyping_summary.get("logic_source")
+            if celltyping_summary is not None
+            else None
+        ),
+        "celltyping": celltyping_summary,
+        "llm_prompt_generated": False,
+        "llm_prompt_path": None,
     }
     log(f"Writing H5AD: {h5ad_path}")
     adata.write_h5ad(h5ad_path)
@@ -918,6 +1120,23 @@ def run(
         tables_dir / "annotation_conflicts.csv",
         index=False,
     )
+    pd.DataFrame(annotation_assignment_summary).to_csv(
+        tables_dir / "annotation_assignments.csv",
+        index=False,
+    )
+    pd.DataFrame(
+        [
+            {
+                "measurement_column": item["measurement_column"],
+                "image": item.get("image") or "",
+                "n_definitions": item["n_definitions"],
+                "classifier_names": "|".join(item["classifier_names"]),
+                "thresholds": "|".join(str(value) for value in item["thresholds"]),
+                "sources": "|".join(item["sources"]),
+            }
+            for item in report.classifier_conflicts
+        ]
+    ).to_csv(tables_dir / "classifier_conflicts.csv", index=False)
     if celltyping_summary is not None:
         counts = adata.obs["celltype"].value_counts(dropna=False).rename_axis("celltype")
         counts.reset_index(name="cell_count").to_csv(

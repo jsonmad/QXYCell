@@ -46,16 +46,16 @@ def assign_core_ids_from_measurements(
     adata,
     *,
     target_col: str = "CoreID",
-    source_cols: tuple[str, ...] = ("TMA Core", "Parent"),
+    source_cols: tuple[str, ...] = ("TMA Core",),
     overwrite: bool = True,
     fill_only_missing: bool = False,
     drop_source_cols: bool = False,
     verbose: bool = True,
 ) -> dict[str, object]:
-    """Assign TMA core IDs from QuPath measurement metadata columns.
+    """Create ``CoreID`` from QuPath's measurement-table ``TMA Core`` column.
 
-    QXYCell uses this as the CoreID path when QuPath exported core metadata
-    such as ``"TMA Core"`` or ``"Parent"``.
+    QXYCell does not infer core IDs from ``Parent`` or GeoJSON annotation
+    labels. By default this function only accepts ``TMA Core``.
     """
 
     if not target_col:
@@ -65,6 +65,10 @@ def assign_core_ids_from_measurements(
     source_cols = tuple(str(column) for column in source_cols if str(column).strip())
     if not source_cols:
         raise ValueError("source_cols must contain at least one column name.")
+    if source_cols != ("TMA Core",):
+        raise ValueError(
+            "CoreID may only be derived from the measurement-table 'TMA Core' column."
+        )
 
     available_source_cols = [column for column in source_cols if column in adata.obs.columns]
     missing_source_cols = [column for column in source_cols if column not in adata.obs.columns]

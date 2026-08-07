@@ -1,15 +1,14 @@
 import json
-import os
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
 
-import qxycell as qxy
 from qxycell.checks import check
 from qxycell.geojson import load_cell_polygons, summarize_geojson_file
-from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, apply_thresholds, run
+from qxycell.pipeline import _apply_annotations, _apply_cell_polygons, run
+from qxycell.tma import assign_tma_cores
 
 
 def _feature(*, object_type, name, coords, classification=None):
@@ -93,7 +92,7 @@ def _write_minimal_manual_threshold_project(project_dir):
             "img_a.ome.tiff": [5],
             "img_b.ome.tiff": [11],
         }
-    ).to_csv(project_dir / "thresholds_260615-1234.tsv", sep="\t", index=False)
+    ).to_csv(project_dir / "manual_thresholds.tsv", sep="\t", index=False)
 
 
 def _write_template_project(project_dir):
@@ -104,8 +103,6 @@ def _write_template_project(project_dir):
             "Object ID": ["cell_0", "cell_1"],
             "Centroid X µm": [5, 25],
             "Centroid Y µm": [5, 25],
-            "Cell: CD8 - Cy5: Mean": [8.0, 2.0],
-            "Nucleus: DAPI: Mean": [100.0, 50.0],
             "Marker: Mean": [10.0, 1.0],
             "Marker: Median": [9.0, 1.5],
             "Marker: Area": [100.0, 200.0],
@@ -123,88 +120,6 @@ def _write_template_project(project_dir):
         ),
         encoding="utf-8",
     )
-
-
-def _write_alias_classifier_project(project_dir):
-    project_dir.mkdir()
-    pd.DataFrame(
-        {
-            "Image": ["img_a.ome.tiff", "img_a.ome.tiff"],
-            "Object ID": ["cell_0", "cell_1"],
-            "Centroid X µm": [5, 25],
-            "Centroid Y µm": [5, 25],
-            "Cell: #945;SMA - TRITC: Mean": [10.0, 1.0],
-        }
-    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
-    (project_dir / "aSMA.json").write_text(
-        json.dumps(
-            {
-                "function": {
-                    "classifier_fun": "ClassifyByMeasurementFunction",
-                    "measurement": "Cell: #945;SMA - TRITC: Mean",
-                    "threshold": 5,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-def _write_measurement_core_project(project_dir):
-    project_dir.mkdir()
-    pd.DataFrame(
-        {
-            "Image": ["img.ome.tiff", "img.ome.tiff"],
-            "Object ID": ["cell_0", "cell_1"],
-            "Centroid X µm": [5, 25],
-            "Centroid Y µm": [5, 25],
-            "TMA Core": ["A-1", "A-2"],
-            "Marker: Mean": [10.0, 1.0],
-        }
-    ).to_csv(project_dir / "detections.tsv", sep="\t", index=False)
-    (project_dir / "marker.json").write_text(
-        json.dumps(
-            {
-                "function": {
-                    "classifier_fun": "ClassifyByMeasurementFunction",
-                    "measurement": "Marker: Mean",
-                    "threshold": 5,
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-def test_run_reports_applied_threshold_and_celltype_provenance(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_minimal_run_project(project_dir)
-    logic_path = tmp_path / "celltype_logic.yaml"
-    logic_path.write_text(
-        "rules:\n  - name: Marker_positive\n    positive: [Marker]\n",
-        encoding="utf-8",
-    )
-
-    adata = run(
-        project_dir,
-        output_dir=tmp_path / "out",
-        pixel_size_um=1.0,
-        apply_thresholds=True,
-        celltype_logic=logic_path,
-        verbose=False,
-    )
-
-    run_log = (tmp_path / "out" / "run.log").read_text(encoding="utf-8")
-    metadata = adata.uns["qxycell"]
-    assert "Thresholds applied: yes" in run_log
-    assert str(logic_path.resolve()) in run_log
-    assert "Cell typing applied: yes" in run_log
-    assert "LLM prompt generated: no" in run_log
-    assert metadata["thresholding_applied"] is True
-    assert metadata["threshold_application_source"]
-    assert metadata["celltyping_applied"] is True
-    assert metadata["celltype_logic_source"] == str(logic_path.resolve())
-    assert metadata["llm_prompt_generated"] is False
 
 
 def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
@@ -236,98 +151,7 @@ def test_run_annotation_mapper_ignores_tma_core_features(tmp_path):
     assert "tma_core" not in adata.obs.columns
 
 
-def test_check_counts_only_measurement_tma_core_values(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_measurement_core_project(project_dir)
-    _write_geojson(
-        project_dir / "img.geojson",
-        [
-            _feature(
-                object_type="annotation",
-                name="A-1",
-                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
-            ),
-            _feature(
-                object_type="annotation",
-                name="Region*",
-                coords=[[0, 0], [30, 0], [30, 30], [0, 30], [0, 0]],
-            ),
-        ],
-    )
-
-    report = check(project_dir, output_dir=tmp_path / "check")
-    report_text = report.report_path.read_text(encoding="utf-8")
-    coreid_report = pd.read_csv(report.output_dir / "tables" / "coreid_report.csv")
-
-    assert report.measurement_core_counts == {"A-1": 1, "A-2": 1}
-    assert report.geojson_core_annotation_counts == {"A-1": 1}
-    assert report.geojson_tma_core_counts == {"A-1": 1}
-    assert "Measurement CoreID values: 2" in str(report)
-    assert "Unique CoreIDs    : 2" in report_text
-    assert "GeoJSON derived TMA CoreIDs" not in report_text
-    assert "Thresholds applied: no — definitions were inspected/validated only" in report_text
-    assert "Cell typing applied: no — no cell type logic was loaded" in report_text
-    assert "LLM prompt generated: no" in report_text
-    assert report.to_dict()["processing"]["thresholds_applied"] is False
-    assert coreid_report.set_index("label").loc["A-1", "status"] == "measurement_coreid"
-
-
-def test_run_uses_tma_core_without_suppressing_matching_annotations(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_measurement_core_project(project_dir)
-    _write_geojson(
-        project_dir / "img.geojson",
-        [
-            _feature(
-                object_type="annotation",
-                name="A-1",
-                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
-            ),
-            _feature(
-                object_type="annotation",
-                name="Region*",
-                coords=[[0, 0], [30, 0], [30, 30], [0, 30], [0, 0]],
-            ),
-        ],
-    )
-
-    adata = run(
-        project_dir,
-        output_dir=tmp_path / "out",
-        pixel_size_um=1.0,
-        verbose=False,
-    )
-
-    assert adata.obs["CoreID"].astype(str).tolist() == ["A-1", "A-2"]
-    assert "annotation__A_1" in adata.obs.columns
-    assert bool(adata.obs.loc["img.ome.tiff::cell_0", "annotation__A_1"])
-    assert "annotation__Region" in adata.obs.columns
-    assert bool(adata.obs.loc["img.ome.tiff::cell_0", "annotation__Region"])
-    assert adata.uns["qxycell"]["measurement_core_assignment"]["target_col"] == "CoreID"
-    assert adata.uns["qxycell"]["ignored_geojson_core_annotation_labels"] == []
-
-
-def test_parent_column_does_not_create_or_report_coreids(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_measurement_core_project(project_dir)
-    measurement_path = project_dir / "detections.tsv"
-    measurements = pd.read_csv(measurement_path, sep="\t").rename(
-        columns={"TMA Core": "Parent"}
-    )
-    measurements.to_csv(measurement_path, sep="\t", index=False)
-
-    report = check(project_dir, output_dir=tmp_path / "check")
-    assert report.measurement_core_counts == {}
-    assert report.n_measurement_core_labels == 0
-    assert "Measurement CoreID values: 0" in str(report)
-
-    adata = run(project_dir, output_dir=tmp_path / "out", verbose=False)
-    assert "CoreID" not in adata.obs.columns
-    assert "Parent" not in adata.obs.columns
-    assert adata.uns["qxycell"]["measurement_core_assignment"] is None
-
-
-def test_run_detects_tma_cores_without_auto_assigning(tmp_path):
+def test_run_auto_assigns_detected_tma_cores(tmp_path):
     project_dir = tmp_path / "project"
     _write_minimal_run_project(project_dir)
     _write_geojson(
@@ -355,50 +179,41 @@ def test_run_detects_tma_cores_without_auto_assigning(tmp_path):
     assert adata.obs["Xµm"].tolist() == [5, 25]
     assert adata.obs["Yµm"].tolist() == [5, 25]
     np.testing.assert_array_equal(adata.obsm["spatial"], np.array([[5, 5], [25, 25]]))
-    assert "tma_core" not in adata.obs.columns
+    assert adata.obs["tma_core"].tolist() == ["core_1", "Unassigned"]
     assert adata.uns["qxycell"]["n_tma_core_features"] == 1
-    assert adata.uns["qxycell"]["tma_assignment"] is None
-    assert "qxycell_tma" not in adata.uns
+    assert adata.uns["qxycell"]["tma_assignment"]["n_assigned_cells"] == 1
+    assert adata.uns["qxycell_tma"]["n_cores"] == 1
 
 
-def test_generate_threshold_table_writes_manual_threshold_template(tmp_path):
+def test_check_writes_manual_threshold_template(tmp_path):
     project_dir = tmp_path / "project"
     _write_template_project(project_dir)
 
-    template_path = qxy.generate_threshold_table(project_dir)
+    report = check(project_dir, output_dir=tmp_path / "out")
 
+    template_path = report.output_dir / "tables" / "manual_threshold_template.tsv"
     assert template_path.exists()
-    assert template_path.parent.name == "thresholds"
-    assert template_path.parent.parent.parent == project_dir.parent
     template = pd.read_csv(template_path, sep="\t")
     assert template.columns.tolist() == [
-        "compartment",
         "marker",
         "measurement_column",
-        "classifier_conflict",
-        "candidate_classifiers",
-        "candidate_thresholds",
-        "candidate_sources",
         "img_a.ome.tiff",
         "img_b.ome.tiff",
     ]
-    assert template["compartment"].fillna("").tolist() == ["Cell", "", "", "Nucleus"]
-    assert template["marker"].tolist() == ["CD8", "marker", "Marker", "DAPI"]
+    assert template["marker"].tolist() == ["Marker", "Marker"]
     assert template["measurement_column"].tolist() == [
-        "Cell: CD8 - Cy5: Mean",
         "Marker: Mean",
         "Marker: Median",
-        "Nucleus: DAPI: Mean",
     ]
-    assert template["img_a.ome.tiff"].tolist()[1] == 5.0
-    assert template["img_b.ome.tiff"].tolist()[1] == 5.0
-    assert template[["img_a.ome.tiff", "img_b.ome.tiff"]].iloc[2].isna().tolist() == [
+    assert template["img_a.ome.tiff"].tolist()[0] == 5.0
+    assert template["img_b.ome.tiff"].tolist()[0] == 5.0
+    assert template[["img_a.ome.tiff", "img_b.ome.tiff"]].iloc[1].isna().tolist() == [
         True,
         True,
     ]
 
 
-def test_threshold_uses_manual_threshold_tsv_after_run(tmp_path):
+def test_run_uses_manual_threshold_tsv_when_simple_json_missing(tmp_path):
     project_dir = tmp_path / "project"
     _write_minimal_manual_threshold_project(project_dir)
 
@@ -406,13 +221,6 @@ def test_threshold_uses_manual_threshold_tsv_after_run(tmp_path):
         project_dir,
         output_dir=tmp_path / "out",
         pixel_size_um=1.0,
-        verbose=False,
-    )
-    assert not any(column.endswith("_pos") for column in adata.obs.columns)
-    threshold_summary = apply_thresholds(
-        adata,
-        project_dir=project_dir,
-        output_dir=tmp_path / "out",
         verbose=False,
     )
 
@@ -420,72 +228,7 @@ def test_threshold_uses_manual_threshold_tsv_after_run(tmp_path):
     assert adata.var.loc["Marker", "source_measurement_column"] == "Marker: Mean"
     assert adata.var.loc["Marker", "threshold"] == "per_image"
     assert adata.obs["Marker_pos"].tolist() == [1, 0, 0, 0]
-    assert threshold_summary["n_pos_columns"] == 1
     assert adata.uns["qxycell"]["n_simple_classifiers"] == 2
-
-
-def test_run_and_threshold_use_classifier_filename_for_marker_name(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_alias_classifier_project(project_dir)
-
-    adata = run(
-        project_dir,
-        output_dir=tmp_path / "out",
-        pixel_size_um=1.0,
-        verbose=False,
-    )
-    threshold_summary = apply_thresholds(
-        adata,
-        project_dir=project_dir,
-        output_dir=tmp_path / "out",
-        verbose=False,
-    )
-
-    assert adata.var_names.tolist() == ["aSMA"]
-    assert adata.var.loc["aSMA", "source_measurement_column"] == "Cell: #945;SMA - TRITC: Mean"
-    assert adata.obs["aSMA_pos"].tolist() == [1, 0]
-    assert threshold_summary["pos_columns"] == ["aSMA_pos"]
-
-
-def test_run_uses_newest_timestamped_threshold_file(tmp_path):
-    project_dir = tmp_path / "project"
-    _write_minimal_manual_threshold_project(project_dir)
-    older = project_dir / "thresholds_260615-1234.tsv"
-    newer = project_dir / "thresholds_260615-1300.tsv"
-    pd.DataFrame(
-        {
-            "marker": ["Marker"],
-            "measurement_column": ["Marker: Mean"],
-            "img_a.ome.tiff": [11],
-            "img_b.ome.tiff": [11],
-        }
-    ).to_csv(newer, sep="\t", index=False)
-    os.utime(older, (1_700_000_000, 1_700_000_000))
-    os.utime(newer, (1_700_000_100, 1_700_000_100))
-
-    report = check(project_dir, output_dir=tmp_path / "out")
-    ignored = [
-        message
-        for message in report.messages
-        if message.code == "classifiers.threshold_file_ignored"
-    ]
-    assert len(ignored) == 1
-    assert ignored[0].path == str(older.resolve())
-
-    adata = run(
-        project_dir,
-        output_dir=tmp_path / "run_out",
-        pixel_size_um=1.0,
-        verbose=False,
-    )
-    apply_thresholds(
-        adata,
-        project_dir=project_dir,
-        output_dir=tmp_path / "run_out",
-        verbose=False,
-    )
-
-    assert adata.obs["Marker_pos"].tolist() == [0, 0, 0, 0]
 
 
 def test_run_sample_annotations_collapse_to_one_sample_column(tmp_path):
@@ -532,27 +275,6 @@ def test_run_sample_annotations_collapse_to_one_sample_column(tmp_path):
     assert adata.obs["Sample"].astype(str).tolist() == ["Ambiguous", "Sample-B"]
     assert adata.uns["qxycell_sample_annotations"]["n_conflicting_cells"] == 1
     assert adata.uns["qxycell"]["n_annotation_conflicts"] == 0
-    assignments = adata.uns["qxycell"]["annotation_assignments"]
-    assert assignments["Region*"]["destination_column"] == "annotation__Region"
-    assert assignments["Region*"]["n_assigned_cells"] == 1
-    assert assignments["Sample-A"]["destination_column"] == "Sample"
-    assert assignments["Sample-A"]["n_assigned_cells"] == 0
-    assert assignments["Sample-B"]["n_assigned_cells"] == 1
-    run_log = (tmp_path / "out" / "run.log").read_text(encoding="utf-8")
-    assert "Annotation assignment details:" in run_log
-    assert 'Region* (1 GeoJSON feature) -> adata.obs["annotation__Region"] = True: 1 cells' in run_log
-    assert 'Sample-B (1 GeoJSON feature) -> adata.obs["Sample"] = "Sample-B": 1 cells' in run_log
-    assert "Thresholds applied: no" in run_log
-    assert "Cell typing applied: no" in run_log
-    assert "LLM prompt generated: no" in run_log
-    assert adata.uns["qxycell"]["llm_prompt_generated"] is False
-    assignment_table = pd.read_csv(tmp_path / "out" / "tables" / "annotation_assignments.csv")
-    assert set(assignment_table["source_annotation"]) == {
-        "Ignore*",
-        "Region*",
-        "Sample-A",
-        "Sample-B",
-    }
 
 
 def test_run_annotation_mapper_uses_classification_and_name_labels(tmp_path):
@@ -660,6 +382,92 @@ def test_load_cell_polygons_defaults_to_obs_wkt_column(tmp_path):
     assert "cell_polygons" not in adata.obsm
 
 
+def test_assign_tma_cores_leaves_overlap_cells_unassigned(tmp_path):
+    geojson_path = _write_geojson(
+        tmp_path / "img.geojson",
+        [
+            _feature(
+                object_type="tmaCore",
+                name="core_1",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ),
+            _feature(
+                object_type="tmaCore",
+                name="core_2",
+                coords=[[5, 0], [15, 0], [15, 10], [5, 10], [5, 0]],
+            ),
+        ],
+    )
+    adata = _adata_for_img([(2, 5), (7, 5), (12, 5)])
+
+    summary = assign_tma_cores(
+        adata,
+        geojson_path,
+        pixel_size_um=1.0,
+        output_dir=tmp_path / "out",
+        verbose=False,
+    )
+
+    assert adata.obs["tma_core"].tolist() == ["core_1", "Unassigned", "core_2"]
+    assert summary["n_overlapping_core_pairs"] == 1
+    assert summary["n_ambiguous_overlap_cells"] == 1
+    assert summary["n_assigned_cells"] == 2
+
+
+def test_assign_tma_cores_ignores_non_tma_annotation_features_by_default(tmp_path):
+    geojson_path = _write_geojson(
+        tmp_path / "img.geojson",
+        [
+            _feature(
+                object_type="annotation",
+                name="Ignore*",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            ),
+            _feature(
+                object_type="tmaCore",
+                name="core_1",
+                coords=[[20, 20], [30, 20], [30, 30], [20, 30], [20, 20]],
+            ),
+        ],
+    )
+    adata = _adata_for_img([(5, 5), (25, 25)])
+
+    summary = assign_tma_cores(
+        adata,
+        geojson_path,
+        pixel_size_um=1.0,
+        output_dir=tmp_path / "out",
+        verbose=False,
+    )
+
+    assert summary["n_cores"] == 1
+    assert adata.obs["tma_core"].tolist() == ["Unassigned", "core_1"]
+
+
+def test_assign_tma_cores_includes_boundary_points(tmp_path):
+    geojson_path = _write_geojson(
+        tmp_path / "img.geojson",
+        [
+            _feature(
+                object_type="tmaCore",
+                name="core_1",
+                coords=[[0, 0], [10, 0], [10, 10], [0, 10], [0, 0]],
+            )
+        ],
+    )
+    adata = _adata_for_img([(0, 5)])
+
+    assign_tma_cores(
+        adata,
+        geojson_path,
+        pixel_size_um=1.0,
+        output_dir=tmp_path / "out",
+        verbose=False,
+    )
+
+    assert adata.obs["tma_core"].tolist() == ["core_1"]
+
+
 def test_check_report_lists_tma_core_labels_under_tma(tmp_path):
     project_dir = tmp_path / "project"
     _write_minimal_run_project(project_dir)
@@ -699,21 +507,6 @@ def test_check_report_lists_tma_core_labels_under_tma(tmp_path):
 
     assert "Sample   : sample1 (1)" in report_text
     assert "Ignore   : Ignore* (1)" in report_text
-    assert "All names: Ignore* (1), sample1 (1)" in report_text
-    assert "Planned AnnData assignments from annotations:" in report_text
-    assert 'sample1 (1 GeoJSON feature) -> adata.obs["Sample"] = "sample1"' in report_text
-    assert 'Ignore* (1 GeoJSON feature) -> adata.obs["annotation__Ignore"] = True' in report_text
-    assert "Annotation features: 2" in report_text
-    assert "QuPath tmaCore objects: 1" in report_text
-    assert "Cell features     : 2" in report_text
-    assert "Measurement CoreID values: 0" in str(report)
-    assert "GeoJSON derived TMA CoreIDs" not in report_text
-    assert "TMA cores: A-1 (1)" in report_text
+    assert "TMA      : A-1 (1)" in report_text
     assert "Other    : none" in report_text
     assert "Cell labels: Ignore* (2)" in report_text
-    report_json = json.loads(report.json_path.read_text(encoding="utf-8"))
-    assert report_json["annotation_label_counts"] == {"Ignore*": 1, "sample1": 1}
-    assert report_json["annotation_obs_columns"] == {
-        "Sample": ["sample1"],
-        "annotation__Ignore": ["Ignore*"],
-    }

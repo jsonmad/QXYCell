@@ -116,11 +116,10 @@ def test_assign_annotations_rejects_missing_labels():
         )
 
 
-def test_assign_core_ids_from_measurements_prefers_tma_core_then_parent():
+def test_assign_core_ids_from_measurements_uses_tma_core():
     obs = pd.DataFrame(
         {
-            "TMA Core": ["G-1", "", pd.NA, "Unassigned", "Root object (Image)"],
-            "Parent": ["fallback_ignored", "H-2", "I-3", "J-4", "K-5"],
+            "TMA Core": ["G-1", " H-2 ", pd.NA, "Unassigned", "Root object (Image)"],
         },
         index=["cell_0", "cell_1", "cell_2", "cell_3", "cell_4"],
     )
@@ -130,13 +129,13 @@ def test_assign_core_ids_from_measurements_prefers_tma_core_then_parent():
 
     assert adata.obs["CoreID"].astype(object).where(
         adata.obs["CoreID"].notna(), None
-    ).tolist() == ["G-1", "H-2", "I-3", "J-4", "K-5"]
-    assert summary["available_source_cols"] == ["TMA Core", "Parent"]
-    assert summary["n_assigned_cells"] == 5
-    assert summary["n_unassigned_cells"] == 0
+    ).tolist() == ["G-1", "H-2", None, None, None]
+    assert summary["available_source_cols"] == ["TMA Core"]
+    assert summary["n_assigned_cells"] == 2
+    assert summary["n_unassigned_cells"] == 3
 
 
-def test_assign_core_ids_from_measurements_can_fill_only_missing_values():
+def test_assign_core_ids_from_measurements_rejects_parent_as_source():
     obs = pd.DataFrame(
         {
             "CoreID": ["existing", pd.NA, ""],
@@ -146,16 +145,13 @@ def test_assign_core_ids_from_measurements_can_fill_only_missing_values():
     )
     adata = ad.AnnData(X=np.zeros((3, 1)), obs=obs)
 
-    qxy.assign_core_ids_from_measurements(
-        adata,
-        source_cols=("Parent",),
-        fill_only_missing=True,
-        verbose=False,
-    )
-
-    assert adata.obs["CoreID"].astype(object).where(
-        adata.obs["CoreID"].notna(), None
-    ).tolist() == ["existing", "H-2", "I-3"]
+    with pytest.raises(ValueError, match="measurement-table 'TMA Core'"):
+        qxy.assign_core_ids_from_measurements(
+            adata,
+            source_cols=("Parent",),
+            fill_only_missing=True,
+            verbose=False,
+        )
 
 
 def test_assign_core_ids_from_measurements_rejects_missing_source_columns():

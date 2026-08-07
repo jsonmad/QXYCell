@@ -11,7 +11,6 @@ build/
 
 # Local notes
 INSTALL_NOTES.md
-README_MAC_INSTALL.md
 
 # Local QuXYCell outputs
 quxycell_output*/
@@ -20,7 +19,6 @@ qxy?run/
 qxy_outputs_*/
 outputs/
 *.ipynb
-!notebooks/basic_qxycell_workflow.ipynb
 
 # Project-specific files that should not be committed
 # YAMLs in repo root (celltype logic, scratch files)
@@ -42,10 +40,3 @@ outputs/
 test_*.py
 !tests/test_*.py
 .DS_Store
-
-# Local test datasets and generated documentation builds
-/UWA_for_qxy_testing/
-/qupath_UWA/
-/docs/_qxy_function_examples_build/
-/Installation (GitHub Clone).txt
-/260610_tests/inputs_UWA/

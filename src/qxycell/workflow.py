@@ -10,6 +10,8 @@ def workflow(
     project_dir: str | Path,
     *,
     output_dir: str | Path | None = None,
+    threshold_file: str | Path | None = None,
+    apply_thresholds: bool = True,
     sample_metadata: str | Path | Any | None = None,
     sample_col: str = "Image",
     metadata_sample_col: str | None = None,
@@ -26,12 +28,24 @@ def workflow(
     from qxycell.filtering import remove_ignore
     from qxycell.io_utils import save
     from qxycell.metadata import add_metadata
-    from qxycell.pipeline import apply_thresholds, run
+    from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata, run
     from qxycell.plotting import plot_spatial, plot_stacked_bar
     from qxycell.qc import qc
 
-    adata = run(project_dir, output_dir=output_dir, verbose=verbose)
-    apply_thresholds(adata, project_dir=project_dir, output_dir=output_dir, verbose=verbose)
+    adata = run(
+        project_dir,
+        output_dir=output_dir,
+        threshold_file=threshold_file,
+        verbose=verbose,
+    )
+    if apply_thresholds:
+        apply_thresholds_to_adata(
+            adata,
+            project_dir=project_dir,
+            threshold_file=threshold_file,
+            output_dir=output_dir,
+            verbose=verbose,
+        )
 
     if sample_metadata is not None:
         add_metadata(
@@ -56,12 +70,14 @@ def workflow(
         plot_stacked_bar(adata, sample_col=plot_col, show=False, verbose=verbose)
         plot_spatial(adata, sample_col=plot_col, show=False, verbose=verbose)
 
-    save(adata, verbose=verbose)
     adata.uns["qxycell_workflow"] = {
         "sample_metadata": str(sample_metadata) if sample_metadata is not None else None,
         "celltype_logic": str(celltype_logic) if celltype_logic is not None else None,
+        "threshold_file": str(threshold_file) if threshold_file is not None else None,
+        "thresholds_applied": bool(apply_thresholds),
         "remove_ignore_cells": bool(remove_ignore_cells),
         "make_qc": bool(make_qc),
         "make_plots": bool(make_plots),
     }
+    save(adata, verbose=verbose)
     return adata

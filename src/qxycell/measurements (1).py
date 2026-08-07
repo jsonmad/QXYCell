@@ -5,11 +5,9 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from qxycell.discovery import is_qxy_output_artifact
 from qxycell.types import MeasurementFile, Message
 
 REQUIRED_MEASUREMENT_COLUMNS = ("Image", "Object ID", "Centroid X µm", "Centroid Y µm")
-MEASUREMENT_TEXT_ENCODING = "utf-8-sig"
 
 
 def discover_measurement_files(project_dir: str | Path) -> list[Path]:
@@ -24,8 +22,6 @@ def discover_measurement_files(project_dir: str | Path) -> list[Path]:
     for path in candidates:
         lower = path.name.lower()
         if lower.startswith("."):
-            continue
-        if is_qxy_output_artifact(path, root):
             continue
         if "measurement" in lower or lower in {"detections.tsv", "detections.csv"}:
             filtered.append(path)
@@ -49,11 +45,7 @@ def summarize_measurement_file(path: str | Path, count_rows: bool = False) -> Me
 
     path = Path(path).expanduser().resolve()
     delimiter = delimiter_for_path(path)
-    with path.open(
-        newline="",
-        errors="replace",
-        encoding=MEASUREMENT_TEXT_ENCODING,
-    ) as handle:
+    with path.open(newline="", errors="replace") as handle:
         reader = csv.reader(handle, delimiter=delimiter)
         try:
             columns = tuple(next(reader))

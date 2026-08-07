@@ -5,13 +5,14 @@ from __future__ import annotations
 import csv
 import json
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from html import escape
 from pathlib import Path
 from typing import Any
 
 from qxycell.classifiers import (
+    classifier_threshold_conflicts,
     compartment_from_measurement_column,
     discover_classifier_files,
     discover_threshold_files,
@@ -20,17 +21,25 @@ from qxycell.classifiers import (
     parse_classifiers,
     parse_threshold_files,
     select_threshold_file,
+    unresolved_threshold_conflicts,
     validate_classifiers,
 )
 from qxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
 from qxycell.markers import marker_name_from_classifier_name
 from qxycell.measurements import (
+    MEASUREMENT_TEXT_ENCODING,
     discover_measurement_files,
     summarize_measurement_file,
     validate_measurement_files,
 )
 from qxycell.paths import OUTPUT_TIMESTAMP_FORMAT, resolve_output_dir
 from qxycell.types import ClassifierDefinition, GeoJsonFile, MeasurementFile, Message
+
+
+def _safe_annotation_column(label: str) -> str:
+    safe = "".join(ch if ch.isalnum() else "_" for ch in str(label).strip())
+    safe = "_".join(part for part in safe.split("_") if part)
+    return f"annotation__{safe or 'Unclassified'}"
 
 
 @dataclass(frozen=True)
@@ -48,6 +57,7 @@ class CheckReport:
     active_threshold_source: Path | None = None
     active_threshold_source_kind: str = "none"
     generated_threshold_template: Path | None = None
+    classifier_conflicts: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -85,6 +95,48 @@ class CheckReport:
     @property
     def n_cell_features(self) -> int:
         return self.geojson_object_count("cell")
+
+    @property
+    def annotation_label_counts(self) -> dict[str, int]:
+        """All annotation names/classifications discovered in GeoJSON files."""
+        counts: Counter[str] = Counter()
+        for geojson_file in self.geojson_files:
+            for object_type, labels in geojson_file.labels_by_object_type.items():
+                if object_type.lower() != "annotation":
+                    continue
+                for label, count in labels.items():
+                    if label and label.lower() not in {"", "none", "null"}:
+                        counts[label] += int(count)
+        return dict(sorted(counts.items()))
+
+    @property
+    def annotation_obs_columns(self) -> dict[str, list[str]]:
+        """Map expected AnnData columns to the annotation labels feeding them."""
+        mapping: dict[str, list[str]] = {}
+        for label in self.annotation_label_counts:
+            column = "Sample" if "sample" in label.lower() else _safe_annotation_column(label)
+            mapping.setdefault(column, []).append(label)
+        return {
+            column: sorted(labels)
+            for column, labels in sorted(mapping.items())
+        }
+
+    @property
+    def annotation_assignments(self) -> list[dict[str, Any]]:
+        """Planned source annotation to AnnData destination assignments."""
+        assignments = []
+        for label, count in self.annotation_label_counts.items():
+            is_sample = "sample" in label.lower()
+            assignments.append(
+                {
+                    "source_annotation": label,
+                    "n_geojson_features": int(count),
+                    "destination_column": "Sample" if is_sample else _safe_annotation_column(label),
+                    "destination_value": label if is_sample else True,
+                    "assignment_type": "categorical_value" if is_sample else "boolean_membership",
+                }
+            )
+        return assignments
 
     @property
     def n_measurement_core_labels(self) -> int:
@@ -135,6 +187,11 @@ class CheckReport:
     def summary_lines(self) -> list[str]:
         """Return a compact, notebook-friendly report summary."""
 
+        annotation_labels = ", ".join(
+            f"{label} ({count})" for label, count in self.annotation_label_counts.items()
+        ) or "none"
+        annotation_columns = ", ".join(self.annotation_obs_columns) or "none"
+
         return [
             f"QXYCell check: {'PASS' if self.ok else 'FAIL'}",
             f"Errors: {self.n_errors}",
@@ -143,10 +200,15 @@ class CheckReport:
             f"Classifier definitions: {len(self.classifiers)}",
             f"Simple classifiers: {sum(1 for item in self.classifiers if item.is_simple)}",
             f"Threshold source: {_display_threshold_source(self)}",
+            f"Conflicting classifier channels: {len(self.classifier_conflicts)}",
+            "Thresholds applied: no (check() validates definitions only)",
+            "Cell typing applied: no (check() does not load cell type logic)",
+            "LLM prompt generated: no",
             f"GeoJSON files: {len(self.geojson_files)}",
             f"Annotation features: {self.n_annotation_features}",
-            f"Measurement derived TMA CoreIDs: {self.n_measurement_core_labels}",
-            f"GeoJSON derived TMA CoreIDs: {self.n_geojson_tma_core_ids}",
+            f"Annotation names: {annotation_labels}",
+            f"AnnData annotation columns: {annotation_columns}",
+            f"Measurement CoreID values: {self.n_measurement_core_labels}",
             f"Cell features: {self.n_cell_features}",
             f"Report: {self.report_path}",
         ]
@@ -186,12 +248,24 @@ class CheckReport:
                 if self.generated_threshold_template
                 else None
             ),
+            "classifier_conflicts": self.classifier_conflicts,
+            "processing": {
+                "thresholds_applied": False,
+                "threshold_application_source": None,
+                "celltyping_applied": False,
+                "celltype_logic_source": None,
+                "llm_prompt_generated": False,
+                "llm_prompt_path": None,
+            },
             "geojson_files": [item.to_dict() for item in self.geojson_files],
             "geojson_object_counts": {
                 "annotation": self.n_annotation_features,
                 "tmaCore": self.n_tma_core_features,
                 "cell": self.n_cell_features,
             },
+            "annotation_label_counts": self.annotation_label_counts,
+            "annotation_obs_columns": self.annotation_obs_columns,
+            "annotation_assignments": self.annotation_assignments,
             "measurement_core_counts": dict(self.measurement_core_counts or {}),
             "geojson_core_annotation_counts": dict(
                 self.geojson_core_annotation_counts or {}
@@ -226,6 +300,12 @@ def _threshold_table_rows(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     images = _unique_measurement_images(measurement_files)
     threshold_lookup = _threshold_lookup(classifiers)
+    conflicts = classifier_threshold_conflicts(classifiers)
+    conflicts_by_measurement = {
+        str(item["measurement_column"]): item
+        for item in conflicts
+        if item.get("image") is None
+    }
     marker_lookup = _marker_lookup_by_measurement_column(classifiers)
     rows = [
         {
@@ -235,14 +315,38 @@ def _threshold_table_rows(
                 marker_name_from_measurement_column(column),
             ),
             "measurement_column": column,
+            "classifier_conflict": column in conflicts_by_measurement,
+            "candidate_classifiers": "|".join(
+                conflicts_by_measurement.get(column, {}).get("classifier_names", [])
+            ),
+            "candidate_thresholds": "|".join(
+                str(value)
+                for value in conflicts_by_measurement.get(column, {}).get("thresholds", [])
+            ),
+            "candidate_sources": "|".join(
+                conflicts_by_measurement.get(column, {}).get("sources", [])
+            ),
             **{
-                image: _prefill_threshold(threshold_lookup, image, column)
+                image: (
+                    ""
+                    if column in conflicts_by_measurement
+                    else _prefill_threshold(threshold_lookup, image, column)
+                )
                 for image in images
             },
         }
         for column in measurement_columns_for_threshold_template(measurement_files)
     ]
-    return rows, ["compartment", "marker", "measurement_column", *images]
+    return rows, [
+        "compartment",
+        "marker",
+        "measurement_column",
+        "classifier_conflict",
+        "candidate_classifiers",
+        "candidate_thresholds",
+        "candidate_sources",
+        *images,
+    ]
 
 
 def _marker_lookup_by_measurement_column(
@@ -279,14 +383,45 @@ def _write_threshold_table(
         columns,
         delimiter="\t",
     )
+    conflicts = classifier_threshold_conflicts(classifiers)
+    _write_csv(
+        thresholds_dir.parent / "tables" / "classifier_conflicts.csv",
+        [
+            {
+                "measurement_column": item["measurement_column"],
+                "image": item.get("image") or "",
+                "n_definitions": item["n_definitions"],
+                "classifier_names": "|".join(item["classifier_names"]),
+                "thresholds": "|".join(str(value) for value in item["thresholds"]),
+                "sources": "|".join(item["sources"]),
+            }
+            for item in conflicts
+        ],
+        [
+            "measurement_column",
+            "image",
+            "n_definitions",
+            "classifier_names",
+            "thresholds",
+            "sources",
+        ],
+    )
     return template_path
 
 
-def threshold_tables_dir(project_dir: str | Path) -> Path:
-    """Return the shared threshold-table folder beside a QuPath export folder."""
+def threshold_tables_dir(
+    project_dir: str | Path,
+    output_dir: str | Path | None = None,
+) -> Path:
+    """Return the generated threshold-table folder for a QXYCell output folder."""
 
     project_path = Path(project_dir).expanduser().resolve()
-    return project_path.parent / "thresholds"
+    output_path = (
+        Path(output_dir).expanduser().resolve()
+        if output_dir is not None
+        else resolve_output_dir(None, project_dir=project_path, project_output_kind="run")
+    )
+    return output_path / "thresholds"
 
 
 def _threshold_template_filename(thresholds_dir: Path, *, always_timestamped: bool) -> str:
@@ -309,7 +444,11 @@ def _unique_measurement_images(measurement_files: list[MeasurementFile]) -> list
         if "Image" not in measurement_file.columns:
             continue
         try:
-            with measurement_file.path.open(newline="", errors="replace") as handle:
+            with measurement_file.path.open(
+                newline="",
+                errors="replace",
+                encoding=MEASUREMENT_TEXT_ENCODING,
+            ) as handle:
                 reader = csv.DictReader(handle, delimiter=measurement_file.delimiter)
                 for row in reader:
                     image = str(row.get("Image", "")).strip()
@@ -373,7 +512,7 @@ def _valid_core_label(value: Any) -> str:
 
 def _measurement_core_counts(
     measurement_files: list[MeasurementFile],
-    source_cols: tuple[str, ...] = ("TMA Core", "Parent"),
+    source_cols: tuple[str, ...] = ("TMA Core",),
 ) -> dict[str, int]:
     counts: Counter[str] = Counter()
     for measurement_file in measurement_files:
@@ -381,7 +520,11 @@ def _measurement_core_counts(
         if not available_cols:
             continue
         try:
-            with measurement_file.path.open(newline="", errors="replace") as handle:
+            with measurement_file.path.open(
+                newline="",
+                errors="replace",
+                encoding=MEASUREMENT_TEXT_ENCODING,
+            ) as handle:
                 reader = csv.DictReader(handle, delimiter=measurement_file.delimiter)
                 for row in reader:
                     for column in available_cols:
@@ -445,17 +588,7 @@ def _write_report(report: CheckReport) -> None:
                     _add_label_count(cell_labels, label, count)
 
     measurement_core_counts = report.measurement_core_counts or {}
-    geojson_core_annotation_counts = report.geojson_core_annotation_counts or {}
-    geojson_tma_core_counts = report.geojson_tma_core_counts
-    measurement_only_core_counts = {
-        label: count
-        for label, count in measurement_core_counts.items()
-        if label not in geojson_core_annotation_counts
-    }
-
-    # Categorise labels into known QXYCell roles. Annotation labels matching
-    # measurement core IDs are reported separately because run() prefers the
-    # measurement CoreID source and skips those labels as annotation columns.
+    # Categorise annotation labels independently from measurement CoreID.
     ignore_labels = {k: v for k, v in annotation_labels.items() if "ignore" in k.lower()}
     sample_labels = {k: v for k, v in annotation_labels.items() if "sample" in k.lower()}
     other_labels = {
@@ -463,7 +596,6 @@ def _write_report(report: CheckReport) -> None:
         if (
             k not in ignore_labels
             and k not in sample_labels
-            and k not in geojson_core_annotation_counts
         )
     }
 
@@ -471,6 +603,34 @@ def _write_report(report: CheckReport) -> None:
         if not d:
             return "none"
         return ", ".join(f"{k} ({v})" for k, v in sorted(d.items()))
+
+    annotation_assignment_lines = []
+    for assignment in report.annotation_assignments:
+        source = assignment["source_annotation"]
+        count = assignment["n_geojson_features"]
+        destination = assignment["destination_column"]
+        if assignment["assignment_type"] == "categorical_value":
+            result = f'adata.obs["{destination}"] = "{source}"'
+        else:
+            result = f'adata.obs["{destination}"] = True'
+        annotation_assignment_lines.append(
+            f"  {source} ({count} GeoJSON feature{'s' if count != 1 else ''}) -> {result}"
+        )
+    if not annotation_assignment_lines:
+        annotation_assignment_lines = ["  none"]
+
+    classifier_conflict_lines = []
+    for conflict in report.classifier_conflicts:
+        scope = conflict.get("image") or "global"
+        candidates = ", ".join(
+            f"{item['classifier_name']}={item['threshold']}"
+            for item in conflict["candidates"]
+        )
+        classifier_conflict_lines.append(
+            f"    {conflict['measurement_column']} [{scope}]: {candidates}"
+        )
+    if not classifier_conflict_lines:
+        classifier_conflict_lines = ["    none"]
 
     lines = [
         "QXYCell check report",
@@ -486,38 +646,34 @@ def _write_report(report: CheckReport) -> None:
         f"  Markers: {', '.join(c.name for c in report.classifiers if c.is_simple) or 'none'}",
         f"  Active threshold source: {_display_threshold_source(report)}",
         f"  Generated threshold table: {threshold_template_path or 'not generated by check()'}",
+        f"  Conflicting measurement channels: {len(report.classifier_conflicts)}",
+        *classifier_conflict_lines,
+        "Processing performed by check():",
+        "  Thresholds applied: no — definitions were inspected/validated only",
+        "  Cell typing applied: no — no cell type logic was loaded",
+        "  LLM prompt generated: no",
         f"GeoJSON files: {len(report.geojson_files)}",
         "GeoJSON object counts:",
         f"  Annotation features: {report.n_annotation_features}",
         f"  QuPath tmaCore objects: {report.n_tma_core_features}",
         f"  Cell features     : {report.n_cell_features}",
-        "Measurement derived TMA CoreIDs:",
+        "Measurement CoreID column:",
         f"  Unique CoreIDs    : {report.n_measurement_core_labels}",
         f"  Assigned cells    : {report.n_measurement_core_cells}",
         f"  CoreIDs           : {_fmt_labels(measurement_core_counts)}",
-        "GeoJSON derived TMA CoreIDs:",
-        f"  Unique CoreIDs    : {report.n_geojson_tma_core_ids}",
-        f"  GeoJSON features  : {report.n_geojson_tma_core_features}",
-        f"  CoreIDs           : {_fmt_labels(geojson_tma_core_counts)}",
-        f"  Matched measurement CoreIDs: {_fmt_labels(geojson_core_annotation_counts)}",
-        f"  Measurement-only  : {_fmt_labels(measurement_only_core_counts)}",
         "",
         "Annotations:",
+        f"  All names: {_fmt_labels(report.annotation_label_counts)}",
         f"  Sample   : {_fmt_labels(sample_labels)}",
         f"  Ignore   : {_fmt_labels(ignore_labels)}",
         f"  Other    : {_fmt_labels(other_labels)}",
+        "Planned AnnData assignments from annotations:",
+        *annotation_assignment_lines,
         f"TMA cores: {_fmt_labels(tma_labels)}",
         f"  Cell labels: {_fmt_labels(cell_labels)}",
         "",
         "Messages:",
     ]
-    if measurement_core_counts and geojson_core_annotation_counts:
-        lines.append(
-            "- INFO tma.measurement_core_ids_preferred: GeoJSON annotation labels "
-            "matching measurement core IDs were found. qxy.run() uses measurement "
-            "CoreID values and does not keep those matching labels as annotation "
-            "columns."
-        )
     if report.messages:
         for message in report.messages:
             suffix = f" [{message.path}]" if message.path else ""
@@ -541,6 +697,28 @@ def _write_report(report: CheckReport) -> None:
             for item in report.measurement_files
         ],
         ["path", "delimiter", "n_columns", "n_rows", "columns"],
+    )
+    _write_csv(
+        tables_dir / "classifier_conflicts.csv",
+        [
+            {
+                "measurement_column": item["measurement_column"],
+                "image": item.get("image") or "",
+                "n_definitions": item["n_definitions"],
+                "classifier_names": "|".join(item["classifier_names"]),
+                "thresholds": "|".join(str(value) for value in item["thresholds"]),
+                "sources": "|".join(item["sources"]),
+            }
+            for item in report.classifier_conflicts
+        ],
+        [
+            "measurement_column",
+            "image",
+            "n_definitions",
+            "classifier_names",
+            "thresholds",
+            "sources",
+        ],
     )
     _write_csv(
         tables_dir / "classifier_report.csv",
@@ -592,16 +770,11 @@ def _write_report(report: CheckReport) -> None:
             {
                 "label": label,
                 "measurement_cell_count": measurement_core_counts.get(label, ""),
-                "geojson_core_annotation_count": geojson_core_annotation_counts.get(label, ""),
-                "status": (
-                    "measurement_and_geojson"
-                    if label in geojson_core_annotation_counts
-                    else "measurement_only"
-                ),
+                "status": "measurement_coreid",
             }
             for label in sorted(measurement_core_counts)
         ],
-        ["label", "measurement_cell_count", "geojson_core_annotation_count", "status"],
+        ["label", "measurement_cell_count", "status"],
     )
     _write_csv(
         tables_dir / "validation_messages.csv",
@@ -619,16 +792,16 @@ def generate_threshold_table(
     """Create a fresh timestamped threshold table from object classifier JSONs.
 
     This function reads measurement columns and object classifier JSON files from
-    ``project_dir``, writes a threshold table under the sibling ``thresholds/``
-    folder, and returns the table path. Existing threshold tables are never
-    modified or used as input here. ``output_dir`` is accepted for backward
-    compatibility and ignored.
+    ``project_dir``, writes a threshold table under ``output_dir/thresholds/``,
+    and returns the table path. Existing threshold tables are never modified or
+    used as input here. If ``output_dir`` is omitted, a timestamped run output
+    folder is created beside the QuPath export folder.
     """
 
     project_path = Path(project_dir).expanduser().resolve()
     if not project_path.exists():
         raise FileNotFoundError(f"Project directory does not exist: {project_path}")
-    thresholds_dir = threshold_tables_dir(project_path)
+    thresholds_dir = threshold_tables_dir(project_path, output_dir=output_dir)
 
     measurement_files = [
         summarize_measurement_file(path, count_rows=count_rows)
@@ -684,6 +857,24 @@ def inspect_project(
     messages.extend(validate_measurement_files(measurement_files))
 
     object_classifiers = parse_classifiers(discover_classifier_files(project_path))
+    classifier_conflicts = classifier_threshold_conflicts(object_classifiers)
+    for conflict in classifier_conflicts:
+        scope = conflict.get("image") or "global"
+        candidates = ", ".join(
+            f"{item['classifier_name']}={item['threshold']}"
+            for item in conflict["candidates"]
+        )
+        messages.append(
+            Message(
+                level="warning",
+                code="classifiers.conflicting_thresholds",
+                message=(
+                    "Multiple thresholds target the same measurement and scope: "
+                    f"{conflict['measurement_column']} [{scope}] ({candidates}). "
+                    "Generated threshold tables leave this channel blank for review."
+                ),
+            )
+        )
     generated_threshold_path = None
     active_threshold_source = None
     active_threshold_source_kind = "none"
@@ -700,7 +891,7 @@ def inspect_project(
                 )
             )
     else:
-        threshold_paths = discover_threshold_files(project_path)
+        threshold_paths = discover_threshold_files(project_path, output_dir=output_path)
         threshold_path, ignored_threshold_paths = select_threshold_file(threshold_paths)
 
     if threshold_path is not None and threshold_path.exists():
@@ -727,7 +918,33 @@ def inspect_project(
         classifiers = object_classifiers
         if classifiers:
             active_threshold_source_kind = "object_classifiers"
-    messages.extend(validate_classifiers(classifiers, measurement_files))
+    classifier_messages = validate_classifiers(classifiers, measurement_files)
+    unresolved_conflicts = (
+        unresolved_threshold_conflicts(threshold_path)
+        if threshold_path is not None and threshold_path.exists()
+        else []
+    )
+    if unresolved_conflicts:
+        classifier_messages = [
+            message
+            for message in classifier_messages
+            if message.code not in {
+                "classifiers.no_simple_thresholds",
+                "classifiers.missing",
+            }
+        ]
+        messages.append(
+            Message(
+                level="warning",
+                code="classifiers.unresolved_conflicts",
+                message=(
+                    f"{len(unresolved_conflicts)} conflict-marked threshold row(s) "
+                    "still require per-image values before thresholding can be applied."
+                ),
+                path=str(threshold_path),
+            )
+        )
+    messages.extend(classifier_messages)
 
     geojson_paths = discover_geojson_files(project_path)
     geojson_files = summarize_geojson_files(geojson_paths)
@@ -750,6 +967,7 @@ def inspect_project(
         active_threshold_source=active_threshold_source,
         active_threshold_source_kind=active_threshold_source_kind,
         generated_threshold_template=generated_threshold_path,
+        classifier_conflicts=classifier_conflicts,
     )
     return report
 

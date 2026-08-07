@@ -8,6 +8,7 @@ import re
 
 QXY_OUTPUT_DIR_NAMES = {"output", "outputs"}
 QXY_PROJECT_OUTPUT_RE = re.compile(r".*_(?:run|check)_\d{6}_\d{4}$")
+QXY_EXPLICIT_OUTPUT_RE = re.compile(r"outputs?_\d{6}(?:[-_]\d{4,6})?$")
 
 
 def is_qxy_output_artifact(path: str | Path, project_dir: str | Path) -> bool:
@@ -26,6 +27,7 @@ def is_qxy_output_artifact(path: str | Path, project_dir: str | Path) -> bool:
             lower in QXY_OUTPUT_DIR_NAMES
             or lower.startswith("qxy_outputs_")
             or QXY_PROJECT_OUTPUT_RE.fullmatch(part)
+            or QXY_EXPLICIT_OUTPUT_RE.fullmatch(lower)
         ):
             return True
     return False

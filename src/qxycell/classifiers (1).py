@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from qxycell.discovery import is_qxy_output_artifact
 from qxycell.types import ClassifierDefinition, Message, MeasurementFile
 
 
@@ -23,7 +22,6 @@ MANUAL_THRESHOLD_FILENAMES = {
     "thresholds.csv",
     "thresholds.tsv",
 }
-MANUAL_THRESHOLD_PREFIX = "thresholds_"
 NAME_COLUMNS = ("name", "marker", "classifier", "classifier_name")
 IMAGE_COLUMNS = ("image", "Image", "sample", "Sample")
 MEASUREMENT_COLUMNS = (
@@ -34,9 +32,6 @@ MEASUREMENT_COLUMNS = (
 )
 THRESHOLD_COLUMNS = ("threshold", "cutoff", "cut_off")
 BASE_THRESHOLD_TEMPLATE_COLUMNS = {
-    "compartment",
-    "localization",
-    "localisation",
     "name",
     "marker",
     "classifier",
@@ -50,100 +45,7 @@ BASE_THRESHOLD_TEMPLATE_COLUMNS = {
     "threshold",
     "cutoff",
     "cut_off",
-    "classifier_conflict",
-    "candidate_classifiers",
-    "candidate_thresholds",
-    "candidate_sources",
 }
-MEASUREMENT_COMPARTMENTS = {"Cell", "Cytoplasm", "Membrane", "Nucleus"}
-MISSING_THRESHOLD_VALUES = {"", "#n/a", "n/a", "na", "nan", "none", "null", "<na>"}
-
-
-def classifier_threshold_conflicts(
-    classifiers: list[ClassifierDefinition],
-) -> list[dict[str, Any]]:
-    """Return distinct competing thresholds for the same measurement and scope.
-
-    Different image-specific thresholds are valid and are grouped separately.
-    A conflict requires more than one distinct numeric threshold for the same
-    measurement column and the same image scope (including global/no image).
-    """
-
-    grouped: dict[tuple[str, str | None], list[ClassifierDefinition]] = {}
-    for classifier in classifiers:
-        if (
-            not classifier.is_simple
-            or classifier.measurement_column is None
-            or classifier.threshold is None
-        ):
-            continue
-        image = str(classifier.image).strip() if classifier.image else None
-        grouped.setdefault((str(classifier.measurement_column), image), []).append(classifier)
-
-    conflicts: list[dict[str, Any]] = []
-    for (measurement, image), definitions in sorted(
-        grouped.items(), key=lambda item: (item[0][0], item[0][1] or "")
-    ):
-        thresholds = sorted({float(item.threshold) for item in definitions})
-        if len(thresholds) <= 1:
-            continue
-        conflicts.append(
-            {
-                "measurement_column": measurement,
-                "image": image,
-                "n_definitions": len(definitions),
-                "classifier_names": [str(item.name) for item in definitions],
-                "thresholds": thresholds,
-                "sources": [str(item.path) for item in definitions],
-                "candidates": [
-                    {
-                        "classifier_name": str(item.name),
-                        "threshold": float(item.threshold),
-                        "source": str(item.path),
-                    }
-                    for item in definitions
-                ],
-            }
-        )
-    return conflicts
-
-
-def unresolved_threshold_conflicts(path: str | Path) -> list[dict[str, Any]]:
-    """Return conflict-marked threshold rows still missing required values."""
-
-    path = Path(path).expanduser().resolve()
-    delimiter = _delimiter_for_threshold_path(path)
-    unresolved: list[dict[str, Any]] = []
-    with path.open(newline="", encoding="utf-8-sig", errors="replace") as handle:
-        reader = csv.DictReader(handle, delimiter=delimiter)
-        for row_index, row in enumerate(reader, start=2):
-            conflict_value = str(row.get("classifier_conflict") or "").strip().lower()
-            if conflict_value not in {"1", "true", "yes", "y"}:
-                continue
-            image_columns = [
-                str(column).strip()
-                for column in row
-                if str(column).strip().lower() not in BASE_THRESHOLD_TEMPLATE_COLUMNS
-            ]
-            missing_images = [
-                image
-                for image in image_columns
-                if _as_float(row.get(image)) is None
-            ]
-            if not image_columns and _as_float(_get_first(row, THRESHOLD_COLUMNS)) is None:
-                missing_images = ["<threshold>"]
-            if missing_images:
-                unresolved.append(
-                    {
-                        "row": row_index,
-                        "marker": _get_first(row, NAME_COLUMNS) or "",
-                        "measurement_column": _get_first(row, MEASUREMENT_COLUMNS) or "",
-                        "missing_images": missing_images,
-                        "candidate_classifiers": row.get("candidate_classifiers", ""),
-                        "candidate_thresholds": row.get("candidate_thresholds", ""),
-                    }
-                )
-    return unresolved
 
 
 def discover_classifier_files(project_dir: str | Path) -> list[Path]:
@@ -158,99 +60,29 @@ def discover_classifier_files(project_dir: str | Path) -> list[Path]:
     return sorted(dict.fromkeys(files))
 
 
-def discover_threshold_files(
-    project_dir: str | Path,
-    output_dir: str | Path | None = None,
-) -> list[Path]:
-    """Find manual classifier-threshold CSV/TSV files for a project directory."""
+def discover_threshold_files(project_dir: str | Path) -> list[Path]:
+    """Find manual classifier-threshold CSV/TSV files below a project directory."""
 
     root = Path(project_dir).expanduser().resolve()
-    search_roots = [root]
-    if output_dir is not None:
-        output_thresholds = Path(output_dir).expanduser().resolve() / "thresholds"
-        if output_thresholds.exists():
-            search_roots.append(output_thresholds)
-    sibling_thresholds = root.parent / "thresholds"
-    if sibling_thresholds.exists():
-        search_roots.append(sibling_thresholds)
-    files = []
-    for search_root in search_roots:
-        files.extend(
-            path
-            for path in search_root.rglob("*")
-            if path.is_file()
-            and not path.name.startswith(".")
-            and (search_root != root or not is_qxy_output_artifact(path, root))
-            and _is_manual_threshold_file(path)
-        )
+    files = [
+        path
+        for path in root.rglob("*")
+        if path.is_file()
+        and not path.name.startswith(".")
+        and path.name.lower() in MANUAL_THRESHOLD_FILENAMES
+    ]
     return sorted(dict.fromkeys(files))
-
-
-def select_threshold_file(paths: list[Path]) -> tuple[Path | None, list[Path]]:
-    """Choose one manual threshold file deterministically.
-
-    Timestamped ``thresholds_*.tsv/csv`` files are preferred. Within the chosen
-    class, the most recently modified file wins. Remaining candidates are
-    returned so callers can report that they were ignored.
-    """
-
-    if not paths:
-        return None, []
-    timestamped = [path for path in paths if _is_timestamped_threshold_file(path)]
-    candidates = timestamped if timestamped else paths
-    chosen = max(candidates, key=lambda path: (path.stat().st_mtime, str(path)))
-    ignored = [path for path in paths if path != chosen]
-    return chosen, sorted(ignored)
-
-
-def _is_timestamped_threshold_file(path: Path) -> bool:
-    return (
-        path.suffix.lower() in {".tsv", ".csv"}
-        and path.stem.lower().startswith(MANUAL_THRESHOLD_PREFIX)
-    )
-
-
-def _is_manual_threshold_file(path: Path) -> bool:
-    name = path.name.lower()
-    suffix = path.suffix.lower()
-    return (
-        name in MANUAL_THRESHOLD_FILENAMES
-        or (
-            suffix in {".tsv", ".csv"}
-            and path.stem.lower().startswith(MANUAL_THRESHOLD_PREFIX)
-        )
-    )
 
 
 def marker_name_from_measurement_column(column: str) -> str:
     """Return a readable marker name from a QuPath measurement column."""
 
-    _compartment, text = measurement_parts_from_measurement_column(column)
-    for separator in (" - ", ":"):
+    text = str(column).strip()
+    for separator in (":", " - ", "_"):
         if separator in text:
             text = text.split(separator, 1)[0].strip()
             break
     return text or "marker"
-
-
-def measurement_parts_from_measurement_column(column: str) -> tuple[str, str]:
-    """Return ``(compartment, marker_text)`` from a QuPath measurement column."""
-
-    text = str(column).strip()
-    if ":" not in text:
-        return "", text
-
-    prefix, remainder = (part.strip() for part in text.split(":", 1))
-    if prefix in MEASUREMENT_COMPARTMENTS:
-        return prefix, remainder
-    return "", text
-
-
-def compartment_from_measurement_column(column: str) -> str:
-    """Return the localization compartment from a QuPath measurement column."""
-
-    compartment, _marker = measurement_parts_from_measurement_column(column)
-    return compartment
 
 
 def measurement_columns_for_threshold_template(
@@ -282,10 +114,6 @@ def _as_float(value: Any) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
-
-
-def _is_missing_threshold_value(value: Any) -> bool:
-    return str(value).strip().lower() in MISSING_THRESHOLD_VALUES
 
 
 def parse_classifier(path: str | Path) -> ClassifierDefinition:
@@ -356,19 +184,6 @@ def _get_first(row: dict[str, str], aliases: tuple[str, ...]) -> str | None:
     return None
 
 
-def _row_has_threshold_value(row: dict[str, str]) -> bool:
-    threshold_value = _get_first(row, THRESHOLD_COLUMNS)
-    if threshold_value and not _is_missing_threshold_value(threshold_value):
-        return True
-    for column, value in row.items():
-        column_name = str(column).strip()
-        if column_name.lower() in BASE_THRESHOLD_TEMPLATE_COLUMNS:
-            continue
-        if str(value).strip() and not _is_missing_threshold_value(value):
-            return True
-    return False
-
-
 def parse_threshold_file(path: str | Path) -> list[ClassifierDefinition]:
     """Parse manually entered marker threshold CSV/TSV rows.
 
@@ -387,9 +202,6 @@ def parse_threshold_file(path: str | Path) -> list[ClassifierDefinition]:
             for row_index, row in enumerate(reader, start=2):
                 name = _get_first(row, NAME_COLUMNS)
                 measurement = _get_first(row, MEASUREMENT_COLUMNS)
-                row_has_threshold = _row_has_threshold_value(row)
-                if not row_has_threshold:
-                    continue
                 if not name or not measurement:
                     classifiers.append(
                         ClassifierDefinition(
