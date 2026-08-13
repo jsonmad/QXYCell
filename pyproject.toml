@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qxycell"
+version = "0.1.0"
+description = "QuPath exported single-cell measurements to annotated AnnData."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "QXYCell contributors" }
+]
+keywords = [
+  "anndata",
+  "digital-pathology",
+  "qupath",
+  "single-cell",
+  "spatial-biology"
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Scientific/Engineering :: Bio-Informatics"
+]
+dependencies = [
+  "anndata>=0.10",
+  "colorcet>=3.0",
+  "cmcrameri>=1.0",
+  "geopandas>=0.14",
+  "matplotlib>=3.8",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pillow>=12.3.0",
+  "pyyaml>=6.0",
+  "scikit-learn>=1.3",
+  "scipy>=1.10",
+  "seaborn>=0.13",
+  "shapely>=2.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.4"
+]
+
+[project.scripts]
+qxycell = "qxycell.cli:main"
+
+[project.urls]
+Documentation = "https://jsonmad.github.io/QXYCell/"
+Issues = "https://github.com/jsonmad/QXYCell/issues"
+Repository = "https://github.com/jsonmad/QXYCell"
+
+[tool.hatch.build.targets.sdist]
+ignore-vcs = true
+include = [
+  "/LICENSE",
+  "/README.md",
+  "/pyproject.toml",
+  "/src/qxycell"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qxycell"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

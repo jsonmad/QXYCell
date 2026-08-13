@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install release tooling
+        run: python -m pip install build==1.5.0 ruff==0.16.2 twine==7.0.0
+
+      - name: Lint public Python sources
+        run: ruff check src docs/generate_qxy_function_examples_html.py
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Validate package metadata
+        run: twine check dist/*
+
+      - name: Inspect distribution contents
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          artifacts = sorted(Path("dist").iterdir())
+          assert len(artifacts) == 2, artifacts
+
+          wheel = next(path for path in artifacts if path.suffix == ".whl")
+          sdist = next(path for path in artifacts if path.name.endswith(".tar.gz"))
+
+          with zipfile.ZipFile(wheel) as archive:
+              wheel_members = archive.namelist()
+          unexpected_wheel = [
+              name
+              for name in wheel_members
+              if not (name.startswith("qxycell/") or ".dist-info/" in name)
+          ]
+          assert not unexpected_wheel, unexpected_wheel
+
+          with tarfile.open(sdist) as archive:
+              sdist_members = archive.getnames()
+          roots = {
+              name.split("/", 1)[1].split("/", 1)[0]
+              for name in sdist_members
+              if "/" in name and name.split("/", 1)[1]
+          }
+          allowed_roots = {
+              ".gitignore",
+              "LICENSE",
+              "PKG-INFO",
+              "README.md",
+              "pyproject.toml",
+              "src",
+          }
+          assert roots <= allowed_roots, sorted(roots - allowed_roots)
+
+          forbidden = (
+              "tests/",
+              "scripts/",
+              "docs/",
+              "notebooks/",
+              "test_data/",
+              "test_outputs/",
+              "internal_docs/",
+          )
+          assert not any(part in name for name in wheel_members + sdist_members for part in forbidden)
+
+          print(f"wheel: {len(wheel_members)} members")
+          print(f"sdist: {len(sdist_members)} members")
+          PY
+
+      - name: Install and smoke-test wheel
+        run: |
+          python -m pip install dist/*.whl
+          python -c "import qxycell; print(qxycell.__file__)"
+          qxycell --help
