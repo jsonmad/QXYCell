@@ -1,0 +1,71 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+/uv.lock
+
+# Local agent, editor, and workflow state
+/.agents/
+/.codex/
+/.superpowers/
+/.vscode/
+/.idea/
+
+# Local notes
+INSTALL_NOTES.md
+README_MAC_INSTALL.md
+
+# Local QXYCell outputs
+quxycell_output*/
+quxycell_run*/
+qxy?run/
+qxy_outputs_*/
+outputs/
+output/
+*_check_??????_????/
+*_run_??????_????/
+*.ipynb
+
+# Project-specific files that should not be committed
+# YAMLs in repo root (celltype logic, scratch files)
+/*.yaml
+/*.yml
+!environment.yml
+
+# Exported notebooks and scratch HTML in repo root
+/*.html
+
+# Images in repo root (keep assets/ folder only)
+/*.png
+/*.jpg
+/*.jpeg
+/*.tif
+/*.tiff
+
+# Tests and local validation scripts are maintained outside the public tree
+test_*.py
+/tests/
+
+# Local test datasets and private research workspaces
+/notebooks/
+/scripts/
+
+# Generated documentation builds and internal planning material
+/docs/_qxy_function_examples_build/
+/docs/generate_qxy_function_examples_html.py
+/docs/superpowers/
+/*.rtf
+/docs/*.rtf
+
+# Local handoff and release helpers
+/HANDOFF.md
+/push.sh
