@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "qxycell"
 version = "0.1.0"
-description = "QuPath exported single-cell measurements to annotated AnnData."
+description = "QuPath single-cell measurements to annotated AnnData."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"

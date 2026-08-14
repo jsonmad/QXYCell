@@ -12,8 +12,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="qxycell")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    check_parser = subparsers.add_parser("check", help="Inspect and validate a QuPath export.")
-    check_parser.add_argument("project_dir", help="Path to a manually exported QuPath project folder.")
+    check_parser = subparsers.add_parser("check", help="Inspect and validate a QuPath project folder.")
+    check_parser.add_argument("project_dir", help="Path to the QuPath project folder.")
     check_parser.add_argument(
         "--out",
         "--output-dir",
@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument(
         "--count-rows",
         action="store_true",
-        help="Count measurement table rows during check. Slower for large exports.",
+        help="Count measurement table rows during check. Slower for large tables.",
     )
     check_parser.add_argument(
         "--threshold-file",
@@ -32,8 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit threshold TSV/CSV to validate instead of auto-selecting from the project folder.",
     )
 
-    run_parser = subparsers.add_parser("run", help="Run QXYCell on a QuPath export.")
-    run_parser.add_argument("project_dir", help="Path to a manually exported QuPath project folder.")
+    run_parser = subparsers.add_parser("run", help="Run QXYCell on a QuPath project folder.")
+    run_parser.add_argument("project_dir", help="Path to the QuPath project folder.")
     run_parser.add_argument(
         "--out",
         "--output-dir",

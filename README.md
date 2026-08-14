@@ -4,8 +4,9 @@
   <img src="assets/qxycell-icon.png" alt="QXYCell icon" width="180">
 </p>
 
-QXYCell converts QuPath single-cell exports into analysis-ready AnnData `.h5ad`
-objects for cell typing, spatial analysis, and plotting.
+QXYCell converts single-cell measurements and spatial assets from a QuPath
+project folder into analysis-ready AnnData `.h5ad` objects for cell typing,
+spatial analysis, and plotting.
 
 The resulting AnnData object can be used with downstream tools such as
 [Scanpy](https://scanpy.readthedocs.io/en/stable/),
@@ -93,19 +94,19 @@ physical pixel calibration. QXYCell supports square pixels only.
 ```python
 import qxycell as qxy
 
-# Optional: validate your QuPath export before running
-report = qxy.check("/path/to/qupath_export")
+# Optional: validate your QuPath project folder before running
+report = qxy.check("/path/to/qupath_project")
 
 # Optional: create a threshold table from QuPath object classifiers
-threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
+threshold_path = qxy.generate_threshold_table("/path/to/qupath_project")
 
 # Import all cells into an AnnData object.
 # The default is 0.28 micrometres per pixel.
-adata = qxy.run("/path/to/qupath_export")
+adata = qxy.run("/path/to/qupath_project")
 
 # Apply marker thresholds to create <marker>_pos columns.
 # Existing celltype labels are renamed with a __stale_celltype suffix.
-threshold_summary = qxy.threshold(adata, "/path/to/qupath_export")
+threshold_summary = qxy.threshold(adata, "/path/to/qupath_project")
 
 # Apply cell type rules after thresholding
 celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
@@ -115,7 +116,7 @@ When the verified QuPath pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
 ```python
-adata = qxy.run("/path/to/qupath_export", pixel_size_um=0.325)
+adata = qxy.run("/path/to/qupath_project", pixel_size_um=0.325)
 ```
 
 The value must be positive and finite. QuPath centroid measurements are already
@@ -127,8 +128,8 @@ When called, `qxy.check()` writes a timestamped sibling check folder. `qxy.run()
 writes only a timestamped sibling run folder:
 
 ```text
-qupath_export_check_YYMMDD_HHMM/
-qupath_export_run_YYMMDD_HHMM/
+qupath_project_check_YYMMDD_HHMM/
+qupath_project_run_YYMMDD_HHMM/
 ```
 
 Downstream functions such as `qxy.threshold()`, `qxy.add_metadata()`,
@@ -164,9 +165,11 @@ QXYCell is released under the [MIT License](LICENSE).
 
 ## QuPath inputs
 
-QXYCell is built around manual QuPath exports. Complete the
+QXYCell reads exported assets from a QuPath project folder. Complete the
 [QuPath preparation and verification workflow](docs/qupath_preparation.md)
-before assembling these inputs. The measurement table is the
+before assembling these inputs. Keep every exported input somewhere inside the
+QuPath project folder and pass that one folder to QXYCell; do not create a
+second input directory. The measurement table is the
 only unconditional input. Threshold definitions and GeoJSON files are needed
 only for the corresponding downstream features:
 
@@ -214,7 +217,7 @@ measurement column text. For example, `aSMA.json` mapped to
 table from object classifier JSONs explicitly, call:
 
 ```python
-threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
+threshold_path = qxy.generate_threshold_table("/path/to/qupath_project")
 ```
 
 The check report lists every annotation name found in GeoJSON, its feature
@@ -243,7 +246,7 @@ the run:
 
 ```python
 threshold_path = qxy.generate_threshold_table(
-    "/path/to/qupath_export",
+    "/path/to/qupath_project",
     output_dir="/path/to/outputs",
 )
 ```
@@ -287,12 +290,12 @@ archives threshold-dependent cell-type and feature columns with a
 labels from the new per-image positivity calls.
 
 To manually edit thresholds, fill in or edit the image threshold columns, save
-the finished file in `output_dir/thresholds/`, then rerun `qxy.check()`
-or `qxy.threshold()`. By default, QXYCell uses the newest recognized threshold
-table in the QuPath export folder, the current output folder's `thresholds/`
-subfolder, or the legacy sibling `thresholds/` folder. To force a specific
-table, pass `threshold_file="path/to/thresholds.tsv"` to `qxy.check()`,
-`qxy.run()`, or `qxy.threshold()`. The compact `CheckReport` summary includes
+the finished file in the QuPath project folder or in the active run's
+`thresholds/` subfolder, then rerun `qxy.check()` or `qxy.threshold()`. By
+default, QXYCell uses the newest recognized threshold table in the QuPath
+project folder or the current output folder's `thresholds/` subfolder. To force
+a specific table, pass `threshold_file="path/to/thresholds.tsv"` to
+`qxy.check()`, `qxy.run()`, or `qxy.threshold()`. The compact `CheckReport` summary includes
 `Threshold source: ...`, and `check_report.txt` includes
 `Active threshold source: ...`.
 
@@ -556,7 +559,7 @@ Plot the original QuPath annotation polygons in one figure per image:
 qxy.plot_annotation_polygons(adata, show=False)
 
 # Override the original location when the project has moved.
-qxy.plot_annotation_polygons(adata, project_dir="/path/to/qupath_export")
+qxy.plot_annotation_polygons(adata, project_dir="/path/to/qupath_project")
 ```
 
 QXYCell stores annotation membership, rather than annotation geometry, in the
@@ -714,7 +717,7 @@ results, and other analysis state already stored on the object.
 By default, QXYCell saves to the active run folder:
 
 ```text
-qupath_export_run_YYMMDD_HHMM/h5ad/qxycell.h5ad
+qupath_project_run_YYMMDD_HHMM/h5ad/qxycell.h5ad
 ```
 
 If `adata.uns["qxycell"]["h5ad_path"]` already exists, `qxy.save(adata)` updates
@@ -772,7 +775,7 @@ Run the full pipeline in one call:
 
 ```python
 adata = qxy.workflow(
-    "/path/to/qupath_export",
+    "/path/to/qupath_project",
     threshold_file="/path/to/reviewed_thresholds.tsv",
     apply_thresholds=True,
     sample_metadata="sample_metadata.tsv",

@@ -44,7 +44,7 @@ def _safe_annotation_column(label: str) -> str:
 
 @dataclass(frozen=True)
 class CheckReport:
-    """Combined inventory and validation report for a QuPath export."""
+    """Combined inventory and validation report for a QuPath project folder."""
 
     project_dir: Path
     output_dir: Path
@@ -570,7 +570,7 @@ def _write_report(report: CheckReport) -> None:
         if label and label.lower() not in ("", "none", "null"):
             target[label] = target.get(label, 0) + count
 
-    # Aggregate labels by GeoJSON object type. QuPath exports can include
+    # Aggregate labels by GeoJSON object type. QuPath GeoJSON files can include
     # annotation polygons, TMA cores, and individual cell objects in the same
     # file; the check report should not mix those categories.
     annotation_labels: dict[str, int] = {}
@@ -795,12 +795,12 @@ def generate_threshold_table(
     ``project_dir``, writes a threshold table under ``output_dir/thresholds/``,
     and returns the table path. Existing threshold tables are never modified or
     used as input here. If ``output_dir`` is omitted, a timestamped run output
-    folder is created beside the QuPath export folder.
+    folder is created beside the QuPath project folder.
     """
 
     project_path = Path(project_dir).expanduser().resolve()
     if not project_path.exists():
-        raise FileNotFoundError(f"Project directory does not exist: {project_path}")
+        raise FileNotFoundError(f"QuPath project folder does not exist: {project_path}")
     thresholds_dir = threshold_tables_dir(project_path, output_dir=output_dir)
 
     measurement_files = [
@@ -823,7 +823,7 @@ def inspect_project(
     threshold_file: str | Path | None = None,
     output_dir: str | Path | None = None,
 ) -> CheckReport:
-    """Inspect a manually exported QuPath project folder without writing reports."""
+    """Inspect a QuPath project folder without writing reports."""
 
     project_path = Path(project_dir).expanduser().resolve()
     output_path = Path(output_dir).expanduser().resolve() if output_dir is not None else project_path
@@ -834,7 +834,7 @@ def inspect_project(
             Message(
                 level="error",
                 code="project.missing",
-                message=f"Project directory does not exist: {project_path}",
+                message=f"QuPath project folder does not exist: {project_path}",
                 path=str(project_path),
             )
         )
@@ -979,7 +979,7 @@ def check(
     count_rows: bool = False,
     threshold_file: str | Path | None = None,
 ) -> CheckReport:
-    """Inspect and validate a manually exported QuPath project folder.
+    """Inspect and validate a QuPath project folder.
 
     The function writes a report folder and returns the same information as a Python object.
     """

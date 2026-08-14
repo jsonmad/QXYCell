@@ -8,17 +8,17 @@
 
 ## What QXYCell needs
 
-The only unconditional input is a QuPath cell measurement table. Other exports enable specific QXYCell features.
+The only unconditional input is a QuPath cell measurement table. Other assets in the QuPath project folder enable specific QXYCell features.
 
 | Asset | Needed for | QXYCell requirement |
 |---|---|---|
 | Cell measurements (`.csv` or `.tsv`) | Every run | Filename contains `measurement`, or is exactly `detections.csv`/`detections.tsv` |
 | Annotation GeoJSON | Sample/region labels and exclusions | One file per image; filename stem must match the measurement table's `Image` value |
 | Cell GeoJSON | Cell boundary geometry | Contains QuPath cell objects and their Object IDs |
-| Single-measurement classifier JSON | Creating a threshold table | Simple classifier JSONs saved anywhere below the export folder |
+| Single-measurement classifier JSON | Creating a threshold table | Simple classifier JSONs saved anywhere below the QuPath project folder |
 | Filled threshold table | Applying marker positivity | Reviewed TSV/CSV with per-image threshold values |
 
-QXYCell discovers files recursively, so the assets may be arranged in subfolders. Do not put an old QXYCell output folder inside the new export folder.
+Keep every exported input inside the QuPath project folder and pass that one folder to QXYCell. QXYCell discovers files recursively, so the assets may be arranged in subfolders such as `qxycell_input`. Do not create a second input directory. Keep generated QXYCell output folders beside the project folder, not inside it.
 
 ## 1. Verify every image before analysis
 
@@ -45,7 +45,7 @@ For another square-pixel size, pass the verified value when QXYCell imports the 
 
 ```python
 adata = qxy.run(
-    "/path/to/qupath_export",
+    "/path/to/qupath_project",
     pixel_size_um=0.325,
 )
 ```
@@ -53,7 +53,7 @@ adata = qxy.run(
 Command-line equivalent:
 
 ```bash
-qxycell run /path/to/qupath_export --pixel-size-um 0.325
+qxycell run /path/to/qupath_project --pixel-size-um 0.325
 ```
 
 The value must be one positive, finite number. Do not average unequal pixel width and height values. Correct or re-export an anisotropic image before using this QXYCell workflow.
@@ -62,7 +62,7 @@ Why this matters: QuPath's exported centroid columns are already in micrometres,
 
 ## 2. Create a QuPath project and add images
 
-1. Create a new, empty folder dedicated to the QuPath project. Let QuPath manage this folder; do not use the QXYCell export folder as the project folder.
+1. Create a new, empty folder dedicated to the QuPath project. This is the **QuPath project folder** that you will later pass to QXYCell.
 2. In QuPath, choose **File > Project… > Create new project** and select the empty folder.
 3. Add the source images by dragging them into QuPath or choosing **File > Project… > Add images**.
 4. If a file contains multiple images or series, enable the image selector and import only the intended series.
@@ -151,7 +151,7 @@ QXYCell reads simple single-measurement classifier JSONs. Composite or malformed
 5. Export all columns unless you have verified a restricted column list includes every required identity, coordinate, and marker measurement.
 6. Choose comma-separated (`.csv`) or tab-separated (`.tsv`) output.
 7. Name the file `measurements.csv` or `measurements.tsv`.
-8. Save it in a separate QXYCell export folder, not inside QuPath's managed project directory.
+8. Save it below the QuPath project folder, preferably in a subfolder named `qxycell_input`.
 
 Required columns are exactly:
 
@@ -174,6 +174,7 @@ Repeat for every image that has annotations to import.
 4. Exclude measurements to keep the file smaller.
 5. Use no compression and the `.geojson` extension.
 6. Name the file from the image name exactly, removing only `.ome` and the image extension.
+7. Save it below the QuPath project folder, preferably in `qxycell_input/annotations`.
 
 Examples:
 
@@ -194,39 +195,44 @@ Cell GeoJSON is optional but required for `cell_polygon_wkt` and cell-boundary p
 3. Export selected objects as a `FeatureCollection`.
 4. Exclude measurements; the separate measurement table is the data source.
 5. Preserve QuPath Object IDs.
-6. Save as `<image-stem>-cells.geojson`, for example `slide01-cells.geojson`.
+6. Save it below the QuPath project folder, preferably in `qxycell_input/cells`, as `<image-stem>-cells.geojson`, for example `slide01-cells.geojson`.
 
 QXYCell matches cell polygons to measurement rows by QuPath Object ID. Do not refresh Object IDs between the measurement and cell-GeoJSON exports.
 
 For very large images, cell GeoJSON can be large. Export one image at a time and verify that the feature count is plausible.
 
-## 9. Assemble the QXYCell export folder
+## 9. Organize the QuPath project folder
 
 Recommended layout:
 
 ```text
-qupath_export/
-|-- measurements.tsv
-|-- annotations/
-|   |-- slide01.geojson
-|   `-- slide02.geojson
-|-- cells/
-|   |-- slide01-cells.geojson
-|   `-- slide02-cells.geojson
-`-- classifiers/
-    `-- object_classifiers/
-        |-- CD3.json
-        `-- PanCK.json
+qupath_project/
+|-- project.qpproj
+|-- data/
+|-- classifiers/
+|   `-- object_classifiers/
+|       |-- CD3.json
+|       `-- PanCK.json
+`-- qxycell_input/
+    |-- measurements.tsv
+    |-- annotations/
+    |   |-- slide01.geojson
+    |   `-- slide02.geojson
+    |-- cells/
+    |   |-- slide01-cells.geojson
+    |   `-- slide02-cells.geojson
+    `-- thresholds/
+        `-- thresholds.tsv
 ```
 
-The source OME-TIFF files and QuPath's managed project files do not have to be copied into this export folder.
+The source OME-TIFF files do not have to be copied into the QuPath project folder when the project contains valid links to their existing locations. Measurements, GeoJSON, classifiers, and project-level threshold tables must remain inside the project folder so QXYCell has one location to search for inputs.
 
 ## 10. Run the QXYCell preflight
 
 ```python
 import qxycell as qxy
 
-project_dir = "/path/to/qupath_export"
+project_dir = "/path/to/qupath_project"
 report = qxy.check(project_dir, count_rows=True)
 
 print(report.ok)
@@ -236,7 +242,7 @@ print(report.n_errors, report.n_warnings)
 Or from a terminal:
 
 ```bash
-qxycell check /path/to/qupath_export --count-rows
+qxycell check /path/to/qupath_project --count-rows
 ```
 
 Review `check_report.txt`, `check_report.json`, and the tables in the generated sibling check folder. Resolve errors before import. Review warnings rather than assuming they are harmless.

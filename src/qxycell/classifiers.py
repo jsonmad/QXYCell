@@ -147,7 +147,7 @@ def unresolved_threshold_conflicts(path: str | Path) -> list[dict[str, Any]]:
 
 
 def discover_classifier_files(project_dir: str | Path) -> list[Path]:
-    """Find QuPath classifier JSON files anywhere within the project directory."""
+    """Find QuPath classifier JSON files anywhere within the project folder."""
 
     root = Path(project_dir).expanduser().resolve()
     files = [
@@ -162,7 +162,7 @@ def discover_threshold_files(
     project_dir: str | Path,
     output_dir: str | Path | None = None,
 ) -> list[Path]:
-    """Find manual classifier-threshold CSV/TSV files for a project directory."""
+    """Find manual classifier-threshold CSV/TSV files for a project folder."""
 
     root = Path(project_dir).expanduser().resolve()
     search_roots = [root]
@@ -170,9 +170,6 @@ def discover_threshold_files(
         output_thresholds = Path(output_dir).expanduser().resolve() / "thresholds"
         if output_thresholds.exists():
             search_roots.append(output_thresholds)
-    sibling_thresholds = root.parent / "thresholds"
-    if sibling_thresholds.exists():
-        search_roots.append(sibling_thresholds)
     files = []
     for search_root in search_roots:
         files.extend(

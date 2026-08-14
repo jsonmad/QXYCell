@@ -29,7 +29,7 @@ def _resolve_project_dir(adata, project_dir: str | Path | None) -> Path:
         )
     resolved = Path(project_dir).expanduser().resolve()
     if not resolved.is_dir():
-        raise FileNotFoundError(f"QuPath project directory does not exist: {resolved}")
+        raise FileNotFoundError(f"QuPath project folder does not exist: {resolved}")
     return resolved
 
 

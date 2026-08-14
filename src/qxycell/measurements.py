@@ -17,7 +17,7 @@ MEASUREMENT_TEXT_ENCODING = "utf-8-sig"
 
 
 def discover_measurement_files(project_dir: str | Path) -> list[Path]:
-    """Find likely QuPath measurement tables below a project export directory."""
+    """Find likely QuPath measurement tables below a QuPath project folder."""
 
     root = Path(project_dir).expanduser().resolve()
     candidates: list[Path] = []

@@ -104,7 +104,7 @@ def load_cell_polygons(
     obsm_key: str | None = None,
     verbose: bool = True,
 ) -> int:
-    """Load cell segmentation polygons from all GeoJSON files in a QuPath export folder.
+    """Load cell segmentation polygons from all GeoJSON files in a QuPath project folder.
 
     Scans every ``.geojson`` file in ``project_dir``, reads all features that have an
     ``Object ID`` property and a valid polygon geometry, and matches them to rows in
@@ -119,7 +119,7 @@ def load_cell_polygons(
     adata:
         AnnData object produced by ``qxy.run()``.
     project_dir:
-        Path to the QuPath export folder containing ``.geojson`` files.
+        Path to the QuPath project folder containing ``.geojson`` files.
     object_id_col:
         Column in ``adata.obs`` containing QuPath Object IDs (default ``"Object ID"``).
     pixel_size_um:
@@ -142,7 +142,7 @@ def load_cell_polygons(
 
     Examples
     --------
-    >>> n = qxy.load_cell_polygons(adata, "/path/to/qupath_export")
+    >>> n = qxy.load_cell_polygons(adata, "/path/to/qupath_project")
     >>> from shapely import wkt
     >>> geom = wkt.loads(adata.obs["cell_polygon_wkt"].iloc[0])
 

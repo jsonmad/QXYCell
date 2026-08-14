@@ -734,7 +734,7 @@ def run(
     celltype_logic: str | Path | dict[str, Any] | None = None,
     verbose: bool = True,
 ) -> Any:
-    """Run QXYCell on a manually exported QuPath project.
+    """Run QXYCell on a QuPath project folder.
 
     The pipeline imports QuPath measurement intensity columns into ``adata.X``
     and stores required identity/spatial columns plus available annotation and

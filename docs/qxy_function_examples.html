@@ -141,7 +141,7 @@
 <main>
 <header>
   <h1>QXYCell Function Examples</h1>
-  <p class="lead">A single-file HTML reference for the public <code>qxy</code> API. Examples were generated from a small synthetic QuPath export and include real tables and plots produced by the current package code.</p>
+  <p class="lead">A single-file HTML reference for the public <code>qxy</code> API. Examples were generated from a small synthetic QuPath project folder and include real tables and plots produced by the current package code.</p>
 </header>
 <section class="note">
   <p><strong>Before using real data:</strong> follow the <a href="qupath_preparation.md">QuPath 0.7 multiplex-IF preparation guide</a> (<a href="QXYCell_QuPath_Preparation_Guide.pdf">PDF</a>). Verify square-pixel calibration and pass it to <code>qxy.run(pixel_size_um=...)</code>; the default is <code>0.28</code> µm/pixel. These synthetic examples deliberately use <code>1.0</code>.</p>
@@ -483,7 +483,7 @@
               <div class="output"><p>Workflow result: 72 cells after Ignore removal.</p></div>
             </section><section class="card">
               <h3>qxy.check()</h3>
-              <p>Inspect the export folder, list every annotation and planned AnnData assignment, and audit competing classifier thresholds without silently choosing one. Check never applies thresholds or cell typing and never generates an LLM prompt.</p>
+              <p>Inspect the QuPath project folder, list every annotation and planned AnnData assignment, and audit competing classifier thresholds without silently choosing one. Check never applies thresholds or cell typing and never generates an LLM prompt.</p>
               <pre><code>report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
