@@ -19,4 +19,4 @@ dependencies:
   - pip:
       - pyyaml>=6.0
       - cmcrameri>=1.0
-      - -e .
+      - .

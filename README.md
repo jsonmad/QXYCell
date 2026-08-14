@@ -50,8 +50,8 @@ conda env create -f environment.yml
 conda activate qxycell
 ```
 
-The environment file installs the scientific Python dependencies and installs
-the cloned QXYCell source in editable mode through `-e .`.
+The environment file installs QXYCell and its scientific Python dependencies
+into the new environment.
 
 Verify the installation:
 
@@ -60,20 +60,15 @@ python -c "import qxycell; print('QXYCell import OK')"
 qxycell --help
 ```
 
-### Updating a clone
+### Updating QXYCell
 
-For the Conda installation:
+When a new QXYCell version is announced, update it manually from inside the
+cloned repository:
 
 ```bash
+conda activate qxycell
 git pull
 conda env update -f environment.yml --prune
-```
-
-For the standard Python installation, activate its environment and run:
-
-```bash
-git pull
-python -m pip install --upgrade .
 ```
 
 ## Prepare data in QuPath

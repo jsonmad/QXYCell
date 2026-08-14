@@ -43,7 +43,7 @@ def _import_runtime_dependencies():
     except ImportError as exc:
         raise ImportError(
             "QXYCell run() requires the package runtime dependencies. "
-            "Install with `pip install -e .` from this repo, or `pip install qxycell` "
+            "Install with `pip install .` from this repo, or `pip install qxycell` "
             "once the package is published."
         ) from exc
     return ad, np, pd
