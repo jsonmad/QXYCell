@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import math
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,16 @@ def _import_runtime_dependencies():
             "once the package is published."
         ) from exc
     return ad, np, pd
+
+
+def _validate_pixel_size_um(value: object) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("pixel_size_um must be a positive finite number") from exc
+    if not math.isfinite(result) or result <= 0:
+        raise ValueError("pixel_size_um must be a positive finite number")
+    return result
 
 
 def _read_measurements(measurement_files, pd):
@@ -732,6 +743,7 @@ def run(
     ``celltype_logic`` is supplied. ``run()`` never generates an LLM prompt.
     """
 
+    pixel_size_um = _validate_pixel_size_um(pixel_size_um)
     ad, np, pd = _import_runtime_dependencies()
 
     project_path = Path(project_dir).expanduser().resolve()

@@ -5,8 +5,14 @@
 </p>
 
 QXYCell converts QuPath single-cell exports into analysis-ready AnnData `.h5ad`
-objects for cell typing, cellular-neighbourhood analysis, spatial analysis, and
-plotting.
+objects for cell typing, spatial analysis, and plotting.
+
+The resulting AnnData object can be used with downstream tools such as
+[Scanpy](https://scanpy.readthedocs.io/en/stable/),
+[Squidpy](https://squidpy.readthedocs.io/en/stable/), and
+[scimap](https://scimap.xyz/), or incorporated into a
+[SpatialData](https://spatialdata.scverse.org/en/stable/) workflow when image,
+label, or shape elements are also needed.
 
 > [!IMPORTANT]
 > QXYCell is alpha software being released on GitHub for testing. It is not yet
@@ -16,6 +22,7 @@ plotting.
 ## Contents
 
 - [Installation](#installation)
+- [Prepare data in QuPath](#prepare-data-in-qupath)
 - [Quick start](#quick-start)
 - [Documentation and support](#documentation-and-support)
 - [QuPath inputs](#qupath-inputs)
@@ -33,7 +40,7 @@ plotting.
 QXYCell requires Python 3.10 or newer. During alpha testing, install it from a
 clone of this GitHub repository.
 
-### Recommended: conda
+### Create the QXYCell environment
 
 ```bash
 git clone https://github.com/jsonmad/QXYCell.git
@@ -45,21 +52,7 @@ conda activate qxycell
 The environment file installs the scientific Python dependencies and installs
 the cloned QXYCell source in editable mode through `-e .`.
 
-### Alternative: standard Python environment
-
-```bash
-git clone https://github.com/jsonmad/QXYCell.git
-cd QXYCell
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install .
-```
-
-On Windows PowerShell, activate the environment with
-`.\.venv\Scripts\Activate.ps1` instead of the `source` command.
-
-Verify either installation:
+Verify the installation:
 
 ```bash
 python -c "import qxycell; print('QXYCell import OK')"
@@ -68,7 +61,7 @@ qxycell --help
 
 ### Updating a clone
 
-For the recommended conda installation:
+For the Conda installation:
 
 ```bash
 git pull
@@ -82,6 +75,19 @@ git pull
 python -m pip install --upgrade .
 ```
 
+## Prepare data in QuPath
+
+Before running QXYCell, follow the
+[QuPath preparation guide](docs/qupath_preparation.md) ([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)).
+It covers image and pixel-size verification, annotations, InstanSeg cell
+segmentation, measurement and classifier export, GeoJSON export, filenames,
+and the required preflight check. The workflow targets QuPath 0.7.0 and is
+applicable to multiplex immunofluorescence data from any acquisition platform.
+
+A multichannel OME-TIFF does not need to originate from COMET, but it must open
+correctly in QuPath and have verified channels, dimensions, registration, and
+physical pixel calibration. QXYCell supports square pixels only.
+
 ## Quick start
 
 ```python
@@ -93,7 +99,8 @@ report = qxy.check("/path/to/qupath_export")
 # Optional: create a threshold table from QuPath object classifiers
 threshold_path = qxy.generate_threshold_table("/path/to/qupath_export")
 
-# Import all cells into an AnnData object
+# Import all cells into an AnnData object.
+# The default is 0.28 micrometres per pixel.
 adata = qxy.run("/path/to/qupath_export")
 
 # Apply marker thresholds to create <marker>_pos columns.
@@ -103,6 +110,18 @@ threshold_summary = qxy.threshold(adata, "/path/to/qupath_export")
 # Apply cell type rules after thresholding
 celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
 ```
+
+When the verified QuPath pixel size differs from 0.28 µm, supply the single
+square-pixel value during import:
+
+```python
+adata = qxy.run("/path/to/qupath_export", pixel_size_um=0.325)
+```
+
+The value must be positive and finite. QuPath centroid measurements are already
+in micrometres; `pixel_size_um` scales annotation and cell GeoJSON coordinates
+from full-resolution pixels into micrometres. Do not average unequal pixel width
+and height values—QXYCell does not support non-square pixels.
 
 When called, `qxy.check()` writes a timestamped sibling check folder. `qxy.run()`
 writes only a timestamped sibling run folder:
@@ -129,7 +148,8 @@ in `adata.uns["qxycell"]["output_dir"]` when `output_dir` is omitted.
 
 ## Documentation and support
 
-The repository includes an [overview](docs/QXYCell_overview.html), a
+The repository includes a [QuPath preparation guide](docs/qupath_preparation.md),
+an [overview](docs/QXYCell_overview.html), a
 [function reference](docs/QXYCell_function_reference.html), and
 [synthetic function examples](docs/qxy_function_examples.html). The rendered
 documentation site will be enabled after the repository becomes public.
@@ -144,7 +164,9 @@ QXYCell is released under the [MIT License](LICENSE).
 
 ## QuPath inputs
 
-QXYCell is built around manual QuPath exports. The measurement table is the
+QXYCell is built around manual QuPath exports. Complete the
+[QuPath preparation and verification workflow](docs/qupath_preparation.md)
+before assembling these inputs. The measurement table is the
 only unconditional input. Threshold definitions and GeoJSON files are needed
 only for the corresponding downstream features:
 
@@ -159,6 +181,9 @@ Required measurement columns: `Image`, `Object ID`, `Centroid X µm`, `Centroid 
 The known encoding variants `Centroid X ¬µm` and `Centroid Y ¬µm` are accepted and
 normalized automatically.
 These QuPath centroid columns are stored in `adata.obs` as `Xµm` and `Yµm`.
+QuPath GeoJSON geometry is stored in full-resolution pixel coordinates and is
+scaled by `qxy.run(..., pixel_size_um=...)`; the default is `0.28`. Verify the
+image's square-pixel calibration in QuPath before running QXYCell.
 An optional QuPath measurement column named exactly `TMA Core` is preserved and
 converted into categorical `adata.obs["CoreID"]` by `qxy.run()`. QXYCell does
 not infer `CoreID` from `Parent` or GeoJSON annotations. If the measurement

@@ -125,6 +125,10 @@
     <code>import qxycell as qxy</code>
   </div>
 
+  <div class="note">
+    <strong>Prepare first:</strong> follow the <a href="qupath_preparation.md">QuPath 0.7 multiplex-IF preparation guide</a> (<a href="QXYCell_QuPath_Preparation_Guide.pdf">PDF</a>) to verify calibration and create the required exports.
+  </div>
+
   <h2>Core QXYCell Functions</h2>
   <table>
     <thead>
@@ -150,8 +154,8 @@
       </tr>
       <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and an optional measurement-table <code>TMA Core</code> column into AnnData. Only <code>TMA Core</code> creates CoreID. Thresholding and cell typing are opt-in via <code>apply_thresholds=True</code> and <code>celltype_logic=...</code>; run never generates an LLM prompt.</td>
-        <td><code>adata = qxy.run(qupath_project)</code></td>
+        <td>Import QuPath measurements, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and an optional measurement-table <code>TMA Core</code> column into AnnData. <code>pixel_size_um</code> scales pixel-based GeoJSON into micrometres; its default is <code>0.28</code> and it must be positive and finite. QXYCell supports one square-pixel scale. Only <code>TMA Core</code> creates CoreID. Thresholding and cell typing are opt-in via <code>apply_thresholds=True</code> and <code>celltype_logic=...</code>; run never generates an LLM prompt.</td>
+        <td><code>adata = qxy.run(qupath_project, pixel_size_um=0.325)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
       <tr>
@@ -1004,6 +1008,7 @@ adata.obs["ImageID"] = image.map(image_name_map).fillna(image)</code></pre>
     <tbody>
       <tr><td><code>qxycell check /path/to/qupath_project</code></td><td>Validate a QuPath export from terminal.</td></tr>
       <tr><td><code>qxycell run /path/to/qupath_project</code></td><td>Run QXYCell import from terminal.</td></tr>
+      <tr><td><code>qxycell run /path/to/qupath_project --pixel-size-um 0.325</code></td><td>Run with a verified square-pixel calibration instead of the 0.28 µm default.</td></tr>
       <tr><td><code>qxycell run /path/to/qupath_project --out my_output</code></td><td>Run import to an explicit output folder.</td></tr>
       <tr><td><code>qxycell run /path/to/qupath_project --celltype-logic logic.yaml</code></td><td>Run import and apply cell type logic.</td></tr>
     </tbody>

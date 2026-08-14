@@ -162,6 +162,10 @@
       <p>QXYCell turns a QuPath project into an analysis-ready AnnData spatial object. It reads cell level measurement tables and GeoJSON annotation polygons into an <code>.h5ad</code> file, then applies marker thresholds and cell type rules as explicit downstream steps for Scanpy, Squidpy, pandas, and custom Python workflows.</p>
     </section>
 
+    <section class="summary">
+      <p><strong>Required preparation:</strong> complete the <a href="qupath_preparation.md">QuPath 0.7 multiplex-IF preparation guide</a> (<a href="QXYCell_QuPath_Preparation_Guide.pdf">PDF</a>) before running QXYCell. It covers image and pixel-size verification, segmentation, required exports, filenames, and preflight checks.</p>
+    </section>
+
     <h2>Overview</h2>
     <p>QXYCell reads a QuPath project folder containing exported measurements, classifier JSON files, and GeoJSON annotations. It extracts marker measurements, assigns annotation labels from spatial boundaries, and stores the result as an AnnData <code>.h5ad</code> object. Marker thresholding and cell typing are separate explicit steps.</p>
     <p>The goal is to make QuPath outputs immediately usable with tools like Scanpy, Squidpy, pandas, and custom Python workflows.</p>
@@ -173,7 +177,11 @@ qupath_project = "/path/to/qupath_export"
 
 report = qxy.check(qupath_project)
 
+# Default: verified square pixels at 0.28 µm/pixel
 adata = qxy.run(qupath_project)
+
+# For a different verified square-pixel calibration:
+# adata = qxy.run(qupath_project, pixel_size_um=0.325)
 
 threshold_summary = qxy.threshold(adata, qupath_project)
 
@@ -198,6 +206,7 @@ Object ID
 Centroid X µm
 Centroid Y µm</code></pre>
     <p>The known encoding variants <code>Centroid X ¬µm</code> and <code>Centroid Y ¬µm</code> are also accepted and normalised to the standard coordinate names during import.</p>
+    <p>QuPath centroid columns are already in micrometres. QuPath GeoJSON is in full-resolution pixel coordinates, so <code>qxy.run()</code> scales it using <code>pixel_size_um</code> (default <code>0.28</code>). The value must be positive and finite. QXYCell supports square pixels only: verify that QuPath's pixel width and height are equal and pass their single value rather than averaging unequal values.</p>
 
     <p>Threshold tables are the source used by <code>qxy.check()</code> and <code>qxy.threshold()</code>. When usable single-measurement object classifier JSONs are present and no threshold table exists, <code>qxy.run()</code> writes a fresh timestamped threshold table at <code>thresholds/thresholds_YYMMDD-HHMM.tsv</code> inside the run output folder. This generated table is the editable threshold source for that output folder and does not overwrite existing threshold files. <code>qxy.threshold()</code> uses the newest recognized threshold table in the QuPath export folder or the current output folder's <code>thresholds/</code> subfolder by default, or a specific table passed with <code>threshold_file=</code>. Threshold tables inside older generated output folders are excluded so they cannot leak into a later run. The compact check summary reports <code>Threshold source: ...</code>, and <code>check_report.txt</code> reports <code>Active threshold source: ...</code>. You can also create a fresh table explicitly with <code>qxy.generate_threshold_table(project_dir, output_dir=output_dir)</code>. Recognized names include <code>thresholds.tsv</code>, <code>manual_thresholds.tsv</code>, <code>marker_thresholds.tsv</code>, <code>qxycell_thresholds.tsv</code>, <code>classifier_thresholds.tsv</code>, their <code>.csv</code> equivalents, and timestamped <code>thresholds_*.tsv</code>/<code>.csv</code> files. If multiple project-level threshold files are found, QXYCell uses the most recently modified timestamped file when available and reports ignored files as warnings.</p>
 
