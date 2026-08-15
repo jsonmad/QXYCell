@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
 
 from qxycell.paths import resolve_output_dir
+from qxycell.stage_state import complete_stage, prepare_stage
 
 
 def _available_markers_from_adata(adata) -> list[str]:
@@ -109,18 +109,45 @@ def celltype_prompt(
 
     saved_path = None
     if save and output_path is None:
-        timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
         output_path = (
             resolve_output_dir(adata=adata)
             / "celltype"
-            / f"celltype_prompt_{timestamp}.txt"
+            / "current_prompt.txt"
         )
+
+    metadata = adata.uns.setdefault("qxycell", {})
+    stages = metadata.setdefault("stages", {})
+    previous_celltyping = adata.uns.get("qxycell_celltyping", {})
+    if "celltypes" not in stages and isinstance(previous_celltyping, dict):
+        previous_columns = [
+            previous_celltyping.get("celltype_column"),
+            *previous_celltyping.get("feature_columns", []),
+            *previous_celltyping.get("derived_feature_columns", []),
+        ]
+        stages["celltypes"] = {
+            "status": "complete",
+            "columns": [column for column in previous_columns if column],
+            "files": [],
+        }
+    prepare_stage(adata, "celltype_prompt", remove_downstream_columns=False)
 
     if save and output_path is not None:
         output_path = Path(output_path).expanduser().resolve()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(prompt, encoding="utf-8")
         saved_path = output_path
+
+    metadata["llm_prompt_generated"] = True
+    metadata["llm_prompt_path"] = str(saved_path) if saved_path is not None else None
+    complete_stage(
+        adata,
+        "celltype_prompt",
+        files=[saved_path] if saved_path is not None else [],
+        details={
+            "prompt_path": str(saved_path) if saved_path is not None else None,
+            "markers": markers,
+        },
+    )
 
     if print_prompt:
         if saved_path is not None:

@@ -153,14 +153,38 @@
         <td><code>thresholds_YYMMDD-HHMM.tsv</code> under the output <code>thresholds/</code> folder.</td>
       </tr>
       <tr>
+        <td><code>qxy.import_measurements</code></td>
+        <td>Stage 1: create the base AnnData from measurement CSV/TSV files only. Marker intensities are stored in <code>adata.X</code>; cell identity and coordinates are stored in <code>adata.obs</code> and <code>adata.obsm["spatial"]</code>.</td>
+        <td><code>adata = qxy.import_measurements(qupath_project)</code></td>
+        <td>Base H5AD plus synchronized observation and marker tables.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.add_annotations</code></td>
+        <td>Stage 2: discover current GeoJSON files and replace GeoJSON-derived annotation, sample, and cell-polygon columns. Rerunning invalidates downstream stages.</td>
+        <td><code>summary = qxy.add_annotations(adata, pixel_size_um=0.28)</code></td>
+        <td>Refreshed annotation columns, H5AD, and <code>cells_obs.csv</code>.</td>
+      </tr>
+      <tr>
         <td><code>qxy.run</code></td>
-        <td>Import QuPath measurements, spatial coordinates, GeoJSON annotations, sample annotations, cell boundary WKT, and an optional measurement-table <code>TMA Core</code> column into AnnData. <code>pixel_size_um</code> scales pixel-based GeoJSON into micrometres; its default is <code>0.28</code> and it must be positive and finite. QXYCell supports one square-pixel scale. Only <code>TMA Core</code> creates CoreID. Thresholding and cell typing are opt-in via <code>apply_thresholds=True</code> and <code>celltype_logic=...</code>; run never generates an LLM prompt.</td>
+        <td>Compatibility wrapper over measurement import and annotation stages. Thresholding and cell typing remain optional; run never generates an LLM prompt.</td>
         <td><code>adata = qxy.run(qupath_project, pixel_size_um=0.325)</code></td>
         <td><code>AnnData</code> plus saved H5AD and tables.</td>
       </tr>
       <tr>
+        <td><code>qxy.threshold_from_classifiers</code></td>
+        <td>Stage 3A: replace marker positivity using QuPath classifier JSON thresholds only. Threshold tables are ignored and conflicting classifiers cause an error.</td>
+        <td><code>summary = qxy.threshold_from_classifiers(adata)</code></td>
+        <td>Refreshed <code>&lt;marker&gt;_pos</code> columns, H5AD, tables, and stage record.</td>
+      </tr>
+      <tr>
+        <td><code>qxy.threshold_from_table</code></td>
+        <td>Stage 3B: replace marker positivity using one named threshold table only. Classifier JSON thresholds are not used as a fallback.</td>
+        <td><code>summary = qxy.threshold_from_table(adata, "thresholds.tsv")</code></td>
+        <td>Refreshed <code>&lt;marker&gt;_pos</code> columns, H5AD, tables, and stage record.</td>
+      </tr>
+      <tr>
         <td><code>qxy.threshold</code></td>
-        <td>Apply active threshold definitions to an imported AnnData object, create <code>&lt;marker&gt;_pos</code> columns, and rename previous cell type columns with a <code>__stale_celltype</code> suffix because they depend on the old thresholds.</td>
+        <td>Legacy automatic-source threshold entry point retained for compatibility. New workflows should select one of the two explicit threshold functions.</td>
         <td><code>summary = qxy.threshold(adata, qupath_project)</code></td>
         <td><code>adata.obs["&lt;marker&gt;_pos"]</code> columns and <code>adata.uns["qxycell_thresholding"]</code>.</td>
       </tr>
@@ -172,13 +196,13 @@
       </tr>
       <tr>
         <td><code>qxy.celltype_prompt</code></td>
-        <td>Create a copy-paste LLM prompt from markers found in the AnnData object.</td>
+        <td>Stage 4: create a copy-paste LLM prompt from thresholded markers. Rerunning replaces <code>celltype/current_prompt.txt</code> but never overwrites an expert-edited YAML.</td>
         <td><code>prompt = qxy.celltype_prompt(adata)</code></td>
         <td>Prompt text and a saved prompt file in the run <code>celltype/</code> folder.</td>
       </tr>
       <tr>
         <td><code>qxy.celltype</code></td>
-        <td>Apply ordered first-match cell type YAML logic.</td>
+        <td>Stage 5: replace cell type, feature, and derived-feature columns using ordered first-match YAML logic.</td>
         <td><code>summary = qxy.celltype(adata)</code></td>
         <td>Adds <code>adata.obs["celltype"]</code> and saves a rule summary TSV.</td>
       </tr>
@@ -332,8 +356,9 @@
 
 qupath_project = "/path/to/qupath_project"
 
-adata = qxy.run(qupath_project)
-qxy.threshold(adata, qupath_project)
+adata = qxy.import_measurements(qupath_project)
+qxy.add_annotations(adata)
+qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
 qxy.remove_ignore(adata)
 
 prompt = qxy.celltype_prompt(
@@ -412,13 +437,14 @@ qxy.save(adata)</code></pre>
     <tbody>
       <tr><td><code>qxy.check()</code></td><td>Reports each measurement, classifier name, threshold, and source. Writes <code>tables/classifier_conflicts.csv</code>.</td></tr>
       <tr><td>Table generation</td><td>Adds candidate-provenance columns, sets <code>classifier_conflict=True</code>, and leaves all affected image cells blank.</td></tr>
-      <tr><td><code>qxy.run()</code></td><td>May import measurements while conflicts await review. The run log and <code>adata.uns["qxycell"]["classifier_conflicts"]</code> retain the audit.</td></tr>
-      <tr><td><code>qxy.threshold()</code></td><td>Raises an error for direct conflicting JSON definitions or conflict-marked rows with any missing image value.</td></tr>
+      <tr><td><code>qxy.import_measurements()</code></td><td>Imports measurements independently while threshold conflicts await review.</td></tr>
+      <tr><td><code>qxy.threshold_from_classifiers()</code></td><td>Raises an error for direct conflicting JSON definitions.</td></tr>
+      <tr><td><code>qxy.threshold_from_table()</code></td><td>Raises an error for conflict-marked rows with any missing image value.</td></tr>
       <tr><td>Resolved table</td><td>One numeric value per image is applied by exact match to <code>adata.obs["Image"]</code>. Values may differ between images.</td></tr>
-      <tr><td>Reapplication</td><td>Rerunning thresholding archives old cell-type outputs with <code>__stale_celltype</code>; rerun <code>qxy.celltype()</code> to regenerate labels.</td></tr>
+      <tr><td>Reapplication</td><td>Rerunning thresholding removes old threshold-dependent cell-type outputs; rerun <code>qxy.celltype()</code> to regenerate labels.</td></tr>
     </tbody>
   </table>
-  <pre><code>qxy.threshold(adata, threshold_file="reviewed_thresholds.tsv")
+  <pre><code>qxy.threshold_from_table(adata, "reviewed_thresholds.tsv")
 qxy.celltype(adata, "celltype_logic.yaml")</code></pre>
 
   <h2>TMA CoreID Commands</h2>

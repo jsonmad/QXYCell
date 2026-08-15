@@ -12,7 +12,15 @@ from qxycell.filtering import remove_annotations
 from qxycell.filtering import remove_ignore
 from qxycell.io_utils import load, load_latest, save
 from qxycell.metadata import add_metadata
-from qxycell.pipeline import apply_thresholds, run, threshold
+from qxycell.pipeline import (
+    add_annotations,
+    apply_thresholds,
+    import_measurements,
+    run,
+    threshold,
+    threshold_from_classifiers,
+    threshold_from_table,
+)
 from qxycell.plotting import (
     plot_annotation_polygons,
     plot_cell_boundaries,
@@ -33,6 +41,7 @@ celltype = apply_celltypes
 __all__ = [
     "CheckReport",
     "add_metadata",
+    "add_annotations",
     "apply_celltypes",
     "apply_thresholds",
     "assign_annotations",
@@ -46,6 +55,7 @@ __all__ = [
     "check",
     "find_latest_celltype_yaml",
     "generate_threshold_table",
+    "import_measurements",
     "load",
     "load_cell_polygons",
     "load_latest",
@@ -64,5 +74,7 @@ __all__ = [
     "run",
     "save",
     "threshold",
+    "threshold_from_classifiers",
+    "threshold_from_table",
     "workflow",
 ]

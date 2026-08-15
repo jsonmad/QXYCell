@@ -10,6 +10,7 @@ from typing import Any
 from qxycell.paths import latest_timestamped_output_dir
 from qxycell.paths import output_dir_from_adata
 from qxycell.paths import resolve_output_dir
+from qxycell.stage_state import complete_stage, prepare_stage
 
 
 def _safe_name(value: str) -> str:
@@ -341,6 +342,21 @@ def apply_celltypes(
         if isinstance(spec, dict)
     }
 
+    stages = adata.uns.setdefault("qxycell", {}).setdefault("stages", {})
+    previous_summary = adata.uns.get("qxycell_celltyping", {})
+    if "celltypes" not in stages and isinstance(previous_summary, dict):
+        previous_columns = [
+            previous_summary.get("celltype_column"),
+            *previous_summary.get("feature_columns", []),
+            *previous_summary.get("derived_feature_columns", []),
+        ]
+        stages["celltypes"] = {
+            "status": "complete",
+            "columns": [column for column in previous_columns if column],
+            "files": [],
+        }
+    prepare_stage(adata, "celltypes")
+
     celltypes = np.full(len(obs), unknown_label, dtype=object)
     unassigned = np.ones(len(obs), dtype=bool)
     missing_references: set[str] = set()
@@ -434,6 +450,25 @@ def apply_celltypes(
     )
     summary["rule_summary_tsv"] = str(rule_summary_tsv)
     adata.uns["qxycell_celltyping"] = summary
+    output_path = resolve_output_dir(adata=adata)
+    tables_dir = output_path / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    counts_path = tables_dir / "celltype_counts.csv"
+    counts = obs[celltype_column].value_counts(dropna=False).rename_axis(celltype_column)
+    counts.reset_index(name="cell_count").to_csv(counts_path, index=False)
+    owned_columns = [celltype_column, *feature_columns, *derived_feature_columns]
+    adata.uns.setdefault("qxycell", {})["celltyping_applied"] = True
+    complete_stage(
+        adata,
+        "celltypes",
+        columns=owned_columns,
+        files=[rule_summary_tsv, counts_path],
+        details={
+            "logic_source": summary["logic_source"],
+            "n_rules": summary["n_rules"],
+            "unknown_count": summary["unknown_count"],
+        },
+    )
     if verbose:
         print(f"Saved cell type rule summary TSV:\n{rule_summary_tsv}")
     return summary

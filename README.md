@@ -92,26 +92,32 @@ import qxycell as qxy
 # Optional: validate your QuPath project folder before running
 report = qxy.check("/path/to/qupath_project")
 
-# Optional: create a threshold table from QuPath object classifiers
-threshold_path = qxy.generate_threshold_table("/path/to/qupath_project")
+# Stage 1: import the measurement table into AnnData
+adata = qxy.import_measurements("/path/to/qupath_project")
 
-# Import all cells into an AnnData object.
-# The default is 0.28 micrometres per pixel.
-adata = qxy.run("/path/to/qupath_project")
+# Stage 2: add or refresh GeoJSON annotations and cell polygons
+qxy.add_annotations(adata, pixel_size_um=0.28)
 
-# Apply marker thresholds to create <marker>_pos columns.
-# Existing celltype labels are renamed with a __stale_celltype suffix.
-threshold_summary = qxy.threshold(adata, "/path/to/qupath_project")
+# Stage 3A: use QuPath classifier JSON thresholds only
+qxy.threshold_from_classifiers(adata)
 
-# Apply cell type rules after thresholding
-celltype_summary = qxy.celltype(adata, "celltype_logic.yaml")
+# Alternatively, stage 3B uses one named threshold table only:
+# table = qxy.generate_threshold_table("/path/to/qupath_project")
+# qxy.threshold_from_table(adata, table)
+
+# Stage 4: create the prompt used to draft celltype_logic.yaml
+qxy.celltype_prompt(adata, context="Describe the tissue and expected populations")
+
+# Review the LLM-generated YAML, save it in the run's celltype folder,
+# then run stage 5
+qxy.celltype(adata)
 ```
 
 When the verified QuPath pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
 ```python
-adata = qxy.run("/path/to/qupath_project", pixel_size_um=0.325)
+qxy.add_annotations(adata, pixel_size_um=0.325)
 ```
 
 The value must be positive and finite. QuPath centroid measurements are already
@@ -127,11 +133,11 @@ qupath_project_check_YYMMDD_HHMM/
 qupath_project_run_YYMMDD_HHMM/
 ```
 
-Downstream functions such as `qxy.threshold()`, `qxy.add_metadata()`,
+Downstream functions such as the explicit threshold stages, `qxy.add_metadata()`,
 `qxy.celltype()`, plotting, and `qxy.save()` reuse the active run folder stored
 in `adata.uns["qxycell"]["output_dir"]` when `output_dir` is omitted.
 
-**`qxy.run()` populates the AnnData as follows:**
+**The measurement and annotation stages populate AnnData as follows:**
 
 | Location | Contents |
 |---|---|
@@ -180,15 +186,15 @@ The known encoding variants `Centroid X ¬µm` and `Centroid Y ¬µm` are accept
 normalized automatically.
 These QuPath centroid columns are stored in `adata.obs` as `Xµm` and `Yµm`.
 QuPath GeoJSON geometry is stored in full-resolution pixel coordinates and is
-scaled by `qxy.run(..., pixel_size_um=...)`; the default is `0.28`. Verify the
+scaled by `qxy.add_annotations(..., pixel_size_um=...)`; the default is `0.28`. Verify the
 image's square-pixel calibration in QuPath before running QXYCell.
 An optional QuPath measurement column named exactly `TMA Core` is preserved and
-converted into categorical `adata.obs["CoreID"]` by `qxy.run()`. QXYCell does
+converted into categorical `adata.obs["CoreID"]` by `qxy.import_measurements()`. QXYCell does
 not infer `CoreID` from `Parent` or GeoJSON annotations. If the measurement
 table has no `TMA Core` column, the resulting AnnData has no `CoreID` column
 and the check report lists zero CoreIDs.
 
-Threshold tables are the source used by `qxy.check()` and `qxy.threshold()`.
+Threshold tables are used explicitly by `qxy.threshold_from_table()`.
 Generated threshold tables are written to a `thresholds/` folder inside the
 QXYCell output folder:
 
@@ -225,7 +231,7 @@ active threshold-definition source but explicitly records that thresholds,
 cell typing, and LLM prompt generation were not performed. `check_report.json`
 stores these flags under `processing`.
 
-After import, `qxy.run()` reports the same source-to-destination mapping with
+After annotation import, `qxy.add_annotations()` reports the same source-to-destination mapping with
 the number of cells actually assigned. The audit is stored in
 `adata.uns["qxycell"]["annotation_assignments"]`, written to `run.log`, and
 exported as `tables/annotation_assignments.csv`.
@@ -246,16 +252,10 @@ threshold_path = qxy.generate_threshold_table(
 )
 ```
 
-`qxy.run()` does not call `qxy.check()` or write a check report. It inspects the
-project files needed for import and checks whether a threshold table already
-exists. If one is found,
-it is used. If no threshold table is found and usable object classifier JSONs
-are present, `qxy.run()` generates a timestamped threshold table in
-`output_dir/thresholds/` and then uses that table for validation. Object classifier
-JSONs never modify an existing threshold table.
-Threshold tables inside older generated output folders are ignored during
-project discovery, preventing one run from silently reusing another run's
-table. The active run's own `thresholds/` folder remains eligible.
+`qxy.import_measurements()` and `qxy.add_annotations()` do not apply or select
+thresholds. Choose `qxy.threshold_from_classifiers()` to use only QuPath
+classifier JSON files, or `qxy.threshold_from_table()` to use only the named
+table. Neither function silently falls back to the other source.
 
 ### Conflicting classifiers and per-image review
 
@@ -264,8 +264,9 @@ measurement and image scope, QXYCell no longer selects one by filename order.
 `qxy.check()` reports every candidate and writes
 `tables/classifier_conflicts.csv`. Generated threshold tables mark the row with
 `classifier_conflict=True`, preserve candidate names, values, and sources, and
-leave every image threshold blank for review. `qxy.run()` may still import the
-data, but `qxy.threshold()` refuses to apply an unresolved conflict row.
+leave every image threshold blank for review. Measurement and annotation import
+can still proceed, but classifier-only thresholding refuses conflicting
+definitions and table-only thresholding refuses unresolved conflict rows.
 
 Fill one threshold for every image column in the generated table, then reapply
 thresholding using that exact file:
@@ -273,24 +274,23 @@ thresholding using that exact file:
 ```python
 threshold_file = output_dir / "thresholds" / "thresholds_YYMMDD-HHMM.tsv"
 
-qxy.threshold(adata, threshold_file=threshold_file)
+qxy.threshold_from_table(adata, threshold_file)
 qxy.celltype(adata, "celltype_logic.yaml")
 ```
 
 Different image columns may contain different values. The wide-table parser
 matches `adata.obs["Image"]` exactly and applies the corresponding threshold to
 each image. After editing the table again, rerun the same calls. Thresholding
-archives threshold-dependent cell-type and feature columns with a
-`__stale_celltype` suffix; the subsequent `qxy.celltype()` call recreates active
-labels from the new per-image positivity calls.
+removes threshold-dependent cell-type and feature columns; the subsequent
+`qxy.celltype()` call recreates active
+labels from the new per-image positivity calls. The active H5AD and
+`tables/cells_obs.csv` are refreshed after every stage.
 
 To manually edit thresholds, fill in or edit the image threshold columns, save
 the finished file in the QuPath project folder or in the active run's
-`thresholds/` subfolder, then rerun `qxy.check()` or `qxy.threshold()`. By
-default, QXYCell uses the newest recognized threshold table in the QuPath
-project folder or the current output folder's `thresholds/` subfolder. To force
-a specific table, pass `threshold_file="path/to/thresholds.tsv"` to
-`qxy.check()`, `qxy.run()`, or `qxy.threshold()`. The compact `CheckReport` summary includes
+`thresholds/` subfolder, then pass that exact path to
+`qxy.threshold_from_table(adata, threshold_file)`. `qxy.check()` can still be
+given the same file to validate it. The compact `CheckReport` summary includes
 `Threshold source: ...`, and `check_report.txt` includes
 `Active threshold source: ...`.
 
@@ -320,7 +320,7 @@ adata = qxy.remove_ignore(adata)
 
 Removes rows from `adata.obs` in-place. Cells inside any `annotation__Ignore` polygon are dropped.
 
-`qxy.run()` converts annotations with `Sample` in the label into one `Sample`
+`qxy.add_annotations()` converts annotations with `Sample` in the label into one `Sample`
 column. Cells inside more than one sample annotation are labelled `Ambiguous`
 and a warning is emitted. You can rerun sample assignment explicitly:
 
@@ -378,7 +378,8 @@ prompt = qxy.celltype_prompt(adata)
 print(prompt)
 ```
 
-This prints the prompt, saves it to the active output folder under `celltype/`,
+This prints the prompt, replaces `celltype/current_prompt.txt` in the active
+output folder,
 and returns the string. After editing and saving a YAML logic file in that
 folder, apply it:
 
@@ -386,7 +387,7 @@ folder, apply it:
 summary = qxy.celltype(adata)
 ```
 
-Adds `adata.obs["celltype"]` (string). Cell type assignment summary stored in `adata.uns["qxycell_celltyping"]`. QXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used. Re-running `qxy.threshold()` renames previous cell type columns with a `__stale_celltype` suffix and clears the active cell typing summary, so cell typing must be rerun after threshold changes.
+Adds `adata.obs["celltype"]` (string). Cell type assignment summary stored in `adata.uns["qxycell_celltyping"]`. QXYCell applies the most recently saved YAML in the celltype folder and prints the file path it used. Re-running either explicit threshold function removes threshold-dependent cell-type and feature columns, marks them stale in the stage record, and requires cell typing to be rerun. Re-running cell typing replaces columns owned by the previous YAML, including obsolete feature columns.
 
 ## Cellular neighbourhoods
 
@@ -606,7 +607,7 @@ Marker positivity and intensity are separate functions and save PDF by default:
 qxy.plot_marker_positivity_heatmap(adata)
 
 # Z-score mean intensity (coolwarm, centred 0, ±3)
-qxy.plot_marker_intensity_heatmap(adata)  # defaults to markers actually applied by qxy.threshold()
+qxy.plot_marker_intensity_heatmap(adata)  # defaults to markers actually thresholded
 
 # Journal single-column (90 mm) or double-column (180 mm) width
 qxy.plot_marker_positivity_heatmap(adata, width="single")
@@ -684,10 +685,10 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 ## TMA and CoreID
 
 QXYCell recognizes core IDs only when the cell measurement table contains
-QuPath's `TMA Core` column. `qxy.run()` preserves it and creates `CoreID`.
+QuPath's `TMA Core` column. `qxy.import_measurements()` preserves it and creates `CoreID`.
 
 ```python
-adata = qxy.run(project_dir)
+adata = qxy.import_measurements(project_dir)
 adata.obs["CoreID"].value_counts()
 ```
 
@@ -739,24 +740,24 @@ adata = qxy.load("path/to/qxycell.h5ad")
 
 | Location | Added by | Contents |
 |---|---|---|
-| `adata.obs["Image"]` | `qxy.run()` | QuPath image name per cell |
-| `adata.obs["Xµm"]`, `adata.obs["Yµm"]` | `qxy.run()` | Cell centroid x/y coordinates in microns |
-| `adata.obs["<marker>_pos"]` | `qxy.threshold()` / `qxy.apply_thresholds()` | Boolean marker positivity columns |
-| `adata.obs["annotation__<label>"]` | `qxy.run()` | Boolean annotation membership columns |
-| `adata.obs["cell_polygon_wkt"]` | `qxy.run()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
-| `adata.obs["Sample"]` | `qxy.run()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
-| `adata.obs["TMA Core"]` | `qxy.run()` | QuPath measurement-table TMA core label |
-| `adata.obs["CoreID"]` | `qxy.run()` / `qxy.assign_core_ids_from_measurements()` | Categorical CoreID derived only from `TMA Core` |
+| `adata.obs["Image"]` | `qxy.import_measurements()` | QuPath image name per cell |
+| `adata.obs["Xµm"]`, `adata.obs["Yµm"]` | `qxy.import_measurements()` | Cell centroid x/y coordinates in microns |
+| `adata.obs["<marker>_pos"]` | explicit threshold stages | Boolean marker positivity columns |
+| `adata.obs["annotation__<label>"]` | `qxy.add_annotations()` | Boolean annotation membership columns |
+| `adata.obs["cell_polygon_wkt"]` | `qxy.add_annotations()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
+| `adata.obs["Sample"]` | `qxy.add_annotations()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
+| `adata.obs["TMA Core"]` | `qxy.import_measurements()` | QuPath measurement-table TMA core label |
+| `adata.obs["CoreID"]` | `qxy.import_measurements()` / `qxy.assign_core_ids_from_measurements()` | Categorical CoreID derived only from `TMA Core` |
 | `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
 | `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
 | `adata.obs[*metadata cols*]` | `qxy.add_metadata()` | Sample metadata broadcast to all cells |
-| `adata.X` | `qxy.run()` | Marker intensity matrix (cells × markers) |
-| `adata.var` | `qxy.run()` | Marker names and metadata |
-| `adata.obsm["spatial"]` | `qxy.run()` | Cell centroid x/y coordinates in microns |
+| `adata.X` | `qxy.import_measurements()` | Marker intensity matrix (cells × markers) |
+| `adata.var` | `qxy.import_measurements()` | Marker names and metadata |
+| `adata.obsm["spatial"]` | `qxy.import_measurements()` | Cell centroid x/y coordinates in microns |
 | `adata.obsm["cn_profile"]` | `qxy.cn_knn()` | Per-cell local cell type composition (sums to 1) |
-| `adata.uns["qxycell"]` | `qxy.run()` | Run metadata, output paths, colour palettes |
-| `adata.uns["qxycell_annotation_labels"]` | `qxy.run()` | Annotation class → column name map |
-| `adata.uns["qxycell_thresholding"]` | `qxy.threshold()` / `qxy.apply_thresholds()` | Threshold source and positivity-column summary |
+| `adata.uns["qxycell"]` | staged functions | Run metadata, output paths, stage status, and provenance |
+| `adata.uns["qxycell_annotation_labels"]` | `qxy.add_annotations()` | Annotation class → column name map |
+| `adata.uns["qxycell_thresholding"]` | explicit threshold stages | Threshold source and positivity-column summary |
 | `adata.uns["qxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
 | `adata.uns["qxycell_core_ids_from_measurements"]` | `qxy.assign_core_ids_from_measurements()` | Measurement-derived CoreID assignment summary |
 | `adata.uns["qxycell_qc"]` | `qxy.qc()` | QC metrics per sample |

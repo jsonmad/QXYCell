@@ -26,11 +26,11 @@ def workflow(
 
     from qxycell.celltyping import apply_celltypes
     from qxycell.filtering import remove_ignore
-    from qxycell.io_utils import save
     from qxycell.metadata import add_metadata
     from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata, run
     from qxycell.plotting import plot_spatial, plot_stacked_bar
     from qxycell.qc import qc
+    from qxycell.stage_state import checkpoint_outputs
 
     adata = run(
         project_dir,
@@ -79,5 +79,7 @@ def workflow(
         "make_qc": bool(make_qc),
         "make_plots": bool(make_plots),
     }
-    save(adata, verbose=verbose)
+    checkpoint_outputs(adata)
+    if verbose:
+        print("Saved workflow H5AD and synchronized observation/marker tables")
     return adata
