@@ -19,6 +19,7 @@ build/
 /.superpowers/
 /.vscode/
 /.idea/
+/.worktrees/
 
 # Local notes
 INSTALL_NOTES.md
