@@ -11,9 +11,6 @@ from qxycell.paths import resolve_output_dir
 
 def _available_markers_from_adata(adata) -> list[str]:
     markers = []
-    if getattr(adata, "var_names", None) is not None:
-        markers.extend(str(marker) for marker in adata.var_names)
-
     obs = getattr(adata, "obs", None)
     if obs is not None:
         for column in obs.columns:
@@ -40,7 +37,10 @@ def celltype_prompt(
 
     markers = _available_markers_from_adata(adata)
     if not markers:
-        raise ValueError("No markers were found in adata.var_names or adata.obs '*_pos' columns.")
+        raise ValueError(
+            "No thresholded markers were found in adata.obs '*_pos' columns. "
+            "Run qxy.threshold() before creating a cell type prompt."
+        )
 
     marker_lines = "\n".join(f"- {marker}" for marker in markers)
     context_text = context.strip() if context and context.strip() else "[No additional context provided]"
