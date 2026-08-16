@@ -129,6 +129,12 @@
     <strong>Prepare first:</strong> follow the <a href="qupath_preparation.md">QuPath 0.7 multiplex-IF preparation guide</a> (<a href="QXYCell_QuPath_Preparation_Guide.pdf">PDF</a>) to verify calibration and create the required project-folder assets.
   </div>
 
+  <div class="note">
+    <strong>Recommended staged workflow:</strong>
+    <code>import_measurements → add_annotations → threshold_from_classifiers/table → celltype_prompt → celltype</code>.
+    Stages after measurement import are rerunnable and replace their owned outputs in the same active H5AD and exported tables.
+  </div>
+
   <h2>Core QXYCell Functions</h2>
   <table>
     <thead>

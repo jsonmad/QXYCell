@@ -34,7 +34,7 @@ label, or shape elements are also needed.
 - [Cellular neighbourhoods](#cellular-neighbourhoods)
 - [Plots and heatmaps](#spatial-plots)
 - [Save and load](#save-and-load)
-- [Workflow shortcut](#workflow-shortcut)
+- [Compatibility workflow shortcut](#compatibility-workflow-shortcut)
 
 ## Installation
 
@@ -113,6 +113,24 @@ qxy.celltype_prompt(adata, context="Describe the tissue and expected populations
 qxy.celltype(adata)
 ```
 
+### Why the workflow is staged
+
+Stage 1 creates the base measurement checkpoint. Stages 2–5 update that same
+H5AD and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, so the
+analysis can be reviewed and revised without reimporting the measurements.
+
+| When an input changes | Rerun | What QXYCell replaces |
+|---|---|---|
+| Annotation or cell GeoJSON | `qxy.add_annotations(adata)` | Annotation, sample, and cell-polygon columns; downstream stages become stale |
+| QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
+| A reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
+| Biological context for the prompt | `qxy.celltype_prompt(adata, context=...)` | `celltype/current_prompt.txt`; an expert-edited YAML is preserved |
+| Cell-type YAML | `qxy.celltype(adata)` | `celltype`, feature, derived-feature, count, and rule-summary outputs |
+
+The two threshold functions are deliberately separate. Classifier-only
+thresholding ignores tables; table-only thresholding uses the named table and
+does not fall back to classifier JSON.
+
 When the verified QuPath pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
@@ -125,17 +143,19 @@ in micrometres; `pixel_size_um` scales annotation and cell GeoJSON coordinates
 from full-resolution pixels into micrometres. Do not average unequal pixel width
 and height values—QXYCell does not support non-square pixels.
 
-When called, `qxy.check()` writes a timestamped sibling check folder. `qxy.run()`
-writes only a timestamped sibling run folder:
+When called, `qxy.check()` writes a timestamped sibling check folder.
+`qxy.import_measurements()` creates the timestamped sibling run folder used by
+all later stages:
 
 ```text
 qupath_project_check_YYMMDD_HHMM/
 qupath_project_run_YYMMDD_HHMM/
 ```
 
-Downstream functions such as the explicit threshold stages, `qxy.add_metadata()`,
-`qxy.celltype()`, plotting, and `qxy.save()` reuse the active run folder stored
-in `adata.uns["qxycell"]["output_dir"]` when `output_dir` is omitted.
+Downstream functions such as annotation import, the explicit threshold stages,
+`qxy.add_metadata()`, `qxy.celltype()`, plotting, and `qxy.save()` reuse the
+active run folder stored in `adata.uns["qxycell"]["output_dir"]` when
+`output_dir` is omitted.
 
 **The measurement and annotation stages populate AnnData as follows:**
 
@@ -765,9 +785,10 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
 
-## Workflow shortcut
+## Compatibility workflow shortcut
 
-Run the full pipeline in one call:
+The staged API above is recommended for reviewable, rerunnable analyses. Older
+code can still run the full pipeline in one call:
 
 ```python
 adata = qxy.workflow(

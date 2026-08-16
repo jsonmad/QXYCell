@@ -170,7 +170,8 @@
     <p>QXYCell reads one QuPath project folder containing exported measurements, classifier JSON files, GeoJSON annotations, and any project-level threshold tables. Keep all exported inputs inside that folder; QXYCell searches it recursively. It extracts marker measurements, assigns annotation labels from spatial boundaries, and stores the result as an AnnData <code>.h5ad</code> object. Marker thresholding and cell typing are separate explicit steps.</p>
     <p>The goal is to make QuPath outputs immediately usable with tools like Scanpy, Squidpy, pandas, and custom Python workflows.</p>
 
-    <h2>Current Workflow</h2>
+    <h2>Core Staged Workflow</h2>
+    <p>Stage 1 creates the base measurement checkpoint. Every later stage is independently rerunnable and refreshes the same active H5AD, <code>tables/cells_obs.csv</code>, and <code>tables/markers_var.csv</code>.</p>
     <pre><code>import qxycell as qxy
 
 qupath_project = "/path/to/qupath_project"
@@ -195,6 +196,18 @@ qxy.celltype_prompt(adata, context="Describe the tissue and expected populations
 # 5. Apply the reviewed YAML
 qxy.celltype(adata)</code></pre>
 
+    <h3>Rerun and replacement rules</h3>
+    <table>
+      <thead><tr><th>Changed input</th><th>Rerun</th><th>Replacement behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>Annotation or cell GeoJSON</td><td><code>qxy.add_annotations(adata)</code></td><td>Replaces annotation, sample, and cell-polygon columns; invalidates thresholds and later stages.</td></tr>
+        <tr><td>Classifier JSON thresholds</td><td><code>qxy.threshold_from_classifiers(adata)</code></td><td>Replaces marker positivity; ignores threshold tables; invalidates prompt, cell types, and post-analysis.</td></tr>
+        <tr><td>Reviewed threshold table</td><td><code>qxy.threshold_from_table(adata, table)</code></td><td>Replaces marker positivity using only the named table; invalidates prompt, cell types, and post-analysis.</td></tr>
+        <tr><td>Prompt context</td><td><code>qxy.celltype_prompt(adata, context=...)</code></td><td>Replaces <code>celltype/current_prompt.txt</code> but preserves an expert-edited YAML.</td></tr>
+        <tr><td>Cell-type YAML</td><td><code>qxy.celltype(adata)</code></td><td>Replaces prior cell type, feature, derived-feature, count, and rule-summary outputs.</td></tr>
+      </tbody>
+    </table>
+
     <p>If no output folder is supplied, <code>qxy.check(...)</code> writes reports to:</p>
     <pre><code>../qupath_project_check_YYMMDD_HHMM/</code></pre>
 
@@ -204,8 +217,8 @@ qxy.celltype(adata)</code></pre>
     <h2>Inputs</h2>
     <p>QXYCell requires a manually exported QuPath measurement table. Other inputs are needed only for the corresponding optional feature:</p>
     <pre><code>measurements.csv or measurements.tsv  (required)
-thresholds.tsv or thresholds_YYMMDD-HHMM.tsv  (required for thresholding)
-*.json  (alternative source for a fresh threshold table template)
+*.json  (threshold option A: QuPath classifier JSON)
+thresholds.tsv or thresholds_YYMMDD-HHMM.tsv  (threshold option B: reviewed table)
 GeoJSON annotation or cell files  (optional spatial annotations and geometry)</code></pre>
 
     <p>The measurement table must contain standard QuPath columns:</p>
@@ -230,13 +243,18 @@ Centroid Y µm</code></pre>
 
 qupath_project_run_YYMMDD_HHMM/
   h5ad/qxycell.h5ad
+  celltype/
+    current_prompt.txt
+    celltype_rules_summary_&lt;logic-name&gt;.tsv
   tables/
     cells_obs.csv
     markers_var.csv
     annotation_assignments.csv
     annotation_conflicts.csv
+    thresholding_summary.csv
+    celltype_counts.csv
   run.log</code></pre>
-    <p>A run adds <code>thresholds/thresholds_YYMMDD-HHMM.tsv</code> only when it must create a table from usable object classifiers. It adds <code>tables/thresholding_summary.csv</code> only when thresholding is applied.</p>
+    <p>The threshold and cell-type files shown above appear after their corresponding stages. <code>qxy.generate_threshold_table()</code> adds <code>thresholds/thresholds_YYMMDD-HHMM.tsv</code> only when explicitly requested.</p>
 
     <h2>Technical Overview</h2>
     <p>QXYCell uses separate, rerunnable functions for validation and each core processing stage:</p>
@@ -253,8 +271,8 @@ qxy.celltype(adata)</code></pre>
         <p class="small">Performs read-only preflight inspection and validation. It discovers measurement tables, threshold definitions, object classifier JSONs, and GeoJSON files; lists every annotation and its planned AnnData assignment; and writes text/JSON reports. It does not generate a threshold table, apply thresholds, apply cell typing, or generate an LLM prompt.</p>
       </div>
       <div class="box">
-        <h3><code>run()</code></h3>
-        <p class="small">Performs the import. It loads measurements, derives <code>CoreID</code> only from an optional <code>TMA Core</code> column, maps every annotation and cell boundary WKT, and writes the base <code>.h5ad</code>. Thresholding and cell typing are optional (<code>apply_thresholds=True</code>, <code>celltype_logic=...</code>); defaults are off. The run log records whether each action occurred and its source. Run does not generate an LLM prompt.</p>
+        <h3>Staged API</h3>
+        <p class="small">The recommended API separates measurement import, annotations, threshold-source selection, prompt generation, and cell typing. Each successful stage checkpoints its owned columns and files. <code>qxy.run()</code> remains a compatibility wrapper over the import and annotation stages, with optional legacy thresholding and cell typing.</p>
       </div>
     </div>
 
@@ -320,7 +338,7 @@ qxy.celltype(adata, "celltype_logic.yaml")
     <p>QXYCell can generate a copy-pasteable prompt for an external LLM to draft a first-pass cell type logic YAML from the markers present in a loaded AnnData object:</p>
     <pre><code>prompt = qxy.celltype_prompt(adata)</code></pre>
     <p>By default, the prompt is printed to the active Python session and saved to:</p>
-    <pre><code>&lt;run-folder&gt;/celltype/celltype_prompt_YYMMDD_HHMMSS.txt</code></pre>
+    <pre><code>&lt;run-folder&gt;/celltype/current_prompt.txt</code></pre>
     <p>The generated YAML can be saved as:</p>
     <pre><code>&lt;run-folder&gt;/celltype/celltype_logic.yaml</code></pre>
     <p>and applied with:</p>

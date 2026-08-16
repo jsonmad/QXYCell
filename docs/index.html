@@ -11,8 +11,13 @@
       h1 { margin-bottom: 8px; font-size: 2.4rem; }
       .lead { color: var(--muted); font-size: 1.08rem; }
       .primary { border-left: 5px solid var(--accent); background: var(--soft); padding: 18px 20px; margin: 28px 0; }
+      .workflow { border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin: 28px 0; }
       .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
       .card { border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+      pre { overflow-x: auto; border-radius: 8px; background: #111827; color: #f8fafc; padding: 16px; line-height: 1.45; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+      .stage-list { margin: 14px 0; padding-left: 22px; }
+      .stage-list li { margin: 7px 0; }
       a { color: var(--accent); font-weight: 650; }
       p { margin: 0 0 10px; }
       @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
@@ -29,10 +34,35 @@
         <p><a href="qupath_preparation.md">Read the preparation guide</a> · <a href="QXYCell_QuPath_Preparation_Guide.pdf">Download the PDF</a></p>
       </section>
 
+      <section class="workflow">
+        <h2>The core staged workflow</h2>
+        <p>Build the analysis one checkpoint at a time. Every successful stage refreshes the active H5AD, <code>cells_obs.csv</code>, and <code>markers_var.csv</code>.</p>
+        <ol class="stage-list">
+          <li><strong>Measurements:</strong> create the base AnnData.</li>
+          <li><strong>Annotations:</strong> add or replace GeoJSON-derived data.</li>
+          <li><strong>Thresholds:</strong> explicitly choose classifier JSON or one threshold table.</li>
+          <li><strong>Prompt:</strong> generate the LLM prompt used to draft the YAML.</li>
+          <li><strong>Cell types:</strong> apply the reviewed YAML.</li>
+        </ol>
+        <pre><code>import qxycell as qxy
+
+adata = qxy.import_measurements("/path/to/qupath_project")
+qxy.add_annotations(adata, pixel_size_um=0.28)
+
+# Choose exactly one threshold source:
+qxy.threshold_from_classifiers(adata)
+# qxy.threshold_from_table(adata, "thresholds.tsv")
+
+qxy.celltype_prompt(adata, context="Describe the tissue and expected populations")
+qxy.celltype(adata)</code></pre>
+        <p><strong>Designed for iteration:</strong> after stage 1, rerun any changed stage. New GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results.</p>
+        <p><a href="QXYCell_overview.html">Read the staged workflow guide</a> · <a href="QXYCell_function_reference.html">See every stage parameter</a></p>
+      </section>
+
       <div class="grid">
         <section class="card">
           <h2>Overview</h2>
-          <p>Understand inputs, outputs, validation, and the QXYCell data model.</p>
+          <p>Follow the staged workflow, rerun rules, inputs, outputs, and AnnData model.</p>
           <a href="QXYCell_overview.html">Open overview</a>
         </section>
         <section class="card">
