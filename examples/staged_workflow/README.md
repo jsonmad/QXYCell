@@ -62,6 +62,29 @@ In PowerShell, the equivalent command is:
 python .\05_apply_celltypes.py
 ```
 
+### Optional step 6: plot spatial cell types
+
+After cell typing, create one spatial PNG per image:
+
+```bash
+python 06_plot_spatial_celltypes.py
+```
+
+In PowerShell:
+
+```powershell
+python .\06_plot_spatial_celltypes.py
+```
+
+The script lists every `qxy.plot_spatial()` option explicitly so you can edit
+the plot settings in one place. It keeps the QXYCell defaults except for
+`show=False`, which prevents interactive plot windows during command-line or
+remote runs. With the supplied options, PNG files are written to:
+
+```text
+OUTPUT_DIR/plots/spatial_celltypes/
+```
+
 ## Rerun changed stages
 
 Every successful script updates the same H5AD and exported tables. Rerun the
@@ -73,7 +96,8 @@ changed stage and any dependent stages:
 | Classifier JSON thresholds | `03a_threshold_from_classifiers.py`, then stages 4 and 5 |
 | Reviewed threshold table | `03b_threshold_from_table.py`, then stages 4 and 5 |
 | Prompt context | `04_generate_celltype_prompt.py` |
-| Cell-type YAML | `05_apply_celltypes.py` |
+| Cell-type YAML | `05_apply_celltypes.py`, then optionally `06_plot_spatial_celltypes.py` |
+| Spatial plot settings | `06_plot_spatial_celltypes.py` |
 
 Stage 1 rebuilds the base checkpoint from measurements. It is normally run
 once unless the measurement files themselves change.
@@ -81,4 +105,3 @@ once unless the measurement files themselves change.
 The two stage 3 scripts are deliberately independent. Classifier-only mode
 ignores threshold tables; table-only mode uses the configured table and never
 falls back to classifier JSON.
-
