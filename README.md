@@ -131,6 +131,9 @@ The two threshold functions are deliberately separate. Classifier-only
 thresholding ignores tables; table-only thresholding uses the named table and
 does not fall back to classifier JSON.
 
+For runnable files with one Python script per stage, see the
+[staged workflow examples](examples/staged_workflow/README.md).
+
 When the verified QuPath pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
