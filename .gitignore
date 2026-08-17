@@ -15,6 +15,7 @@ build/
 
 # Local agent, editor, and workflow state
 /.agents/
+/examples/staged_workflow/AGENTS.md
 /.codex/
 /.superpowers/
 /.vscode/
