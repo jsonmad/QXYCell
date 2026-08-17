@@ -4,6 +4,18 @@ These scripts run the core QXYCell workflow one checkpoint at a time. Each
 script has one job, so annotation GeoJSON, thresholds, prompt context, and
 cell-type YAML can be revised without reimporting the measurements.
 
+## Scripts or notebook
+
+The [QXYCell staged workflow notebook](QXYCell_staged_workflow.ipynb) and the
+numbered Python scripts implement the same staged workflow. Use the scripts
+from a terminal or the notebook for an interactive, cell-by-cell experience.
+
+In the notebook, edit the configuration cell, run stages 1 and 2, select
+`"classifiers"` or `"table"` for stage 3, and run stage 4. Pause to review the
+LLM-generated YAML with an expert before running stage 5. The optional stage 6
+creates the same spatial plots as `06_plot_spatial_celltypes.py`. The rerun
+rules below apply equally to notebook cells and numbered scripts.
+
 ## Configure once
 
 Activate the QXYCell environment, then edit [`config.py`](config.py):

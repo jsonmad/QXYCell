@@ -132,7 +132,10 @@ thresholding ignores tables; table-only thresholding uses the named table and
 does not fall back to classifier JSON.
 
 For runnable files with one Python script per stage, see the
-[staged workflow examples](examples/staged_workflow/README.md).
+[staged workflow examples](examples/staged_workflow/README.md). The
+[interactive notebook](examples/staged_workflow/QXYCell_staged_workflow.ipynb)
+and numbered scripts implement the same staged workflow; choose the notebook
+for a cell-by-cell experience or the scripts for terminal use.
 
 When the verified QuPath pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
