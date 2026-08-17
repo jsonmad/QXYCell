@@ -131,8 +131,8 @@
 
   <div class="note">
     <strong>Recommended staged workflow:</strong>
-    <code>import_measurements → add_annotations → threshold_from_classifiers/table → celltype_prompt → celltype</code>.
-    Stages after measurement import are rerunnable and replace their owned outputs in the same active H5AD and exported tables.
+    <code>import_measurements → add_annotations → optional remove_ignore → threshold_from_classifiers/table → celltype_prompt → celltype</code>.
+    Stages replace their outputs in the same active H5AD and exported tables. If ignore polygons change after cells have been removed, rebuild stages 1 and 2 before running the optional removal stage again.
   </div>
 
   <h2>Core QXYCell Functions</h2>

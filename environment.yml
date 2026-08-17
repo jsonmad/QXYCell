@@ -1,14 +1,16 @@
 name: qxycell
 channels:
   - conda-forge
-  - defaults
+  - nodefaults
 dependencies:
   - python>=3.10
   - pip
-  # Core scientific stack — installed via conda for reliable binaries
+  # Core scientific stack — installed together from conda-forge for compatible binaries
   - numpy>=1.24
   - pandas>=2.0
   - scipy>=1.10
+  - hdf5
+  - h5py
   - matplotlib>=3.8
   - pillow>=12.3.0
   - seaborn>=0.13

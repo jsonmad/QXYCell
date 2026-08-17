@@ -10,11 +10,12 @@ The [QXYCell staged workflow notebook](QXYCell_staged_workflow.ipynb) and the
 numbered Python scripts implement the same staged workflow. Use the scripts
 from a terminal or the notebook for an interactive, cell-by-cell experience.
 
-In the notebook, edit the configuration cell, run stages 1 and 2, select
-`"classifiers"` or `"table"` for stage 3, and run stage 4. Pause to review the
-LLM-generated YAML with an expert before running stage 5. The optional stage 6
-creates the same spatial plots as `06_plot_spatial_celltypes.py`. The rerun
-rules below apply equally to notebook cells and numbered scripts.
+In the notebook, edit the configuration cell, run stages 1 and 2, optionally
+run stage 2b to remove ignored regions, select `"classifiers"` or `"table"` for
+stage 3, and run stage 4. Pause to review the LLM-generated YAML with an expert
+before running stage 5. The optional stage 6 creates the same spatial plots as
+`06_plot_spatial_celltypes.py`. The rerun rules below apply equally to notebook
+cells and numbered scripts.
 
 ## Configure once
 
@@ -25,6 +26,7 @@ Activate the QXYCell environment, then edit [`config.py`](config.py):
 - `THRESHOLD_TABLE`: reviewed threshold CSV/TSV used only by stage 3B.
 - `CELLTYPE_YAML`: expert-reviewed cell-type logic applied by stage 5.
 - `PIXEL_SIZE_UM`: verified square-pixel size used to scale GeoJSON coordinates.
+- `IGNORE_ANNOTATION_TEXT`: case-insensitive text identifying exclusion annotations.
 - `CELLTYPE_CONTEXT`: tissue and project context added to the LLM prompt.
 
 Use an absolute path for `PROJECT_DIR` and `OUTPUT_DIR` on your computer. The
@@ -40,6 +42,9 @@ Run the scripts from this folder in numerical order.
 python 01_import_measurements.py
 python 02_add_annotations.py
 
+# Optional: remove cells inside annotations containing "ignore":
+python 02b_remove_ignore_annotations.py
+
 # Choose exactly one threshold source:
 python 03a_threshold_from_classifiers.py
 # OR: python 03b_threshold_from_table.py
@@ -52,6 +57,9 @@ python 04_generate_celltype_prompt.py
 ```powershell
 python .\01_import_measurements.py
 python .\02_add_annotations.py
+
+# Optional: remove cells inside annotations containing "ignore":
+python .\02b_remove_ignore_annotations.py
 
 # Choose exactly one threshold source:
 python .\03a_threshold_from_classifiers.py
@@ -104,7 +112,8 @@ changed stage and any dependent stages:
 
 | Changed input | Rerun |
 |---|---|
-| Annotation or cell GeoJSON | `02_add_annotations.py`, the chosen stage 3 script, then stages 4 and 5 |
+| Non-ignore annotation or cell GeoJSON | `02_add_annotations.py`, optionally stage 2b, the chosen stage 3 script, then stages 4 and 5 |
+| Ignore annotation polygons | Stages 1, 2, and 2b, the chosen stage 3 script, then stages 4 and 5 |
 | Classifier JSON thresholds | `03a_threshold_from_classifiers.py`, then stages 4 and 5 |
 | Reviewed threshold table | `03b_threshold_from_table.py`, then stages 4 and 5 |
 | Prompt context | `04_generate_celltype_prompt.py` |
@@ -113,6 +122,11 @@ changed stage and any dependent stages:
 
 Stage 1 rebuilds the base checkpoint from measurements. It is normally run
 once unless the measurement files themselves change.
+
+Stage 2b removes rows from the shared checkpoint. Running it repeatedly with
+unchanged annotations is safe, but removed cells cannot be restored from that
+checkpoint. If an ignore polygon is added, removed, or changed, rerun stages 1,
+2, and 2b in order before continuing downstream.
 
 The two stage 3 scripts are deliberately independent. Classifier-only mode
 ignores threshold tables; table-only mode uses the configured table and never

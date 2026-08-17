@@ -53,6 +53,9 @@ conda activate qxycell
 The environment file installs QXYCell and its scientific Python dependencies
 into the new environment.
 
+Compiled scientific dependencies, including `h5py` and HDF5, are installed
+together from `conda-forge` to prevent binary version mismatches.
+
 Verify the installation:
 
 ```bash
@@ -70,6 +73,11 @@ conda activate qxycell
 git pull
 conda env update -f environment.yml --prune
 ```
+
+The `--prune` option also removes packages from older environment definitions.
+If Conda reports an HDF5 or `h5py` conflict, deactivate and recreate the
+environment from `environment.yml` rather than mixing pip and Conda versions of
+these compiled libraries.
 
 ## Prepare data in QuPath
 
@@ -98,6 +106,9 @@ adata = qxy.import_measurements("/path/to/qupath_project")
 # Stage 2: add or refresh GeoJSON annotations and cell polygons
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
+# Optional Stage 2b: remove cells inside annotations containing "ignore"
+qxy.remove_ignore(adata, ignore_text="ignore")
+
 # Stage 3A: use QuPath classifier JSON thresholds only
 qxy.threshold_from_classifiers(adata)
 
@@ -117,11 +128,13 @@ qxy.celltype(adata)
 
 Stage 1 creates the base measurement checkpoint. Stages 2–5 update that same
 H5AD and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, so the
-analysis can be reviewed and revised without reimporting the measurements.
+analysis can be reviewed and revised without reimporting the measurements. The
+optional Stage 2b script also synchronizes the filtered H5AD and cells table.
 
 | When an input changes | Rerun | What QXYCell replaces |
 |---|---|---|
 | Annotation or cell GeoJSON | `qxy.add_annotations(adata)` | Annotation, sample, and cell-polygon columns; downstream stages become stale |
+| Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_ignore(adata)` | Rebuilds all cells before removing those inside the current ignore regions |
 | QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
 | A reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
 | Biological context for the prompt | `qxy.celltype_prompt(adata, context=...)` | `celltype/current_prompt.txt`; an expert-edited YAML is preserved |

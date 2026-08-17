@@ -171,7 +171,7 @@
     <p>The goal is to make QuPath outputs immediately usable with tools like Scanpy, Squidpy, pandas, and custom Python workflows.</p>
 
     <h2>Core Staged Workflow</h2>
-    <p>Stage 1 creates the base measurement checkpoint. Every later stage is independently rerunnable and refreshes the same active H5AD, <code>tables/cells_obs.csv</code>, and <code>tables/markers_var.csv</code>.</p>
+    <p>Stage 1 creates the base measurement checkpoint. Later stages refresh the same active H5AD, <code>tables/cells_obs.csv</code>, and <code>tables/markers_var.csv</code>. The optional ignore-removal stage deletes cells, so changed ignore polygons require rebuilding stages 1 and 2 first.</p>
     <pre><code>import qxycell as qxy
 
 qupath_project = "/path/to/qupath_project"
@@ -183,6 +183,9 @@ adata = qxy.import_measurements(qupath_project)
 
 # 2. Replace current GeoJSON-derived data
 qxy.add_annotations(adata, pixel_size_um=0.28)
+
+# Optional 2b. Remove cells inside annotations containing "ignore"
+qxy.remove_ignore(adata, ignore_text="ignore")
 
 # 3A. Use classifier JSON thresholds only
 qxy.threshold_from_classifiers(adata)
@@ -201,6 +204,7 @@ qxy.celltype(adata)</code></pre>
       <thead><tr><th>Changed input</th><th>Rerun</th><th>Replacement behaviour</th></tr></thead>
       <tbody>
         <tr><td>Annotation or cell GeoJSON</td><td><code>qxy.add_annotations(adata)</code></td><td>Replaces annotation, sample, and cell-polygon columns; invalidates thresholds and later stages.</td></tr>
+        <tr><td>Ignore annotation polygons</td><td>Rebuild stages 1 and 2, then run <code>qxy.remove_ignore(adata)</code></td><td>Restores the full measurement set before removing cells inside the current ignore regions.</td></tr>
         <tr><td>Classifier JSON thresholds</td><td><code>qxy.threshold_from_classifiers(adata)</code></td><td>Replaces marker positivity; ignores threshold tables; invalidates prompt, cell types, and post-analysis.</td></tr>
         <tr><td>Reviewed threshold table</td><td><code>qxy.threshold_from_table(adata, table)</code></td><td>Replaces marker positivity using only the named table; invalidates prompt, cell types, and post-analysis.</td></tr>
         <tr><td>Prompt context</td><td><code>qxy.celltype_prompt(adata, context=...)</code></td><td>Replaces <code>celltype/current_prompt.txt</code> but preserves an expert-edited YAML.</td></tr>

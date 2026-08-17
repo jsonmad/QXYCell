@@ -40,6 +40,7 @@
         <ol class="stage-list">
           <li><strong>Measurements:</strong> create the base AnnData.</li>
           <li><strong>Annotations:</strong> add or replace GeoJSON-derived data.</li>
+          <li><strong>Optional ignored regions:</strong> remove cells inside annotations containing <code>ignore</code>.</li>
           <li><strong>Thresholds:</strong> explicitly choose classifier JSON or one threshold table.</li>
           <li><strong>Prompt:</strong> generate the LLM prompt used to draft the YAML.</li>
           <li><strong>Cell types:</strong> apply the reviewed YAML.</li>
@@ -49,13 +50,16 @@
 adata = qxy.import_measurements("/path/to/qupath_project")
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
+# Optional: remove cells inside annotations containing "ignore"
+qxy.remove_ignore(adata, ignore_text="ignore")
+
 # Choose exactly one threshold source:
 qxy.threshold_from_classifiers(adata)
 # qxy.threshold_from_table(adata, "thresholds.tsv")
 
 qxy.celltype_prompt(adata, context="Describe the tissue and expected populations")
 qxy.celltype(adata)</code></pre>
-        <p><strong>Designed for iteration:</strong> after stage 1, rerun any changed stage. New GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results.</p>
+        <p><strong>Designed for iteration:</strong> new GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results. Because ignored-region removal deletes cells, changed ignore polygons require rerunning measurements, annotations, and ignored-region removal in order.</p>
         <p>The <a href="https://github.com/jsonmad/QXYCell/blob/main/examples/staged_workflow/QXYCell_staged_workflow.ipynb">interactive notebook</a> and numbered Python scripts implement the same staged workflow. Use the notebook cell by cell or run the scripts from a terminal.</p>
         <p><a href="https://github.com/jsonmad/QXYCell/tree/main/examples/staged_workflow">Download the step-by-step Python scripts</a> · <a href="QXYCell_overview.html">Read the staged workflow guide</a> · <a href="QXYCell_function_reference.html">See every stage parameter</a></p>
       </section>
