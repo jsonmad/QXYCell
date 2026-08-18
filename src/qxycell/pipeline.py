@@ -15,7 +15,7 @@ from qxycell.classifiers import parse_classifiers
 from qxycell.classifiers import parse_threshold_files
 from qxycell.classifiers import unresolved_threshold_conflicts
 from qxycell.celltyping import apply_celltypes
-from qxycell.checks import inspect_project
+from qxycell.checks import inspect_project, write_classifier_threshold_table
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import (
     _classification_name,
@@ -307,6 +307,7 @@ def _apply_threshold_definitions(
     threshold_source: str,
     threshold_source_kind: str,
     generated_threshold_template: str | None = None,
+    threshold_table_writer: Any | None = None,
     image_col: str = "Image",
     verbose: bool = True,
 ) -> dict[str, Any]:
@@ -368,6 +369,10 @@ def _apply_threshold_definitions(
             "files": [],
         }
     replacement = prepare_stage(adata, "thresholds")
+    if threshold_table_writer is not None:
+        generated_threshold_template = str(
+            Path(threshold_table_writer()).expanduser().resolve()
+        )
 
     for column in ("classifier_name", "threshold", "threshold_source"):
         if column in adata.var.columns:
@@ -415,11 +420,14 @@ def _apply_threshold_definitions(
     tables_dir.mkdir(parents=True, exist_ok=True)
     summary_path = tables_dir / "thresholding_summary.csv"
     pd.DataFrame([summary]).to_csv(summary_path, index=False)
+    stage_files = [summary_path]
+    if generated_threshold_template:
+        stage_files.append(Path(generated_threshold_template))
     complete_stage(
         adata,
         "thresholds",
         columns=active_pos_columns,
-        files=[summary_path],
+        files=stage_files,
         details={
             "source_kind": threshold_source_kind,
             "source_path": threshold_source,
@@ -442,7 +450,11 @@ def threshold_from_classifiers(
     image_col: str = "Image",
     verbose: bool = True,
 ) -> dict[str, Any]:
-    """Apply only QuPath classifier JSON thresholds, ignoring all tables."""
+    """Apply classifier JSON thresholds and save the applied threshold table.
+
+    Supplied threshold tables are ignored. A successful run writes or replaces
+    ``thresholds/classifier_thresholds.tsv`` in the active output directory.
+    """
 
     metadata = getattr(adata, "uns", {}).get("qxycell", {})
     if project_dir is None and isinstance(metadata, dict):
@@ -465,13 +477,19 @@ def threshold_from_classifiers(
     )
     if not simple_paths:
         raise ValueError("No usable QuPath classifier JSON thresholds are available.")
+    output_path = _threshold_output_dir(adata, output_dir)
     return _apply_threshold_definitions(
         adata,
         classifiers,
         project_dir=project_path,
-        output_path=_threshold_output_dir(adata, output_dir),
+        output_path=output_path,
         threshold_source="|".join(simple_paths),
         threshold_source_kind="object_classifiers",
+        threshold_table_writer=lambda: write_classifier_threshold_table(
+            project_path,
+            output_path,
+            classifiers,
+        ),
         image_col=image_col,
         verbose=verbose,
     )

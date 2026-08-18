@@ -453,20 +453,20 @@ def remove_ignore(
     adata,
     *,
     annotation_prefix: str = "annotation__",
-    ignore_text: str = "Ignore",
+    remove_cells: str = "ignore",
     copy: bool = False,
     verbose: bool = True,
 ):
-    """Remove cells that fall inside annotation columns containing ``ignore_text``.
+    """Remove cells inside annotations whose names contain ``remove_cells``.
 
     This is a convenience wrapper around :func:`remove_annotations` using
-    ``ignore_text="Ignore"`` by default.
+    ``remove_cells="ignore"`` by default.
     """
 
     return remove_annotations(
         adata,
         annotation_prefix=annotation_prefix,
-        text=ignore_text,
+        text=remove_cells,
         copy=copy,
         verbose=verbose,
     )

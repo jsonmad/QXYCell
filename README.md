@@ -74,11 +74,6 @@ git pull
 conda env update -f environment.yml --prune
 ```
 
-The `--prune` option also removes packages from older environment definitions.
-If Conda reports an HDF5 or `h5py` conflict, deactivate and recreate the
-environment from `environment.yml` rather than mixing pip and Conda versions of
-these compiled libraries.
-
 ## Prepare data in QuPath
 
 Before running QXYCell, follow the
@@ -106,11 +101,12 @@ adata = qxy.import_measurements("/path/to/qupath_project")
 # Stage 2: add or refresh GeoJSON annotations and cell polygons
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
-# Optional Stage 2b: remove cells inside annotations containing "ignore"
-qxy.remove_ignore(adata, ignore_text="ignore")
+# Optional Stage 2b: remove cells in tissue or staining artifact regions
+qxy.remove_ignore(adata, remove_cells="ignore")
 
 # Stage 3A: use QuPath classifier JSON thresholds only
 qxy.threshold_from_classifiers(adata)
+# Saves the applied values to thresholds/classifier_thresholds.tsv
 
 # Alternatively, stage 3B uses one named threshold table only:
 # table = qxy.generate_threshold_table("/path/to/qupath_project")
@@ -119,9 +115,12 @@ qxy.threshold_from_classifiers(adata)
 # Stage 4: create the prompt used to draft celltype_logic.yaml
 qxy.celltype_prompt(adata, context="Describe the tissue and expected populations")
 
-# Review the LLM-generated YAML, save it in the run's celltype folder,
-# then run stage 5
-qxy.celltype(adata)
+# Pause for expert review, then save the returned YAML
+# Stage 5: assign cell types from the reviewed YAML
+qxy.celltype(adata, "/path/to/celltype_logic.yaml")
+
+# Optional Stage 6: plot assigned cell types without opening GUI windows
+qxy.plot_spatial(adata, category_col="celltype", show=False)
 ```
 
 ### Why the workflow is staged
@@ -129,13 +128,15 @@ qxy.celltype(adata)
 Stage 1 creates the base measurement checkpoint. Stages 2–5 update that same
 H5AD and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, so the
 analysis can be reviewed and revised without reimporting the measurements. The
-optional Stage 2b script also synchronizes the filtered H5AD and cells table.
+optional Stage 2b removes cells inside user-labelled regions containing tissue
+artifacts, folds, debris, edge artifacts, or staining artifacts, then refreshes
+the filtered H5AD and `tables/cells_obs.csv`.
 
 | When an input changes | Rerun | What QXYCell replaces |
 |---|---|---|
 | Annotation or cell GeoJSON | `qxy.add_annotations(adata)` | Annotation, sample, and cell-polygon columns; downstream stages become stale |
-| Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_ignore(adata)` | Rebuilds all cells before removing those inside the current ignore regions |
-| QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
+| Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_ignore(adata, remove_cells="ignore")` | Rebuilds all cells before removing those inside tissue or staining artifact regions |
+| QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns and `thresholds/classifier_thresholds.tsv`; prompt, cell types, and post-analysis become stale |
 | A reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
 | Biological context for the prompt | `qxy.celltype_prompt(adata, context=...)` | `celltype/current_prompt.txt`; an expert-edited YAML is preserved |
 | Cell-type YAML | `qxy.celltype(adata)` | `celltype`, feature, derived-feature, count, and rule-summary outputs |
@@ -143,6 +144,11 @@ optional Stage 2b script also synchronizes the filtered H5AD and cells table.
 The two threshold functions are deliberately separate. Classifier-only
 thresholding ignores tables; table-only thresholding uses the named table and
 does not fall back to classifier JSON.
+
+Each successful classifier-only threshold run replaces
+`thresholds/classifier_thresholds.tsv` in the active output folder. This table
+records the classifier-derived values that were applied and can be reviewed or
+passed later to `qxy.threshold_from_table()`.
 
 For runnable files with one Python script per stage, see the
 [staged workflow examples](examples/staged_workflow/README.md). The
@@ -351,13 +357,15 @@ CD8       CD8: Median           0.31            0.29
 
 ## Annotations
 
-Remove cells inside `Ignore` regions (tissue folds, artefacts):
+Remove cells inside annotations drawn around tissue artifacts, tissue folds,
+debris, edge artifacts, or staining artifacts:
 
 ```python
-adata = qxy.remove_ignore(adata)
+adata = qxy.remove_ignore(adata, remove_cells="ignore")
 ```
 
-Removes rows from `adata.obs` in-place. Cells inside any `annotation__Ignore` polygon are dropped.
+The match is case-insensitive. Rows inside matching annotation polygons are
+removed from `adata.obs` in place.
 
 `qxy.add_annotations()` converts annotations with `Sample` in the label into one `Sample`
 column. Cells inside more than one sample annotation are labelled `Ambiguous`

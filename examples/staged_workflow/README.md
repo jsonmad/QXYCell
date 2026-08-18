@@ -11,10 +11,10 @@ numbered Python scripts implement the same staged workflow. Use the scripts
 from a terminal or the notebook for an interactive, cell-by-cell experience.
 
 In the notebook, edit the configuration cell, run stages 1 and 2, optionally
-run stage 2b to remove ignored regions, select `"classifiers"` or `"table"` for
-stage 3, and run stage 4. Pause to review the LLM-generated YAML with an expert
-before running stage 5. The optional stage 6 creates the same spatial plots as
-`06_plot_spatial_celltypes.py`. The rerun rules below apply equally to notebook
+run stage 2b to remove cells in tissue or staining artifact regions, select
+`"classifiers"` or `"table"` for stage 3, and run stage 4. Pause to review the
+LLM-generated YAML with an expert, then run stage 5 to assign cell types and
+optional stage 6 to plot them. The rerun rules below apply equally to notebook
 cells and numbered scripts.
 
 ## Configure once
@@ -42,7 +42,7 @@ Run the scripts from this folder in numerical order.
 python 01_import_measurements.py
 python 02_add_annotations.py
 
-# Optional: remove cells inside annotations containing "ignore":
+# Optional: remove cells in tissue/staining artifact annotations containing "ignore":
 python 02b_remove_ignore_annotations.py
 
 # Choose exactly one threshold source:
@@ -50,6 +50,10 @@ python 03a_threshold_from_classifiers.py
 # OR: python 03b_threshold_from_table.py
 
 python 04_generate_celltype_prompt.py
+
+# Pause here: review the generated YAML with an expert, then save it at CELLTYPE_YAML.
+python 05_apply_celltypes.py
+python 06_plot_spatial_celltypes.py  # Optional
 ```
 
 ### Windows PowerShell
@@ -58,7 +62,7 @@ python 04_generate_celltype_prompt.py
 python .\01_import_measurements.py
 python .\02_add_annotations.py
 
-# Optional: remove cells inside annotations containing "ignore":
+# Optional: remove cells in tissue/staining artifact annotations containing "ignore":
 python .\02b_remove_ignore_annotations.py
 
 # Choose exactly one threshold source:
@@ -66,6 +70,10 @@ python .\03a_threshold_from_classifiers.py
 # OR: python .\03b_threshold_from_table.py
 
 python .\04_generate_celltype_prompt.py
+
+# Pause here: review the generated YAML with an expert, then save it at CELLTYPE_YAML.
+python .\05_apply_celltypes.py
+python .\06_plot_spatial_celltypes.py  # Optional
 ```
 
 Stage 4 writes `OUTPUT_DIR/celltype/current_prompt.txt`. Copy that prompt into
@@ -128,6 +136,12 @@ unchanged annotations is safe, but removed cells cannot be restored from that
 checkpoint. If an ignore polygon is added, removed, or changed, rerun stages 1,
 2, and 2b in order before continuing downstream.
 
+Use stage 2b for annotations drawn around tissue folds, damaged tissue, debris,
+edge artifacts, staining artifacts, or other regions that should not contribute
+cells to the analysis.
+
 The two stage 3 scripts are deliberately independent. Classifier-only mode
 ignores threshold tables; table-only mode uses the configured table and never
-falls back to classifier JSON.
+falls back to classifier JSON. Classifier-only mode also writes the exact values
+it applied to `OUTPUT_DIR/thresholds/classifier_thresholds.tsv`; rerunning stage
+3A replaces that stable table.

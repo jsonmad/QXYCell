@@ -10,7 +10,7 @@ def main() -> None:
     qxy.remove_ignore(
         adata,
         annotation_prefix="annotation__",
-        ignore_text=IGNORE_ANNOTATION_TEXT,
+        remove_cells=IGNORE_ANNOTATION_TEXT,
         copy=False,
         verbose=True,
     )

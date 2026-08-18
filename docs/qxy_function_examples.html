@@ -436,9 +436,9 @@
               <div class="output"><p>The active H5AD and <code>cells_obs.csv</code> are refreshed.</p></div>
             </section><section class="card">
               <h3>qxy.threshold_from_classifiers()</h3>
-              <p>Stage 3A uses QuPath classifier JSON thresholds only and ignores threshold tables.</p>
+              <p>Stage 3A uses QuPath classifier JSON thresholds only, ignores supplied threshold tables, and saves the applied values to a stable reusable table.</p>
               <pre><code>summary = qxy.threshold_from_classifiers(adata)</code></pre>
-              <div class="output"><p>Conflicting classifier definitions produce an error for expert review.</p></div>
+              <div class="output"><p>Successful runs save or replace <code>thresholds/classifier_thresholds.tsv</code>. Conflicting classifier definitions produce an error for expert review.</p></div>
             </section><section class="card">
               <h3>qxy.threshold_from_table()</h3>
               <p>Stage 3B uses one named threshold table only and never falls back to classifier JSON.</p>
@@ -665,8 +665,8 @@
 </table></div>
             </section><section class="card">
               <h3>qxy.remove_ignore()</h3>
-              <p>Remove cells in annotation columns containing Ignore.</p>
-              <pre><code>clean = qxy.remove_ignore(adata, copy=True)</code></pre>
+              <p>Remove cells in tissue, edge, or staining artifact annotations whose names contain the configured text.</p>
+              <pre><code>clean = qxy.remove_ignore(adata, remove_cells="ignore", copy=True)</code></pre>
               <div class="output"><p>Before: 72 cells. After copy: 71 cells.</p></div>
             </section><section class="card">
               <h3>qxy.remove_annotations()</h3>

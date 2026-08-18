@@ -369,12 +369,17 @@ def _write_threshold_table(
     classifiers: list[ClassifierDefinition],
     *,
     always_timestamped: bool,
+    filename: str | None = None,
 ) -> Path:
     """Write a TSV threshold table."""
 
-    template_path = thresholds_dir / _threshold_template_filename(
-        thresholds_dir,
-        always_timestamped=always_timestamped,
+    template_path = thresholds_dir / (
+        filename
+        if filename is not None
+        else _threshold_template_filename(
+            thresholds_dir,
+            always_timestamped=always_timestamped,
+        )
     )
     rows, columns = _threshold_table_rows(measurement_files, classifiers)
     _write_csv(
@@ -813,6 +818,27 @@ def generate_threshold_table(
         measurement_files,
         classifiers,
         always_timestamped=True,
+    )
+
+
+def write_classifier_threshold_table(
+    project_dir: str | Path,
+    output_dir: str | Path,
+    classifiers: list[ClassifierDefinition],
+) -> Path:
+    """Replace the stable table containing classifier-derived thresholds."""
+
+    project_path = Path(project_dir).expanduser().resolve()
+    measurement_files = [
+        summarize_measurement_file(path, count_rows=False)
+        for path in discover_measurement_files(project_path)
+    ]
+    return _write_threshold_table(
+        threshold_tables_dir(project_path, output_dir=output_dir),
+        measurement_files,
+        classifiers,
+        always_timestamped=False,
+        filename="classifier_thresholds.tsv",
     )
 
 

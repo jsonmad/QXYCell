@@ -131,7 +131,7 @@
 
   <div class="note">
     <strong>Recommended staged workflow:</strong>
-    <code>import_measurements → add_annotations → optional remove_ignore → threshold_from_classifiers/table → celltype_prompt → celltype</code>.
+    <code>import_measurements → add_annotations → optional remove_ignore → threshold_from_classifiers/table → celltype_prompt → celltype → optional plot_spatial</code>.
     Stages replace their outputs in the same active H5AD and exported tables. If ignore polygons change after cells have been removed, rebuild stages 1 and 2 before running the optional removal stage again.
   </div>
 
@@ -178,9 +178,9 @@
       </tr>
       <tr>
         <td><code>qxy.threshold_from_classifiers</code></td>
-        <td>Stage 3A: replace marker positivity using QuPath classifier JSON thresholds only. Threshold tables are ignored and conflicting classifiers cause an error.</td>
+        <td>Stage 3A: replace marker positivity using QuPath classifier JSON thresholds only. Threshold tables are ignored, conflicting classifiers cause an error, and the applied values are saved to a stable threshold table.</td>
         <td><code>summary = qxy.threshold_from_classifiers(adata)</code></td>
-        <td>Refreshed <code>&lt;marker&gt;_pos</code> columns, H5AD, tables, and stage record.</td>
+        <td>Refreshed <code>&lt;marker&gt;_pos</code> columns, H5AD, tables, stage record, and <code>thresholds/classifier_thresholds.tsv</code>.</td>
       </tr>
       <tr>
         <td><code>qxy.threshold_from_table</code></td>
@@ -220,8 +220,8 @@
       </tr>
       <tr>
         <td><code>qxy.remove_ignore</code></td>
-        <td>Remove cells inside annotation columns containing <code>Ignore</code>.</td>
-        <td><code>qxy.remove_ignore(adata)</code></td>
+        <td>Remove cells in annotation columns identifying tissue folds, damaged tissue, debris, edge artifacts, staining artifacts, or other excluded regions.</td>
+        <td><code>qxy.remove_ignore(adata, remove_cells="ignore")</code></td>
         <td>Filters <code>adata</code> in place by default.</td>
       </tr>
       <tr>
@@ -364,16 +364,18 @@ qupath_project = "/path/to/qupath_project"
 
 adata = qxy.import_measurements(qupath_project)
 qxy.add_annotations(adata)
+qxy.remove_ignore(adata, remove_cells="ignore")  # optional artifact removal
 qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
-qxy.remove_ignore(adata)
+# Classifier mode saves/replaces thresholds/classifier_thresholds.tsv
 
 prompt = qxy.celltype_prompt(
     adata,
     context="Add biological/project context here."
 )
 
-# Save YAML returned by an LLM into the run celltype folder, then:
-summary = qxy.celltype(adata)
+# Save and review the YAML returned by an LLM, then:
+summary = qxy.celltype(adata, "/path/to/celltype_logic.yaml")
+qxy.plot_spatial(adata, category_col="celltype", show=False)
 
 qxy.add_metadata(
     adata,
@@ -444,7 +446,7 @@ qxy.save(adata)</code></pre>
       <tr><td><code>qxy.check()</code></td><td>Reports each measurement, classifier name, threshold, and source. Writes <code>tables/classifier_conflicts.csv</code>.</td></tr>
       <tr><td>Table generation</td><td>Adds candidate-provenance columns, sets <code>classifier_conflict=True</code>, and leaves all affected image cells blank.</td></tr>
       <tr><td><code>qxy.import_measurements()</code></td><td>Imports measurements independently while threshold conflicts await review.</td></tr>
-      <tr><td><code>qxy.threshold_from_classifiers()</code></td><td>Raises an error for direct conflicting JSON definitions.</td></tr>
+      <tr><td><code>qxy.threshold_from_classifiers()</code></td><td>Raises an error for direct conflicting JSON definitions; otherwise saves the applied values to <code>thresholds/classifier_thresholds.tsv</code>.</td></tr>
       <tr><td><code>qxy.threshold_from_table()</code></td><td>Raises an error for conflict-marked rows with any missing image value.</td></tr>
       <tr><td>Resolved table</td><td>One numeric value per image is applied by exact match to <code>adata.obs["Image"]</code>. Values may differ between images.</td></tr>
       <tr><td>Reapplication</td><td>Rerunning thresholding removes old threshold-dependent cell-type outputs; rerun <code>qxy.celltype()</code> to regenerate labels.</td></tr>
