@@ -25,7 +25,7 @@ def workflow(
     """Run the common QXYCell notebook workflow and return AnnData."""
 
     from qxycell.celltyping import apply_celltypes
-    from qxycell.filtering import remove_ignore
+    from qxycell.filtering import remove_cells
     from qxycell.metadata import add_metadata
     from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata, run
     from qxycell.plotting import plot_spatial, plot_stacked_bar
@@ -57,7 +57,7 @@ def workflow(
         )
 
     if remove_ignore_cells:
-        remove_ignore(adata, verbose=verbose)
+        remove_cells(adata, verbose=verbose)
 
     if celltype_logic is not None:
         apply_celltypes(adata, celltype_logic, verbose=verbose)

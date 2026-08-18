@@ -449,7 +449,7 @@ def remove_annotations(
     return filtered
 
 
-def remove_ignore(
+def remove_cells(
     adata,
     *,
     annotation_prefix: str = "annotation__",

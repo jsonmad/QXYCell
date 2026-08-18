@@ -131,7 +131,7 @@
 
   <div class="note">
     <strong>Recommended staged workflow:</strong>
-    <code>import_measurements → add_annotations → optional remove_ignore → threshold_from_classifiers/table → celltype_prompt → celltype → optional plot_spatial</code>.
+    <code>import_measurements → add_annotations → optional remove_cells → threshold_from_classifiers/table → celltype_prompt → celltype → optional plot_spatial</code>.
     Stages replace their outputs in the same active H5AD and exported tables. If ignore polygons change after cells have been removed, rebuild stages 1 and 2 before running the optional removal stage again.
   </div>
 
@@ -219,9 +219,9 @@
         <td>Adds <code>adata.obs["celltype"]</code> and saves a rule summary TSV.</td>
       </tr>
       <tr>
-        <td><code>qxy.remove_ignore</code></td>
+        <td><code>qxy.remove_cells</code></td>
         <td>Remove cells in annotation columns identifying tissue folds, damaged tissue, debris, edge artifacts, staining artifacts, or other excluded regions.</td>
-        <td><code>qxy.remove_ignore(adata, remove_cells="ignore")</code></td>
+        <td><code>qxy.remove_cells(adata, remove_cells="ignore")</code></td>
         <td>Filters <code>adata</code> in place by default.</td>
       </tr>
       <tr>
@@ -364,7 +364,7 @@ qupath_project = "/path/to/qupath_project"
 
 adata = qxy.import_measurements(qupath_project)
 qxy.add_annotations(adata)
-qxy.remove_ignore(adata, remove_cells="ignore")  # optional artifact removal
+qxy.remove_cells(adata, remove_cells="ignore")  # optional artifact removal
 qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
 # Classifier mode saves/replaces thresholds/classifier_thresholds.tsv
 

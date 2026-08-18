@@ -185,7 +185,7 @@ adata = qxy.import_measurements(qupath_project)
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
 # Optional 2b. Remove cells in tissue/staining artifact annotations
-qxy.remove_ignore(adata, remove_cells="ignore")
+qxy.remove_cells(adata, remove_cells="ignore")
 
 # 3A. Use classifier JSON thresholds only
 qxy.threshold_from_classifiers(adata)
@@ -208,7 +208,7 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)</code></pre>
       <thead><tr><th>Changed input</th><th>Rerun</th><th>Replacement behaviour</th></tr></thead>
       <tbody>
         <tr><td>Annotation or cell GeoJSON</td><td><code>qxy.add_annotations(adata)</code></td><td>Replaces annotation, sample, and cell-polygon columns; invalidates thresholds and later stages.</td></tr>
-        <tr><td>Ignore annotation polygons</td><td>Rebuild stages 1 and 2, then run <code>qxy.remove_ignore(adata, remove_cells="ignore")</code></td><td>Restores the full measurement set before removing cells inside the current tissue or staining artifact regions.</td></tr>
+        <tr><td>Ignore annotation polygons</td><td>Rebuild stages 1 and 2, then run <code>qxy.remove_cells(adata, remove_cells="ignore")</code></td><td>Restores the full measurement set before removing cells inside the current tissue or staining artifact regions.</td></tr>
         <tr><td>Classifier JSON thresholds</td><td><code>qxy.threshold_from_classifiers(adata)</code></td><td>Replaces marker positivity and <code>thresholds/classifier_thresholds.tsv</code>; ignores supplied threshold tables; invalidates prompt, cell types, and post-analysis.</td></tr>
         <tr><td>Reviewed threshold table</td><td><code>qxy.threshold_from_table(adata, table)</code></td><td>Replaces marker positivity using only the named table; invalidates prompt, cell types, and post-analysis.</td></tr>
         <tr><td>Prompt context</td><td><code>qxy.celltype_prompt(adata, context=...)</code></td><td>Replaces <code>celltype/current_prompt.txt</code> but preserves an expert-edited YAML.</td></tr>
@@ -272,7 +272,7 @@ qupath_project_run_YYMMDD_HHMM/
     <pre><code>qxy.check(project_dir)
 adata = qxy.import_measurements(project_dir)
 qxy.add_annotations(adata)
-qxy.remove_ignore(adata, remove_cells="ignore")  # optional artifact removal
+qxy.remove_cells(adata, remove_cells="ignore")  # optional artifact removal
 qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
 qxy.celltype_prompt(adata)
 qxy.celltype(adata, "/path/to/celltype_logic.yaml")
@@ -376,7 +376,7 @@ qxy.plot_spatial(adata_cn, underlay_adata=adata,
     <p>GeoJSON annotation labels remain ordinary <code>annotation__&lt;label&gt;</code> columns even when their text matches an explicit measurement CoreID.</p>
     <p>GeoJSON files are also parsed for these feature types:</p>
     <ul>
-      <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_ignore()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
+      <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_cells()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
       <li><strong>TMA core polygons</strong> (<code>objectType: tmaCore</code>) — reported by <code>qxy.check()</code> and <code>qxy.run()</code>, but never used for CoreID assignment.</li>
       <li><strong>Cell polygons</strong> (<code>objectType: cell</code>) — matched to cells by QuPath Object ID and stored as WKT strings in <code>adata.obs["cell_polygon_wkt"]</code>. These can be plotted with <code>qxy.plot_cell_boundaries()</code>.</li>
     </ul>

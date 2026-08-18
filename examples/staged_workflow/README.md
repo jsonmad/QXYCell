@@ -43,7 +43,7 @@ python 01_import_measurements.py
 python 02_add_annotations.py
 
 # Optional: remove cells in tissue/staining artifact annotations containing "ignore":
-python 02b_remove_ignore_annotations.py
+python 02b_remove_cells_by_annotations.py
 
 # Choose exactly one threshold source:
 python 03a_threshold_from_classifiers.py
@@ -63,7 +63,7 @@ python .\01_import_measurements.py
 python .\02_add_annotations.py
 
 # Optional: remove cells in tissue/staining artifact annotations containing "ignore":
-python .\02b_remove_ignore_annotations.py
+python .\02b_remove_cells_by_annotations.py
 
 # Choose exactly one threshold source:
 python .\03a_threshold_from_classifiers.py

@@ -9,7 +9,7 @@ from qxycell.filtering import assign_annotations
 from qxycell.filtering import assign_core_ids_from_measurements
 from qxycell.filtering import assign_samples
 from qxycell.filtering import remove_annotations
-from qxycell.filtering import remove_ignore
+from qxycell.filtering import remove_cells
 from qxycell.io_utils import load, load_latest, save
 from qxycell.metadata import add_metadata
 from qxycell.pipeline import (
@@ -70,7 +70,7 @@ __all__ = [
     "plot_stacked_bar",
     "qc",
     "remove_annotations",
-    "remove_ignore",
+    "remove_cells",
     "run",
     "save",
     "threshold",

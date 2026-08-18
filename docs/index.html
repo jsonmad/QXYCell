@@ -52,7 +52,7 @@ adata = qxy.import_measurements("/path/to/qupath_project")
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
 # Optional: remove cells in tissue/staining artifact annotations
-qxy.remove_ignore(adata, remove_cells="ignore")
+qxy.remove_cells(adata, remove_cells="ignore")
 
 # Choose exactly one threshold source:
 qxy.threshold_from_classifiers(adata)

@@ -102,7 +102,7 @@ adata = qxy.import_measurements("/path/to/qupath_project")
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
 # Optional Stage 2b: remove cells in tissue or staining artifact regions
-qxy.remove_ignore(adata, remove_cells="ignore")
+qxy.remove_cells(adata, remove_cells="ignore")
 
 # Stage 3A: use QuPath classifier JSON thresholds only
 qxy.threshold_from_classifiers(adata)
@@ -135,7 +135,7 @@ the filtered H5AD and `tables/cells_obs.csv`.
 | When an input changes | Rerun | What QXYCell replaces |
 |---|---|---|
 | Annotation or cell GeoJSON | `qxy.add_annotations(adata)` | Annotation, sample, and cell-polygon columns; downstream stages become stale |
-| Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_ignore(adata, remove_cells="ignore")` | Rebuilds all cells before removing those inside tissue or staining artifact regions |
+| Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_cells(adata, remove_cells="ignore")` | Rebuilds all cells before removing those inside tissue or staining artifact regions |
 | QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns and `thresholds/classifier_thresholds.tsv`; prompt, cell types, and post-analysis become stale |
 | A reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
 | Biological context for the prompt | `qxy.celltype_prompt(adata, context=...)` | `celltype/current_prompt.txt`; an expert-edited YAML is preserved |
@@ -361,7 +361,7 @@ Remove cells inside annotations drawn around tissue artifacts, tissue folds,
 debris, edge artifacts, or staining artifacts:
 
 ```python
-adata = qxy.remove_ignore(adata, remove_cells="ignore")
+adata = qxy.remove_cells(adata, remove_cells="ignore")
 ```
 
 The match is case-insensitive. Rows inside matching annotation polygons are

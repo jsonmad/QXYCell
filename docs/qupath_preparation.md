@@ -85,7 +85,7 @@ Annotations define regions used for segmentation and downstream grouping.
 ### QXYCell annotation conventions
 
 - A label containing `Sample` (case-insensitive) defines a sample boundary. Examples: `Sample A`, `Sample_01`, `Tumour Sample`.
-- A label containing `Ignore` is imported as an annotation that can be removed with `qxy.remove_ignore(adata)`.
+- A label containing `Ignore` is imported as an annotation that can be removed with `qxy.remove_cells(adata)`.
 - Other labels become boolean columns named `annotation__<safe_label>` in `adata.obs`.
 - Annotation labels do not create `CoreID`. QXYCell creates `CoreID` only from an exported measurement column named exactly `TMA Core`.
 - Cells inside more than one sample annotation are reported as conflicts rather than silently assigned.
