@@ -224,7 +224,6 @@ only for the corresponding downstream features:
 - **Object classifier JSONs** *(alternative threshold-template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. When no threshold table exists, QXYCell can convert these JSONs into a fresh timestamped table for review. Existing threshold tables remain the active source.
 - **Annotation GeoJSON** *(optional)* — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude. Annotation labels never create or replace `CoreID` values.
 - **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
-- **TMA core GeoJSON** *(optional)* — TMA core boundary objects are reported by `qxy.check()` but are not used for core assignment.
 
 Required measurement columns: `Image`, `Object ID`, `Centroid X µm`, `Centroid Y µm`.
 The known encoding variants `Centroid X ¬µm` and `Centroid Y ¬µm` are accepted and
@@ -235,7 +234,7 @@ scaled by `qxy.add_annotations(..., pixel_size_um=...)`; the default is `0.28`. 
 image's square-pixel calibration in QuPath before running QXYCell.
 An optional QuPath measurement column named exactly `TMA Core` is preserved and
 converted into categorical `adata.obs["CoreID"]` by `qxy.import_measurements()`. QXYCell does
-not infer `CoreID` from `Parent` or GeoJSON annotations. If the measurement
+not infer `CoreID` from any other source. If the measurement
 table has no `TMA Core` column, the resulting AnnData has no `CoreID` column
 and the check report lists zero CoreIDs.
 
@@ -731,11 +730,24 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 
 ## TMA and CoreID
 
-QXYCell recognizes core IDs only when the cell measurement table contains
-QuPath's `TMA Core` column. `qxy.import_measurements()` preserves it and creates `CoreID`.
+TMA core identity enters QXYCell through the QuPath cell measurement export.
+Use this workflow:
+
+1. Create and label the TMA grid in QuPath using the commands under **TMA**.
+2. Confirm that the detected cells are associated with the intended cores.
+3. Choose **Measure > Export measurements**, select the project images, set
+   **Export type** to cells, and choose a tab separator.
+4. Export `measurements.tsv` and confirm that the selected columns include the
+   exact column name `TMA Core`.
+5. Run `qxy.import_measurements()`. QXYCell preserves `TMA Core` and
+   automatically creates categorical `CoreID`.
+
+QuPath documents the [TMA grid commands](https://qupath.readthedocs.io/en/stable/docs/reference/commands.html#tma)
+and the [project measurement exporter](https://qupath.readthedocs.io/en/stable/docs/tutorials/exporting_measurements.html).
 
 ```python
 adata = qxy.import_measurements(project_dir)
+adata.obs[["TMA Core", "CoreID"]].head()
 adata.obs["CoreID"].value_counts()
 ```
 
@@ -743,11 +755,8 @@ The output is a categorical `adata.obs["CoreID"]`, and the summary is stored in
 `adata.uns["qxycell_core_ids_from_measurements"]` and
 `adata.uns["qxycell"]["measurement_core_assignment"]`.
 
-`Parent`, annotation GeoJSON labels, and GeoJSON `tmaCore` objects never create
-`CoreID`. If the measurement table has no `TMA Core` column, QXYCell reports
+If the measurement table has no `TMA Core` column, QXYCell reports
 zero CoreIDs and does not add `adata.obs["CoreID"]`.
-All ordinary annotation labels remain available as `annotation__<label>`
-columns even when their text matches a measurement CoreID value.
 
 ## Save and load
 

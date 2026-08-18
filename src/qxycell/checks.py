@@ -53,7 +53,6 @@ class CheckReport:
     geojson_files: list[GeoJsonFile]
     messages: list[Message]
     measurement_core_counts: dict[str, int] | None = None
-    geojson_core_annotation_counts: dict[str, int] | None = None
     active_threshold_source: Path | None = None
     active_threshold_source_kind: str = "none"
     generated_threshold_template: Path | None = None
@@ -87,10 +86,6 @@ class CheckReport:
     @property
     def n_annotation_features(self) -> int:
         return self.geojson_object_count("annotation")
-
-    @property
-    def n_tma_core_features(self) -> int:
-        return self.geojson_object_count("tmaCore")
 
     @property
     def n_cell_features(self) -> int:
@@ -145,32 +140,6 @@ class CheckReport:
     @property
     def n_measurement_core_cells(self) -> int:
         return sum(int(count) for count in (self.measurement_core_counts or {}).values())
-
-    @property
-    def n_geojson_core_annotation_features(self) -> int:
-        return sum(
-            int(count) for count in (self.geojson_core_annotation_counts or {}).values()
-        )
-
-    @property
-    def geojson_tma_core_counts(self) -> dict[str, int]:
-        counts: Counter[str] = Counter(self.geojson_core_annotation_counts or {})
-        for geojson_file in self.geojson_files:
-            for object_type, labels in geojson_file.labels_by_object_type.items():
-                if object_type.lower() != "tmacore":
-                    continue
-                for label, count in labels.items():
-                    if label and label.lower() not in {"", "none", "null"}:
-                        counts[label] += int(count)
-        return dict(sorted(counts.items()))
-
-    @property
-    def n_geojson_tma_core_ids(self) -> int:
-        return len(self.geojson_tma_core_counts)
-
-    @property
-    def n_geojson_tma_core_features(self) -> int:
-        return sum(int(count) for count in self.geojson_tma_core_counts.values())
 
     @property
     def report_path(self) -> Path:
@@ -260,17 +229,12 @@ class CheckReport:
             "geojson_files": [item.to_dict() for item in self.geojson_files],
             "geojson_object_counts": {
                 "annotation": self.n_annotation_features,
-                "tmaCore": self.n_tma_core_features,
                 "cell": self.n_cell_features,
             },
             "annotation_label_counts": self.annotation_label_counts,
             "annotation_obs_columns": self.annotation_obs_columns,
             "annotation_assignments": self.annotation_assignments,
             "measurement_core_counts": dict(self.measurement_core_counts or {}),
-            "geojson_core_annotation_counts": dict(
-                self.geojson_core_annotation_counts or {}
-            ),
-            "geojson_tma_core_counts": self.geojson_tma_core_counts,
             "messages": [item.to_dict() for item in self.messages],
         }
 
@@ -542,24 +506,6 @@ def _measurement_core_counts(
     return dict(sorted(counts.items()))
 
 
-def _geojson_core_annotation_counts(
-    geojson_files: list[GeoJsonFile],
-    measurement_core_counts: dict[str, int],
-) -> dict[str, int]:
-    measurement_labels = set(measurement_core_counts)
-    if not measurement_labels:
-        return {}
-    counts: Counter[str] = Counter()
-    for geojson_file in geojson_files:
-        for object_type, labels in geojson_file.labels_by_object_type.items():
-            if object_type.lower() != "annotation":
-                continue
-            for label, count in labels.items():
-                if label in measurement_labels:
-                    counts[label] += int(count)
-    return dict(sorted(counts.items()))
-
-
 def _write_report(report: CheckReport) -> None:
     report.output_dir.mkdir(parents=True, exist_ok=True)
     tables_dir = report.output_dir / "tables"
@@ -575,11 +521,8 @@ def _write_report(report: CheckReport) -> None:
         if label and label.lower() not in ("", "none", "null"):
             target[label] = target.get(label, 0) + count
 
-    # Aggregate labels by GeoJSON object type. QuPath GeoJSON files can include
-    # annotation polygons, TMA cores, and individual cell objects in the same
-    # file; the check report should not mix those categories.
+    # Aggregate supported annotation and cell labels independently.
     annotation_labels: dict[str, int] = {}
-    tma_labels: dict[str, int] = {}
     cell_labels: dict[str, int] = {}
     for gf in report.geojson_files:
         for object_type, labels in gf.labels_by_object_type.items():
@@ -587,8 +530,6 @@ def _write_report(report: CheckReport) -> None:
             for label, count in labels.items():
                 if object_type_lower == "annotation":
                     _add_label_count(annotation_labels, label, count)
-                elif object_type_lower == "tmacore":
-                    _add_label_count(tma_labels, label, count)
                 elif object_type_lower == "cell":
                     _add_label_count(cell_labels, label, count)
 
@@ -660,7 +601,6 @@ def _write_report(report: CheckReport) -> None:
         f"GeoJSON files: {len(report.geojson_files)}",
         "GeoJSON object counts:",
         f"  Annotation features: {report.n_annotation_features}",
-        f"  QuPath tmaCore objects: {report.n_tma_core_features}",
         f"  Cell features     : {report.n_cell_features}",
         "Measurement CoreID column:",
         f"  Unique CoreIDs    : {report.n_measurement_core_labels}",
@@ -674,7 +614,6 @@ def _write_report(report: CheckReport) -> None:
         f"  Other    : {_fmt_labels(other_labels)}",
         "Planned AnnData assignments from annotations:",
         *annotation_assignment_lines,
-        f"TMA cores: {_fmt_labels(tma_labels)}",
         f"  Cell labels: {_fmt_labels(cell_labels)}",
         "",
         "Messages:",
@@ -976,10 +915,6 @@ def inspect_project(
     geojson_files = summarize_geojson_files(geojson_paths)
     messages.extend(validate_geojson_files(geojson_files))
     measurement_core_counts = _measurement_core_counts(measurement_files)
-    geojson_core_annotation_counts = _geojson_core_annotation_counts(
-        geojson_files,
-        measurement_core_counts,
-    )
 
     report = CheckReport(
         project_dir=project_path,
@@ -989,7 +924,6 @@ def inspect_project(
         geojson_files=geojson_files,
         messages=messages,
         measurement_core_counts=measurement_core_counts,
-        geojson_core_annotation_counts=geojson_core_annotation_counts,
         active_threshold_source=active_threshold_source,
         active_threshold_source_kind=active_threshold_source_kind,
         generated_threshold_template=generated_threshold_path,

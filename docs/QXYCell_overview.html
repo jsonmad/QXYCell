@@ -372,16 +372,14 @@ qxy.plot_spatial(adata_cn, underlay_adata=adata,
                  sample_col="Sample", category_col="cn")</code></pre>
 
     <h2>Annotation and TMA Core Handling</h2>
-    <p>QXYCell uses core IDs only when the measurement table contains QuPath's <code>TMA Core</code> column. It does not infer core IDs from <code>Parent</code> or GeoJSON annotation labels. Without <code>TMA Core</code>, no <code>adata.obs["CoreID"]</code> column is created.</p>
-    <p>GeoJSON annotation labels remain ordinary <code>annotation__&lt;label&gt;</code> columns even when their text matches an explicit measurement CoreID.</p>
+    <p>QXYCell uses core IDs only when the cell measurement table contains QuPath's exact <code>TMA Core</code> column. <code>qxy.import_measurements()</code> preserves that column and automatically creates categorical <code>adata.obs["CoreID"]</code>. Without <code>TMA Core</code>, no <code>CoreID</code> column is created.</p>
     <p>GeoJSON files are also parsed for these feature types:</p>
     <ul>
       <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_cells()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>
-      <li><strong>TMA core polygons</strong> (<code>objectType: tmaCore</code>) — reported by <code>qxy.check()</code> and <code>qxy.run()</code>, but never used for CoreID assignment.</li>
       <li><strong>Cell polygons</strong> (<code>objectType: cell</code>) — matched to cells by QuPath Object ID and stored as WKT strings in <code>adata.obs["cell_polygon_wkt"]</code>. These can be plotted with <code>qxy.plot_cell_boundaries()</code>.</li>
     </ul>
     <p>Cell boundary GeoJSON features are matched to cells by QuPath Object ID. Annotation geometry is applied by spatial containment of cell centroids.</p>
-    <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels or between annotations and TMA cores are expected geometry and are not flagged. Conflicts are written to:</p>
+    <p>Annotation conflicts are flagged only when the <em>same annotation column</em> is triggered more than once for a single cell — i.e. two overlapping polygons of the same label. Overlaps between different annotation labels are not flagged. Conflicts are written to:</p>
     <pre><code>tables/annotation_conflicts.csv</code></pre>
 
     <h2>Current Plotting Defaults</h2>

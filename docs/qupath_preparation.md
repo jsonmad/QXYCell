@@ -162,6 +162,24 @@ Centroid X µm
 Centroid Y µm
 ```
 
+### Include TMA core identity in the measurement export
+
+For a tissue microarray project:
+
+1. Create and label the grid with the commands under **TMA**.
+2. Confirm that detected cells are associated with the intended cores.
+3. In **Measure > Export measurements**, keep **Export type** set to cells and
+   choose a tab separator.
+4. Include the exact column `TMA Core` and export `measurements.tsv`.
+5. Check the exported header before running QXYCell.
+
+`qxy.import_measurements()` preserves `TMA Core` and automatically creates the
+categorical `CoreID` column. If `TMA Core` is absent, QXYCell does not create
+`CoreID`.
+
+QuPath documents the [TMA grid commands](https://qupath.readthedocs.io/en/stable/docs/reference/commands.html#tma)
+and the [project measurement exporter](https://qupath.readthedocs.io/en/stable/docs/tutorials/exporting_measurements.html).
+
 One table may contain cells from multiple images. Large tables may contain millions of rows; do not resave them from spreadsheet software that may truncate rows, alter identifiers, or change headers.
 
 ## 7. Export annotation GeoJSON
@@ -278,6 +296,7 @@ Plot cell centroids and annotation or cell boundaries as a final alignment check
 - [ ] Pixel width and height are equal and the scalar value is recorded.
 - [ ] Segmentation visually reviewed across representative regions.
 - [ ] `measurements.csv` or `measurements.tsv` contains all required columns.
+- [ ] TMA projects include the exact `TMA Core` column in the cell measurement export.
 - [ ] Annotation GeoJSON filenames match their image stems exactly.
 - [ ] Cell GeoJSON retains the Object IDs used in the measurement export.
 - [ ] Classifier JSONs are simple single-measurement classifiers where used.

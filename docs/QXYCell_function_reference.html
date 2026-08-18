@@ -458,7 +458,7 @@ qxy.celltype(adata, "celltype_logic.yaml")</code></pre>
   <h2>TMA CoreID Commands</h2>
 
   <div class="note">
-    <strong>CoreID assignment:</strong> QXYCell recognizes only QuPath's measurement-table <code>TMA Core</code> column. <code>Parent</code>, annotation labels, and GeoJSON <code>tmaCore</code> objects never create CoreID values.
+    <strong>CoreID assignment:</strong> QXYCell recognizes only QuPath's exact measurement-table <code>TMA Core</code> column. <code>qxy.import_measurements()</code> preserves it and automatically creates categorical <code>CoreID</code> values.
   </div>
 
   <table>

@@ -62,11 +62,15 @@ def summarize_geojson_file(path: str | Path) -> GeoJsonFile:
         class_counts: collections.Counter[str] = collections.Counter()
         name_counts: collections.Counter[str] = collections.Counter()
         labels_by_object_type: dict[str, collections.Counter[str]] = {}
+        n_supported_features = 0
         for feature in features:
             properties = feature.get("properties", {}) if isinstance(feature, dict) else {}
             if not isinstance(properties, dict):
                 properties = {}
             object_type = str(properties.get("objectType") or "unknown")
+            if object_type.lower() not in {"annotation", "cell"}:
+                continue
+            n_supported_features += 1
             object_type_counts[object_type] += 1
             class_counts[_classification_name(properties)] += 1
             name_counts[str(properties.get("name") or "")] += 1
@@ -75,7 +79,7 @@ def summarize_geojson_file(path: str | Path) -> GeoJsonFile:
                 labels_by_object_type[object_type][label] += 1
         return GeoJsonFile(
             path=path,
-            n_features=len(features),
+            n_features=n_supported_features,
             object_type_counts=dict(object_type_counts),
             class_counts=dict(class_counts),
             name_counts=dict(name_counts),
@@ -188,6 +192,8 @@ def load_cell_polygons(
             properties = feature.get("properties") or {}
             if not isinstance(properties, dict):
                 properties = {}
+            if str(properties.get("objectType") or "").lower() != "cell":
+                continue
 
             # QuPath stores the Object ID as the top-level GeoJSON feature "id"
             # field, not inside "properties". Fall back to property keys for
