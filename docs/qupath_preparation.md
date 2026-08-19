@@ -1,6 +1,6 @@
 # Preparing multiplex immunofluorescence data in QuPath for QXYCell
 
-**Applies to:** QuPath 0.7.0 and QXYCell 0.1 alpha
+**Applies to:** QuPath 0.7.0 and QXYCell 0.1
 
 **Purpose:** create the measurement, annotation, segmentation, and classifier assets that QXYCell can validate and import.
 
@@ -20,40 +20,39 @@ The only unconditional input is a QuPath cell measurement table. Other assets in
 
 Keep every exported input inside the QuPath project folder and pass that one folder to QXYCell. QXYCell discovers files recursively, so the assets may be arranged in subfolders such as `qxycell_input`. Do not create a second input directory. Keep generated QXYCell output folders beside the project folder, not inside it.
 
-## 1. Verify every image before analysis
+## 1. Verify the image and pixel size
 
-Perform these checks in QuPath for every project image. Do not assume that OME-TIFF metadata is complete or correct.
+Open each project image in QuPath and confirm that it is the intended
+fluorescence image or series, that the expected marker channels are present,
+and that there is no obvious channel misregistration.
 
-- [ ] The intended image and series opens without an image-reader error.
-- [ ] The image is fluorescence, not a rendered RGB snapshot.
-- [ ] Width, height, channel count, bit depth, z-slices, and timepoints match the intended acquisition.
-- [ ] Each channel has the expected marker/fluorophore identity and visible biological signal.
-- [ ] Channels are spatially registered; obvious inter-channel displacement has been corrected upstream.
-- [ ] Blank, saturated, corrupted, or unexpectedly clipped channels have been investigated.
-- [ ] The **Image** tab reports pixel width and pixel height in micrometres (`µm`).
-- [ ] Pixel width and height are plausible for the microscope and acquisition settings.
-- [ ] Pixel width equals pixel height. QXYCell currently supports square pixels only.
-- [ ] The pixel size selected for QXYCell is recorded with the analysis.
+In the **Image** tab, check the pixel calibration before analysis:
 
-QuPath reads pixel calibration from the image metadata when possible, but the metadata can be absent or wrong. Pixel size is the important physical scale; nominal objective magnification is not a substitute.
+- Pixel width and pixel height are reported in micrometres (`µm`).
+- The values are plausible for the microscope and acquisition settings.
+- Pixel width equals pixel height. QXYCell currently supports square pixels only.
+- Record the verified pixel size with the analysis.
+
+QuPath reads pixel calibration from image metadata when possible, but the
+metadata can be absent or wrong. Pixel size is the important physical scale;
+nominal objective magnification is not a substitute.
 
 ### Choose the QXYCell pixel size
 
 QXYCell's default is **0.28 µm/pixel**. Use the default only when the verified QuPath pixel size is 0.28 µm in both directions.
 
-For another square-pixel size, pass the verified value when QXYCell imports the data:
+Import the cell measurements first, then pass the verified pixel size when
+adding annotation and cell GeoJSON geometry:
 
 ```python
-adata = qxy.run(
-    "/path/to/qupath_project",
-    pixel_size_um=0.325,
-)
+adata = qxy.import_cells("/path/to/qupath_project")
+qxy.add_annotations(adata, pixel_size_um=0.325)
 ```
 
-Command-line equivalent:
+The terminal command performs Stage 1 only:
 
 ```bash
-qxycell run /path/to/qupath_project --pixel-size-um 0.325
+qxycell import-cells /path/to/qupath_project
 ```
 
 The value must be one positive, finite number. Do not average unequal pixel width and height values. Correct or re-export an anisotropic image before using this QXYCell workflow.
@@ -67,7 +66,7 @@ Why this matters: QuPath's exported centroid columns are already in micrometres,
 3. Add the source images by dragging them into QuPath or choosing **File > Project… > Add images**.
 4. If a file contains multiple images or series, enable the image selector and import only the intended series.
 5. Set the image type to fluorescence where required.
-6. Open every project entry and complete the image verification checklist above.
+6. Open every project entry and verify the image and pixel size as described above.
 7. Save the project.
 
 QuPath stores links to the source images. If images are moved, use **File > Project… > Check project URIs** to repair their locations.
@@ -77,18 +76,31 @@ QuPath stores links to the source images. If images are moved, use **File > Proj
 Annotations define regions used for segmentation and downstream grouping.
 
 1. Select a drawing tool such as Rectangle, Ellipse, Polygon, Brush, or Wand.
-2. Draw the analysis region on the image. For whole-image analysis, use **Objects > Annotations… > Create full image annotation**.
+2. Draw the required analysis regions on the image.
 3. Assign every exported annotation a meaningful QuPath classification or name.
 4. Avoid overlapping annotations that represent mutually exclusive samples.
 5. Save the image data.
 
 ### QXYCell annotation conventions
 
-- A label containing `Sample` (case-insensitive) defines a sample boundary. Examples: `Sample A`, `Sample_01`, `Tumour Sample`.
-- A label containing `Ignore` is imported as an annotation that can be removed with `qxy.remove_cells(adata)`.
-- Other labels become boolean columns named `annotation__<safe_label>` in `adata.obs`.
-- Annotation labels do not create `CoreID`. QXYCell creates `CoreID` only from an exported measurement column named exactly `TMA Core`.
-- Cells inside more than one sample annotation are reported as conflicts rather than silently assigned.
+- Include the word `sample` anywhere in each sample annotation name. Matching is
+  case-insensitive. For example, `Sample_01`, `sample_tumour`, and
+  `PatientA Sample` are automatically imported into `adata.obs["Sample"]`;
+  the complete annotation name becomes the sample value.
+- Use unique sample annotation names and avoid overlaps. Cells inside more than
+  one sample annotation are labelled `Ambiguous` and reported as conflicts.
+- Give every region that should later be excluded a common word in its name.
+  For example, name regions `Ignore_fold`, `Ignore_edge`, and
+  `Ignore_staining`, then remove their cells with
+  `qxy.remove_cells(adata, remove_cells="ignore")`. The matching word can be
+  changed, but the same word must be used consistently in the annotation names
+  and the `remove_cells=` argument.
+- Other annotation labels become boolean columns named
+  `annotation__<safe_label>` in `adata.obs`.
+- QuPath TMA core assignments are not imported from annotation GeoJSON. Create
+  the TMA grid in QuPath before cell detection and measurement export. QuPath
+  then includes each cell's grid assignment in the measurement table column
+  named exactly `TMA Core`, which QXYCell converts to `CoreID`.
 
 ## 4. Segment cells with InstanSeg
 
@@ -115,7 +127,7 @@ InstanSeg is the recommended workflow represented here, but QXYCell does not req
 
 Use the verified physical calibration: InstanSeg models operate at a physical resolution and QuPath uses pixel calibration when rescaling image data. A successful run is not proof that segmentation is biologically accurate; visual review remains required.
 
-## 5. Review measurements and optional marker classifiers
+## 5. Review cell measurements
 
 ### Confirm cell measurements
 
@@ -128,19 +140,6 @@ Open **Measure > Show detection measurements** and confirm that the cell rows co
 - `TMA Core` when a QuPath TMA grid is used and core identity is required
 
 QXYCell imports marker columns whose names contain `mean` or `median` (case-insensitive). Confirm that the intended marker measurements use one of those summaries.
-
-### Create optional marker thresholds
-
-For each marker that requires a QuPath-derived starting threshold:
-
-1. Choose **Classify > Object classification > Create single measurement classifier**.
-2. Filter to cells.
-3. Select one marker measurement, preferably a reviewed mean or median measurement from the appropriate compartment.
-4. Set the below/above-threshold classes and enable live preview.
-5. Review positive and negative cells across representative images and tissue conditions.
-6. Save the classifier with a short, unique marker-based name.
-
-QXYCell reads simple single-measurement classifier JSONs. Composite or malformed classifiers are reported but are not converted into threshold rows. Classifier thresholds are starting definitions: generate and review the QXYCell threshold table before applying positivity.
 
 ## 6. Export the cell measurement table
 
@@ -173,7 +172,7 @@ For a tissue microarray project:
 4. Include the exact column `TMA Core` and export `measurements.tsv`.
 5. Check the exported header before running QXYCell.
 
-`qxy.import_measurements()` preserves `TMA Core` and automatically creates the
+`qxy.import_cells()` preserves `TMA Core` and automatically creates the
 categorical `CoreID` column. If `TMA Core` is absent, QXYCell does not create
 `CoreID`.
 
@@ -182,7 +181,24 @@ and the [project measurement exporter](https://qupath.readthedocs.io/en/stable/d
 
 One table may contain cells from multiple images. Large tables may contain millions of rows; do not resave them from spreadsheet software that may truncate rows, alter identifiers, or change headers.
 
-## 7. Export annotation GeoJSON
+## 7. Create optional marker thresholds
+
+Marker thresholds are separate from the cell measurement table, but they must
+be created after cells have been segmented so the classifier can be previewed
+and reviewed on cell measurements.
+
+For each marker that requires a QuPath-derived starting threshold:
+
+1. Choose **Classify > Object classification > Create single measurement classifier**.
+2. Filter to cells.
+3. Select one marker measurement, preferably a reviewed mean or median measurement from the appropriate compartment.
+4. Set the below/above-threshold classes and enable live preview.
+5. Review positive and negative cells across representative images and tissue conditions.
+6. Save the classifier with a short, unique marker-based name.
+
+QXYCell reads simple single-measurement classifier JSONs. Composite or malformed classifiers are reported but are not converted into threshold rows. Classifier thresholds are starting definitions: generate and review the QXYCell threshold table before applying positivity.
+
+## 8. Export annotation GeoJSON
 
 Repeat for every image that has annotations to import.
 
@@ -204,7 +220,7 @@ Examples:
 
 QXYCell matches annotation geometry to image rows by this stem. A file named `slide01-annotations.geojson` will not match `slide01.ome.tif`.
 
-## 8. Export cell GeoJSON
+## 9. Export cell GeoJSON
 
 Cell GeoJSON is optional but required for `cell_polygon_wkt` and cell-boundary plots.
 
@@ -219,7 +235,7 @@ QXYCell matches cell polygons to measurement rows by QuPath Object ID. Do not re
 
 For very large images, cell GeoJSON can be large. Export one image at a time and verify that the feature count is plausible.
 
-## 9. Organize the QuPath project folder
+## 10. Organize the QuPath project folder
 
 Recommended layout:
 
@@ -245,7 +261,7 @@ qupath_project/
 
 The source OME-TIFF files do not have to be copied into the QuPath project folder when the project contains valid links to their existing locations. Measurements, GeoJSON, classifiers, and project-level threshold tables must remain inside the project folder so QXYCell has one location to search for inputs.
 
-## 10. Run the QXYCell preflight
+## 11. Run the QXYCell preflight
 
 ```python
 import qxycell as qxy
@@ -267,18 +283,19 @@ Review `check_report.txt`, `check_report.json`, and the tables in the generated 
 
 The QXYCell check validates exported assets; it cannot confirm microscope calibration, channel identity, registration, biological staining quality, or segmentation accuracy. Those remain explicit QuPath pre-verification points.
 
-## 11. Run QXYCell
+## 12. Import cells and add annotations
 
-Use the default only for verified 0.28 µm square pixels:
+Import the cell measurements to create the base AnnData checkpoint:
 
 ```python
-adata = qxy.run(project_dir)
+adata = qxy.import_cells(project_dir)
 ```
 
-Otherwise provide the recorded QuPath value:
+Then import GeoJSON geometry using the recorded pixel size. Use `0.28` only
+for verified 0.28 µm square pixels:
 
 ```python
-adata = qxy.run(project_dir, pixel_size_um=0.325)
+qxy.add_annotations(adata, pixel_size_um=0.325)
 ```
 
 After import, confirm the stored audit value:
@@ -301,7 +318,7 @@ Plot cell centroids and annotation or cell boundaries as a final alignment check
 - [ ] Cell GeoJSON retains the Object IDs used in the measurement export.
 - [ ] Classifier JSONs are simple single-measurement classifiers where used.
 - [ ] `qxy.check()` errors resolved and warnings reviewed.
-- [ ] `qxy.run()` uses the verified `pixel_size_um` value.
+- [ ] `qxy.add_annotations()` uses the verified `pixel_size_um` value.
 - [ ] Spatial overlay alignment reviewed after import.
 
 ## Troubleshooting

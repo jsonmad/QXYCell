@@ -179,7 +179,7 @@ qupath_project = "/path/to/qupath_project"
 report = qxy.check(qupath_project)
 
 # 1. Base AnnData from measurements
-adata = qxy.import_measurements(qupath_project)
+adata = qxy.import_cells(qupath_project)
 
 # 2. Replace current GeoJSON-derived data
 qxy.add_annotations(adata, pixel_size_um=0.28)
@@ -215,12 +215,12 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)</code></pre>
         <tr><td>Cell-type YAML</td><td><code>qxy.celltype(adata)</code></td><td>Replaces prior cell type, feature, derived-feature, count, and rule-summary outputs.</td></tr>
       </tbody>
     </table>
-    <p>The <a href="https://github.com/jsonmad/QXYCell/blob/main/examples/staged_workflow/QXYCell_staged_workflow.ipynb">interactive notebook</a> and <a href="https://github.com/jsonmad/QXYCell/tree/main/examples/staged_workflow">numbered Python scripts</a> implement the same staged workflow. Use the notebook for a cell-by-cell experience or run each script from a terminal.</p>
+    <p>The <a href="https://github.com/jsonmad/QXYCell/blob/main/staged_workflow/QXYCell_staged_workflow.ipynb">interactive notebook</a> and <a href="https://github.com/jsonmad/QXYCell/tree/main/staged_workflow">numbered Python scripts</a> implement the same staged workflow. Use the notebook for a cell-by-cell experience or run each script from a terminal.</p>
 
     <p>If no output folder is supplied, <code>qxy.check(...)</code> writes reports to:</p>
     <pre><code>../qupath_project_check_YYMMDD_HHMM/</code></pre>
 
-    <p>The saved <code>.h5ad</code> from <code>qxy.import_measurements(...)</code> is written by default to:</p>
+    <p>The saved <code>.h5ad</code> from <code>qxy.import_cells(...)</code> is written by default to:</p>
     <pre><code>../qupath_project_run_YYMMDD_HHMM/h5ad/qxycell.h5ad</code></pre>
 
     <h2>Inputs</h2>
@@ -270,7 +270,7 @@ qupath_project_run_YYMMDD_HHMM/
     <h2>Technical Overview</h2>
     <p>QXYCell uses separate, rerunnable functions for validation and each core processing stage:</p>
     <pre><code>qxy.check(project_dir)
-adata = qxy.import_measurements(project_dir)
+adata = qxy.import_cells(project_dir)
 qxy.add_annotations(adata)
 qxy.remove_cells(adata, remove_cells="ignore")  # optional artifact removal
 qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
@@ -285,12 +285,12 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)</code></pre>
       </div>
       <div class="box">
         <h3>Staged API</h3>
-        <p class="small">The recommended API separates measurement import, annotations, threshold-source selection, prompt generation, and cell typing. Each successful stage checkpoints its owned columns and files. <code>qxy.run()</code> remains a compatibility wrapper over the import and annotation stages, with optional legacy thresholding and cell typing.</p>
+        <p class="small">The API separates cell import, annotations, threshold-source selection, prompt generation, and cell typing. Each successful stage checkpoints its owned columns and files so later stages can be rerun explicitly.</p>
       </div>
     </div>
 
     <h2>AnnData Layout</h2>
-    <p><code>adata.X</code> contains the raw marker measurement matrix imported by <code>qxy.import_measurements()</code>. One of the two explicit threshold stages later adds marker positivity columns to <code>adata.obs</code>. Re-running a threshold stage replaces its positivity columns and removes downstream cell-type and feature columns because those labels depend on the prior thresholds.</p>
+    <p><code>adata.X</code> contains the raw marker measurement matrix imported by <code>qxy.import_cells()</code>. One of the two explicit threshold stages later adds marker positivity columns to <code>adata.obs</code>. Re-running a threshold stage replaces its positivity columns and removes downstream cell-type and feature columns because those labels depend on the prior thresholds.</p>
     <p><code>adata.obs</code> contains per-cell metadata and computed annotations:</p>
     <pre><code>Image
 Object ID
@@ -372,7 +372,7 @@ qxy.plot_spatial(adata_cn, underlay_adata=adata,
                  sample_col="Sample", category_col="cn")</code></pre>
 
     <h2>Annotation and TMA Core Handling</h2>
-    <p>QXYCell uses core IDs only when the cell measurement table contains QuPath's exact <code>TMA Core</code> column. <code>qxy.import_measurements()</code> preserves that column and automatically creates categorical <code>adata.obs["CoreID"]</code>. Without <code>TMA Core</code>, no <code>CoreID</code> column is created.</p>
+    <p>QXYCell uses core IDs only when the cell measurement table contains QuPath's exact <code>TMA Core</code> column. <code>qxy.import_cells()</code> preserves that column and automatically creates categorical <code>adata.obs["CoreID"]</code>. Without <code>TMA Core</code>, no <code>CoreID</code> column is created.</p>
     <p>GeoJSON files are also parsed for these feature types:</p>
     <ul>
       <li><strong>Annotation polygons</strong> (<code>objectType: annotation</code>) — regular labels become boolean <code>annotation__&lt;label&gt;</code> columns. Labels containing <code>Sample</code> collapse into one <code>adata.obs["Sample"]</code> column. Ignore annotations remain removable with <code>qxy.remove_cells()</code> or <code>qxy.remove_annotations(adata, text="Ignore")</code>.</li>

@@ -534,11 +534,12 @@ def plot_annotation_polygons(
 ) -> dict[str, object]:
     """Plot QuPath annotation GeoJSON polygons in one figure per image.
 
-    Annotation geometry is reloaded from ``project_dir`` because ``qxy.run()``
-    stores per-cell annotation membership in AnnData, not the original polygon
-    coordinates. When ``project_dir`` is omitted, the original run folder is
-    read from ``adata.uns["qxycell"]["project_dir"]``. Coordinates are scaled
-    using the run's stored ``pixel_size_um`` unless explicitly overridden.
+    Annotation geometry is reloaded from ``project_dir`` because
+    ``qxy.add_annotations()`` stores per-cell annotation membership in AnnData,
+    not the original polygon coordinates. When ``project_dir`` is omitted, the
+    original run folder is read from ``adata.uns["qxycell"]["project_dir"]``.
+    Coordinates are scaled using the run's stored ``pixel_size_um`` unless
+    explicitly overridden.
     By default, cell locations are shown beneath boundary-only polygons as a
     coarse 2D density raster. Pass ``fill=True`` to add translucent polygon
     fills. The raster avoids drawing millions of individual cell points.
@@ -1218,8 +1219,9 @@ def plot_cell_boundaries(
     """Create spatial plots from cell boundary polygons instead of dot centroids.
 
     Cell polygons are read from ``adata.obs[polygon_col]`` as WKT strings. This
-    column is created by ``qxy.run()`` when cell GeoJSON boundaries are present,
-    or by ``qxy.load_cell_polygons()``. Pass ``label_celltypes="Tumor"`` or a
+    column is created by ``qxy.add_annotations()`` when cell GeoJSON boundaries
+    are present, or by ``qxy.load_cell_polygons()``. Pass
+    ``label_celltypes="Tumor"`` or a
     list of labels to annotate representative cells from only those cell types.
     Labels use the cell type colour by default; pass ``label_color`` to override.
     By default, each sample is centered on the geometric bounding box of the
@@ -1246,8 +1248,8 @@ def plot_cell_boundaries(
     if polygon_col not in adata.obs.columns:
         raise KeyError(
             f"Cell polygon column not found in adata.obs: {polygon_col!r}. "
-            "Run qxy.run() with cell GeoJSON files present or call "
-            "qxy.load_cell_polygons(adata, project_dir)."
+            "Run qxy.add_annotations(adata) with cell GeoJSON files present or "
+            "call qxy.load_cell_polygons(adata, project_dir)."
         )
 
     output_dir = _resolve_plot_dir(adata, output_dir) / "cell_boundaries"

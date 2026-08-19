@@ -100,7 +100,8 @@ def cn_knn(
         )
     if "spatial" not in adata.obsm:
         raise ValueError(
-            "adata.obsm['spatial'] not found. Run qxy.run() first to populate spatial coordinates."
+            "adata.obsm['spatial'] not found. Run qxy.import_cells() first to populate "
+            "spatial coordinates."
         )
 
     # --- setup ---

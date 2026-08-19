@@ -14,7 +14,6 @@ from qxycell.classifiers import measurement_columns_for_threshold_template
 from qxycell.classifiers import parse_classifiers
 from qxycell.classifiers import parse_threshold_files
 from qxycell.classifiers import unresolved_threshold_conflicts
-from qxycell.celltyping import apply_celltypes
 from qxycell.checks import inspect_project, write_classifier_threshold_table
 from qxycell.filtering import assign_core_ids_from_measurements, assign_samples
 from qxycell.geojson import (
@@ -33,7 +32,7 @@ from qxycell.measurements import (
     validate_measurement_files,
 )
 from qxycell.paths import resolve_output_dir
-from qxycell.stage_state import checkpoint_outputs, complete_stage, prepare_stage
+from qxycell.stage_state import complete_stage, prepare_stage
 
 CENTROID_OBS_COLUMN_RENAMES = {
     "Centroid X µm": "Xµm",
@@ -48,7 +47,7 @@ def _import_runtime_dependencies():
         import pandas as pd
     except ImportError as exc:
         raise ImportError(
-            "QXYCell run() requires the package runtime dependencies. "
+            "QXYCell requires the package runtime dependencies. "
             "Install with `pip install .` from this repo, or `pip install qxycell` "
             "once the package is published."
         ) from exc
@@ -232,8 +231,8 @@ def apply_thresholds(
     """Apply marker threshold definitions to an existing AnnData object.
 
     This step adds ``<marker>_pos`` columns to ``adata.obs``. It is separate
-    from ``qxy.run()``, which imports measurement intensities, spatial
-    coordinates, and annotation metadata into AnnData.
+    from ``qxy.import_cells()``, which imports measurement intensities and
+    spatial coordinates into AnnData.
     """
 
     metadata = getattr(adata, "uns", {}).get("qxycell", {})
@@ -788,14 +787,14 @@ def _apply_annotations(
     return []
 
 
-def import_measurements(
+def import_cells(
     project_dir: str | Path,
     output_dir: str | Path | None = None,
     *,
     fail_on_check_error: bool = True,
     verbose: bool = True,
 ) -> Any:
-    """Create the base AnnData checkpoint from QuPath measurement tables only."""
+    """Create the base AnnData cell checkpoint from QuPath measurement tables."""
 
     ad, np, pd = _import_runtime_dependencies()
     project_path = Path(project_dir).expanduser().resolve()
@@ -1004,76 +1003,3 @@ def add_annotations(
             f"{n_cell_polygons:,} matched cell polygons"
         )
     return summary
-
-
-def run(
-    project_dir: str | Path,
-    output_dir: str | Path | None = None,
-    *,
-    fail_on_check_error: bool = True,
-    pixel_size_um: float = 0.28,
-    threshold_file: str | Path | None = None,
-    apply_thresholds: bool = False,
-    celltype_logic: str | Path | dict[str, Any] | None = None,
-    verbose: bool = True,
-) -> Any:
-    """Run the staged measurement and annotation pipeline as one convenience call."""
-
-    pixel_size_um = _validate_pixel_size_um(pixel_size_um)
-    adata = import_measurements(
-        project_dir,
-        output_dir=output_dir,
-        fail_on_check_error=fail_on_check_error,
-        verbose=verbose,
-    )
-    add_annotations(
-        adata,
-        project_dir=project_dir,
-        pixel_size_um=pixel_size_um,
-        verbose=verbose,
-    )
-    thresholding_summary = None
-    if apply_thresholds:
-        thresholding_summary = globals()["apply_thresholds"](
-            adata,
-            project_dir=project_dir,
-            threshold_file=threshold_file,
-            output_dir=output_dir,
-            verbose=verbose,
-        )
-
-    celltyping_summary = None
-    if celltype_logic is not None:
-        if not any(str(column).endswith("_pos") for column in adata.obs.columns):
-            raise ValueError(
-                "celltype_logic requires marker positivity columns. Apply classifier "
-                "or table thresholds first, or pass apply_thresholds=True."
-            )
-        celltyping_summary = apply_celltypes(
-            adata,
-            celltype_logic,
-            celltype_dir=resolve_output_dir(adata=adata) / "celltype",
-            verbose=verbose,
-        )
-
-    metadata = adata.uns.setdefault("qxycell", {})
-    metadata["pixel_size_um"] = pixel_size_um
-    metadata["thresholding"] = thresholding_summary
-    metadata["celltyping"] = celltyping_summary
-    metadata["llm_prompt_generated"] = False
-    metadata["llm_prompt_path"] = None
-    checkpoint_outputs(adata)
-    output_path = resolve_output_dir(adata=adata)
-    log_lines = [
-        "QXYCell staged run complete",
-        f"Project: {Path(project_dir).expanduser().resolve()}",
-        f"Output: {output_path}",
-        "Stages: measurements, annotations",
-        f"Thresholds applied: {'yes' if thresholding_summary is not None else 'no'}",
-        f"Cell typing applied: {'yes' if celltyping_summary is not None else 'no'}",
-        "LLM prompt generated: no",
-    ]
-    (output_path / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
-    if verbose:
-        print("QXYCell staged run complete")
-    return adata

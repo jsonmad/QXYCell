@@ -15,11 +15,6 @@ The resulting AnnData object can be used with downstream tools such as
 [SpatialData](https://spatialdata.scverse.org/en/stable/) workflow when image,
 label, or shape elements are also needed.
 
-> [!IMPORTANT]
-> QXYCell is alpha software being released on GitHub for testing. It is not yet
-> available from PyPI. Interfaces and output details may change while the first
-> public workflows are evaluated.
-
 ## Contents
 
 - [Installation](#installation)
@@ -34,12 +29,11 @@ label, or shape elements are also needed.
 - [Cellular neighbourhoods](#cellular-neighbourhoods)
 - [Plots and heatmaps](#spatial-plots)
 - [Save and load](#save-and-load)
-- [Compatibility workflow shortcut](#compatibility-workflow-shortcut)
+- [Optional workflow shortcut](#optional-workflow-shortcut)
 
 ## Installation
 
-QXYCell requires Python 3.10 or newer. During alpha testing, install it from a
-clone of this GitHub repository.
+QXYCell requires Python 3.10 or newer.
 
 ### Create the QXYCell environment
 
@@ -52,9 +46,6 @@ conda activate qxycell
 
 The environment file installs QXYCell and its scientific Python dependencies
 into the new environment.
-
-Compiled scientific dependencies, including `h5py` and HDF5, are installed
-together from `conda-forge` to prevent binary version mismatches.
 
 Verify the installation:
 
@@ -96,7 +87,7 @@ import qxycell as qxy
 report = qxy.check("/path/to/qupath_project")
 
 # Stage 1: import the measurement table into AnnData
-adata = qxy.import_measurements("/path/to/qupath_project")
+adata = qxy.import_cells("/path/to/qupath_project")
 
 # Stage 2: add or refresh GeoJSON annotations and cell polygons
 qxy.add_annotations(adata, pixel_size_um=0.28)
@@ -151,8 +142,8 @@ records the classifier-derived values that were applied and can be reviewed or
 passed later to `qxy.threshold_from_table()`.
 
 For runnable files with one Python script per stage, see the
-[staged workflow examples](examples/staged_workflow/README.md). The
-[interactive notebook](examples/staged_workflow/QXYCell_staged_workflow.ipynb)
+[staged workflow examples](staged_workflow/README.md). The
+[interactive notebook](staged_workflow/QXYCell_staged_workflow.ipynb)
 and numbered scripts implement the same staged workflow; choose the notebook
 for a cell-by-cell experience or the scripts for terminal use.
 
@@ -169,7 +160,7 @@ from full-resolution pixels into micrometres. Do not average unequal pixel width
 and height values—QXYCell does not support non-square pixels.
 
 When called, `qxy.check()` writes a timestamped sibling check folder.
-`qxy.import_measurements()` creates the timestamped sibling run folder used by
+`qxy.import_cells()` creates the timestamped sibling run folder used by
 all later stages:
 
 ```text
@@ -233,7 +224,7 @@ QuPath GeoJSON geometry is stored in full-resolution pixel coordinates and is
 scaled by `qxy.add_annotations(..., pixel_size_um=...)`; the default is `0.28`. Verify the
 image's square-pixel calibration in QuPath before running QXYCell.
 An optional QuPath measurement column named exactly `TMA Core` is preserved and
-converted into categorical `adata.obs["CoreID"]` by `qxy.import_measurements()`. QXYCell does
+converted into categorical `adata.obs["CoreID"]` by `qxy.import_cells()`. QXYCell does
 not infer `CoreID` from any other source. If the measurement
 table has no `TMA Core` column, the resulting AnnData has no `CoreID` column
 and the check report lists zero CoreIDs.
@@ -296,7 +287,7 @@ threshold_path = qxy.generate_threshold_table(
 )
 ```
 
-`qxy.import_measurements()` and `qxy.add_annotations()` do not apply or select
+`qxy.import_cells()` and `qxy.add_annotations()` do not apply or select
 thresholds. Choose `qxy.threshold_from_classifiers()` to use only QuPath
 classifier JSON files, or `qxy.threshold_from_table()` to use only the named
 table. Neither function silently falls back to the other source.
@@ -739,14 +730,14 @@ Use this workflow:
    **Export type** to cells, and choose a tab separator.
 4. Export `measurements.tsv` and confirm that the selected columns include the
    exact column name `TMA Core`.
-5. Run `qxy.import_measurements()`. QXYCell preserves `TMA Core` and
+5. Run `qxy.import_cells()`. QXYCell preserves `TMA Core` and
    automatically creates categorical `CoreID`.
 
 QuPath documents the [TMA grid commands](https://qupath.readthedocs.io/en/stable/docs/reference/commands.html#tma)
 and the [project measurement exporter](https://qupath.readthedocs.io/en/stable/docs/tutorials/exporting_measurements.html).
 
 ```python
-adata = qxy.import_measurements(project_dir)
+adata = qxy.import_cells(project_dir)
 adata.obs[["TMA Core", "CoreID"]].head()
 adata.obs["CoreID"].value_counts()
 ```
@@ -796,20 +787,20 @@ adata = qxy.load("path/to/qxycell.h5ad")
 
 | Location | Added by | Contents |
 |---|---|---|
-| `adata.obs["Image"]` | `qxy.import_measurements()` | QuPath image name per cell |
-| `adata.obs["Xµm"]`, `adata.obs["Yµm"]` | `qxy.import_measurements()` | Cell centroid x/y coordinates in microns |
+| `adata.obs["Image"]` | `qxy.import_cells()` | QuPath image name per cell |
+| `adata.obs["Xµm"]`, `adata.obs["Yµm"]` | `qxy.import_cells()` | Cell centroid x/y coordinates in microns |
 | `adata.obs["<marker>_pos"]` | explicit threshold stages | Boolean marker positivity columns |
 | `adata.obs["annotation__<label>"]` | `qxy.add_annotations()` | Boolean annotation membership columns |
 | `adata.obs["cell_polygon_wkt"]` | `qxy.add_annotations()` / `qxy.load_cell_polygons()` | Cell segmentation polygon geometry as WKT strings |
 | `adata.obs["Sample"]` | `qxy.add_annotations()` / `qxy.assign_samples()` | Sample label from annotations with `Sample` in the label |
-| `adata.obs["TMA Core"]` | `qxy.import_measurements()` | QuPath measurement-table TMA core label |
-| `adata.obs["CoreID"]` | `qxy.import_measurements()` / `qxy.assign_core_ids_from_measurements()` | Categorical CoreID derived only from `TMA Core` |
+| `adata.obs["TMA Core"]` | `qxy.import_cells()` | QuPath measurement-table TMA core label |
+| `adata.obs["CoreID"]` | `qxy.import_cells()` / `qxy.assign_core_ids_from_measurements()` | Categorical CoreID derived only from `TMA Core` |
 | `adata.obs["celltype"]` | `qxy.celltype()` | Assigned cell type string |
 | `adata.obs["cn"]` | `qxy.cn_kmeans()` | CN cluster label (int, then renamed to string) |
 | `adata.obs[*metadata cols*]` | `qxy.add_metadata()` | Sample metadata broadcast to all cells |
-| `adata.X` | `qxy.import_measurements()` | Marker intensity matrix (cells × markers) |
-| `adata.var` | `qxy.import_measurements()` | Marker names and metadata |
-| `adata.obsm["spatial"]` | `qxy.import_measurements()` | Cell centroid x/y coordinates in microns |
+| `adata.X` | `qxy.import_cells()` | Marker intensity matrix (cells × markers) |
+| `adata.var` | `qxy.import_cells()` | Marker names and metadata |
+| `adata.obsm["spatial"]` | `qxy.import_cells()` | Cell centroid x/y coordinates in microns |
 | `adata.obsm["cn_profile"]` | `qxy.cn_knn()` | Per-cell local cell type composition (sums to 1) |
 | `adata.uns["qxycell"]` | staged functions | Run metadata, output paths, stage status, and provenance |
 | `adata.uns["qxycell_annotation_labels"]` | `qxy.add_annotations()` | Annotation class → column name map |
@@ -821,10 +812,10 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
 
-## Compatibility workflow shortcut
+## Optional workflow shortcut
 
-The staged API above is recommended for reviewable, rerunnable analyses. Older
-code can still run the full pipeline in one call:
+The staged API above is recommended for reviewable, rerunnable analyses.
+`qxy.workflow()` remains available when a single convenience call is preferred:
 
 ```python
 adata = qxy.workflow(

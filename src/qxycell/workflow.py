@@ -27,17 +27,18 @@ def workflow(
     from qxycell.celltyping import apply_celltypes
     from qxycell.filtering import remove_cells
     from qxycell.metadata import add_metadata
-    from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata, run
+    from qxycell.pipeline import add_annotations, import_cells
+    from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata
     from qxycell.plotting import plot_spatial, plot_stacked_bar
     from qxycell.qc import qc
     from qxycell.stage_state import checkpoint_outputs
 
-    adata = run(
+    adata = import_cells(
         project_dir,
         output_dir=output_dir,
-        threshold_file=threshold_file,
         verbose=verbose,
     )
+    add_annotations(adata, project_dir=project_dir, pixel_size_um=0.28, verbose=verbose)
     if apply_thresholds:
         apply_thresholds_to_adata(
             adata,

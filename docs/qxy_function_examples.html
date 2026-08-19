@@ -141,7 +141,7 @@
 <main>
 <header>
   <h1>QXYCell Function Examples</h1>
-  <p class="lead">A single-file HTML reference for the public <code>qxy</code> API. Examples were generated from a small synthetic QuPath project folder and include real tables and plots produced by the current package code.</p>
+  <p class="lead">A single-file HTML reference for the public <code>qxy</code> API. Examples were generated from a small synthetic QuPath export and include real tables and plots produced by the current package code.</p>
 </header>
 <section class="note">
   <p><strong>Before using real data:</strong> follow the <a href="qupath_preparation.md">QuPath 0.7 multiplex-IF preparation guide</a> (<a href="QXYCell_QuPath_Preparation_Guide.pdf">PDF</a>). Verify square-pixel calibration and pass it to <code>qxy.add_annotations(pixel_size_um=...)</code>; the default is <code>0.28</code> µm/pixel. These synthetic examples deliberately use <code>1.0</code>.</p>
@@ -150,7 +150,7 @@
   <div class="metric"><span>Cells</span><strong>72</strong></div>
   <div class="metric"><span>Markers</span><strong>4</strong></div>
   <div class="metric"><span>Samples</span><strong>2</strong></div>
-  <div class="metric"><span>Functions</span><strong>34</strong></div>
+  <div class="metric"><span>Functions</span><strong>37</strong></div>
 </section>
 <section class="note">
   <p><strong>Annotation and core rule shown here:</strong> sample annotations collapse into one <code>Sample</code> column; Ignore and other annotations remain boolean <code>annotation__*</code> columns; the exact measurement-table <code>TMA Core</code> column automatically creates categorical <code>CoreID</code>.</p>
@@ -325,9 +325,9 @@
 <h2>Function Examples</h2>
 <div class="grid">
 <section class="card">
-              <h3>qxy.run()</h3>
-              <p>Compatibility wrapper over the separate measurement-import and annotation stages. Thresholding and cell typing are off by default.</p>
-              <pre><code>adata = qxy.run(project_dir, output_dir=out_dir, pixel_size_um=1.0)</code></pre>
+              <h3>qxy.import_cells()</h3>
+              <p>Stage 1: import QuPath cell measurements and spatial coordinates into the base AnnData checkpoint.</p>
+              <pre><code>adata = qxy.import_cells(project_dir, output_dir=out_dir)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
     <tr style="text-align: right;">
@@ -425,28 +425,98 @@
   </tbody>
 </table></div>
             </section><section class="card">
-              <h3>qxy.import_measurements()</h3>
-              <p>Stage 1 creates the base AnnData and checkpoint from measurement CSV/TSV files only.</p>
-              <pre><code>adata = qxy.import_measurements(project_dir, output_dir=out_dir)</code></pre>
-              <div class="output"><p>Marker intensities are stored in <code>adata.X</code>; coordinates are stored in <code>adata.obs</code> and <code>adata.obsm["spatial"]</code>.</p></div>
-            </section><section class="card">
               <h3>qxy.add_annotations()</h3>
-              <p>Stage 2 replaces annotation, sample, and cell-polygon data from the project’s current GeoJSON files.</p>
+              <p>Stage 2: add or replace annotation, sample, and cell-polygon data using the verified pixel size.</p>
               <pre><code>summary = qxy.add_annotations(adata, pixel_size_um=1.0)</code></pre>
-              <div class="output"><p>The active H5AD and <code>cells_obs.csv</code> are refreshed.</p></div>
+              <div class="output"><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>field</th>
+      <th>value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pixel_size_um</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <td>n_geojson_files</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <td>n_annotation_columns</td>
+      <td>3.0</td>
+    </tr>
+    <tr>
+      <td>n_cell_polygons</td>
+      <td>72.0</td>
+    </tr>
+  </tbody>
+</table></div>
             </section><section class="card">
               <h3>qxy.threshold_from_classifiers()</h3>
-              <p>Stage 3A uses QuPath classifier JSON thresholds only, ignores supplied threshold tables, and saves the applied values to a stable reusable table.</p>
+              <p>Stage 3A: apply only QuPath classifier JSON thresholds and save the applied values as a stable table.</p>
               <pre><code>summary = qxy.threshold_from_classifiers(adata)</code></pre>
-              <div class="output"><p>Successful runs save or replace <code>thresholds/classifier_thresholds.tsv</code>. Conflicting classifier definitions produce an error for expert review.</p></div>
+              <div class="output"><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>field</th>
+      <th>value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>threshold_source_kind</td>
+      <td>object_classifiers</td>
+    </tr>
+    <tr>
+      <td>n_threshold_definitions</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>n_pos_columns</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <td>generated_threshold_template</td>
+      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/classifier_threshold_example/thresholds/classifier_thresholds.tsv</td>
+    </tr>
+  </tbody>
+</table></div>
             </section><section class="card">
               <h3>qxy.threshold_from_table()</h3>
-              <p>Stage 3B uses one named threshold table only and never falls back to classifier JSON.</p>
-              <pre><code>summary = qxy.threshold_from_table(adata, threshold_path)</code></pre>
-              <div class="output"><p>Rerunning replaces positivity and invalidates threshold-dependent cell types.</p></div>
+              <p>Stage 3B: apply only one reviewed threshold table without falling back to classifier JSON files.</p>
+              <pre><code>summary = qxy.threshold_from_table(adata, &#x27;thresholds.tsv&#x27;)</code></pre>
+              <div class="output"><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: right;">
+      <th>field</th>
+      <th>value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>threshold_source_kind</td>
+      <td>manual_threshold_file</td>
+    </tr>
+    <tr>
+      <td>threshold_source</td>
+      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/threshold_example/thresholds/thresholds_YYMMDD-HHMM.tsv</td>
+    </tr>
+    <tr>
+      <td>n_threshold_definitions</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td>n_pos_columns</td>
+      <td>4</td>
+    </tr>
+  </tbody>
+</table></div>
             </section><section class="card">
               <h3>qxy.threshold()</h3>
-              <p>Legacy automatic-source entry point retained for compatibility. Prefer one of the two explicit threshold functions.</p>
+              <p>Apply threshold definitions to an imported AnnData object, add &lt;marker&gt;_pos columns, and rename previous cell type labels with a __stale_celltype suffix.</p>
               <pre><code>summary = qxy.threshold(adata, project_dir, output_dir=out_dir)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
@@ -458,11 +528,11 @@
   <tbody>
     <tr>
       <td>threshold_source</td>
-      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/thresholds/thresholds_YYMMDD-HHMM.tsv</td>
+      <td>object_classifiers</td>
     </tr>
     <tr>
       <td>n_threshold_definitions</td>
-      <td>8</td>
+      <td>4</td>
     </tr>
     <tr>
       <td>n_pos_columns</td>
@@ -484,11 +554,11 @@
   <tbody>
     <tr>
       <td>threshold_source</td>
-      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/thresholds/thresholds_YYMMDD-HHMM.tsv</td>
+      <td>object_classifiers</td>
     </tr>
     <tr>
       <td>n_threshold_definitions</td>
-      <td>8</td>
+      <td>4</td>
     </tr>
     <tr>
       <td>n_pos_columns</td>
@@ -503,7 +573,7 @@
               <div class="output"><p>Workflow result: 72 cells after Ignore removal.</p></div>
             </section><section class="card">
               <h3>qxy.check()</h3>
-              <p>Inspect the QuPath project folder, list every annotation and planned AnnData assignment, and audit competing classifier thresholds without silently choosing one. Check never applies thresholds or cell typing and never generates an LLM prompt.</p>
+              <p>Inspect the export folder, list every annotation and planned AnnData assignment, and audit competing classifier thresholds without silently choosing one. Check never applies thresholds or cell typing and never generates an LLM prompt.</p>
               <pre><code>report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
@@ -665,8 +735,8 @@
 </table></div>
             </section><section class="card">
               <h3>qxy.remove_cells()</h3>
-              <p>Remove cells in tissue, edge, or staining artifact annotations whose names contain the configured text.</p>
-              <pre><code>clean = qxy.remove_cells(adata, remove_cells="ignore", copy=True)</code></pre>
+              <p>Remove cells in annotation columns containing Ignore.</p>
+              <pre><code>clean = qxy.remove_cells(adata, copy=True)</code></pre>
               <div class="output"><p>Before: 72 cells. After copy: 71 cells.</p></div>
             </section><section class="card">
               <h3>qxy.remove_annotations()</h3>
@@ -788,7 +858,7 @@ derived_features: {}</code></pre></div>
               <div class="output"><p><code>True</code>; errors: <code>0</code>; warnings: <code>0</code></p></div>
             </section><section class="card">
               <h3>qxy.celltype_prompt()</h3>
-              <p>Stage 4 replaces <code>celltype/current_prompt.txt</code> for drafting cell type rules while preserving any expert-edited YAML.</p>
+              <p>Generate a prompt for drafting cell type rules.</p>
               <pre><code>prompt = qxy.celltype_prompt(adata, print_prompt=False)</code></pre>
               <div class="output"><pre><code>You are helping draft a first-pass QXYCell cell type logic YAML file for spatial single-cell data imported from QuPath.
 

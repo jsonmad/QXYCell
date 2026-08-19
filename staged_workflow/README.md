@@ -39,7 +39,7 @@ Run the scripts from this folder in numerical order.
 ### macOS or Linux
 
 ```bash
-python 01_import_measurements.py
+python 01_import_cells.py
 python 02_add_annotations.py
 
 # Optional: remove cells in tissue/staining artifact annotations containing "ignore":
@@ -59,7 +59,7 @@ python 06_plot_spatial_celltypes.py  # Optional
 ### Windows PowerShell
 
 ```powershell
-python .\01_import_measurements.py
+python .\01_import_cells.py
 python .\02_add_annotations.py
 
 # Optional: remove cells in tissue/staining artifact annotations containing "ignore":

@@ -121,14 +121,14 @@ def load_cell_polygons(
     Parameters
     ----------
     adata:
-        AnnData object produced by ``qxy.run()``.
+        AnnData object produced by ``qxy.import_cells()``.
     project_dir:
         Path to the QuPath project folder containing ``.geojson`` files.
     object_id_col:
         Column in ``adata.obs`` containing QuPath Object IDs (default ``"Object ID"``).
     pixel_size_um:
         Pixel size in microns used to scale polygon coordinates to microns
-        (default ``0.28``). Must match the value used in ``qxy.run()``.
+        (default ``0.28``). Must match the value used in ``qxy.add_annotations()``.
     obs_key:
         Column under which WKT strings are stored in ``adata.obs``
         (default ``"cell_polygon_wkt"``).

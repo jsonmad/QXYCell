@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from qxycell.checks import check
-from qxycell.pipeline import run
+from qxycell.pipeline import import_cells
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,35 +32,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit threshold TSV/CSV to validate instead of auto-selecting from the project folder.",
     )
 
-    run_parser = subparsers.add_parser("run", help="Run QXYCell on a QuPath project folder.")
-    run_parser.add_argument("project_dir", help="Path to the QuPath project folder.")
-    run_parser.add_argument(
+    import_parser = subparsers.add_parser(
+        "import-cells",
+        help="Import QuPath cell measurements into AnnData.",
+    )
+    import_parser.add_argument("project_dir", help="Path to the QuPath project folder.")
+    import_parser.add_argument(
         "--out",
         "--output-dir",
         dest="output_dir",
         default=None,
-        help="Output folder for QXYCell reports and AnnData. Defaults to <project-name>_run_YYMMDD_HHMM beside project_dir.",
-    )
-    run_parser.add_argument(
-        "--pixel-size-um",
-        type=float,
-        default=0.28,
-        help="Pixel size used to scale QuPath GeoJSON coordinates into microns.",
-    )
-    run_parser.add_argument(
-        "--celltype-logic",
-        default=None,
-        help="Optional YAML file with ordered cell type rules. Implies --apply-thresholds.",
-    )
-    run_parser.add_argument(
-        "--threshold-file",
-        default=None,
-        help="Explicit threshold TSV/CSV to use when --apply-thresholds is set.",
-    )
-    run_parser.add_argument(
-        "--apply-thresholds",
-        action="store_true",
-        help="Apply threshold definitions after importing AnnData to create <marker>_pos columns.",
+        help="Output folder for AnnData and tables. Defaults to <project-name>_run_YYMMDD_HHMM beside project_dir.",
     )
     return parser
 
@@ -85,16 +67,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Errors: {report.n_errors}; warnings: {report.n_warnings}")
         return 0 if report.ok else 1
 
-    if args.command == "run":
-        adata = run(
+    if args.command == "import-cells":
+        adata = import_cells(
             args.project_dir,
             output_dir=args.output_dir,
-            pixel_size_um=args.pixel_size_um,
-            celltype_logic=args.celltype_logic,
-            threshold_file=args.threshold_file,
-            apply_thresholds=args.apply_thresholds or args.celltype_logic is not None,
         )
-        print("QXYCell run complete")
+        print("QXYCell cell import complete")
         print(f"H5AD: {adata.uns['qxycell']['h5ad_path']}")
         print(f"Output: {adata.uns['qxycell']['run_dir']}")
         return 0
