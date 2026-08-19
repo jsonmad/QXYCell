@@ -88,7 +88,7 @@
 
     <section id="workflow" aria-labelledby="workflow-heading">
       <h2 id="workflow-heading">Forward workflow</h2>
-      <p class="checkpoint">Successful stages refresh the active H5AD, <code>tables/cells_obs.csv</code>, and <code>tables/markers_var.csv</code>.</p>
+      <p class="checkpoint">Stages 1–5 update the active H5AD and refresh both <code>tables/cells_obs.csv</code> and <code>tables/markers_var.csv</code>. Optional Stage 2b refreshes the filtered H5AD and <code>cells_obs.csv</code>; preflight and Stage 6 create reports or plots without changing the active checkpoint.</p>
       <div class="flow">
         <article class="node" id="prepare"><span class="label required">Required</span><h3>Prepare QuPath project</h3><p>Export the measurements and spatial assets that define the run inputs.</p><p class="detail">Verify image calibration and prepare measurement, annotation, cell, and threshold assets before import.</p></article>
         <div class="connector" aria-hidden="true"></div>
