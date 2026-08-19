@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Technical flowchart for the staged QXYCell workflow and rerun dependencies.">
+  <title>QXYCell technical workflow</title>
+  <style>
+    :root { --teal: #087e8b; --teal-dark: #075966; --ink: #1f2933; --muted: #52606d; --line: #bcccdc; --surface: #f6f8fa; --optional: #fff8e1; --review: #f3e8ff; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: #fff; color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+    .page { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 3rem; }
+    .skip-link { position: absolute; left: 1rem; top: -4rem; background: var(--teal-dark); color: #fff; padding: .6rem .8rem; z-index: 2; }
+    .skip-link:focus { top: 1rem; }
+    header { border-bottom: 4px solid var(--teal); padding-bottom: 1.25rem; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.6rem); }
+    h2 { margin-top: 2.5rem; }
+    .lede, .checkpoint { color: var(--muted); max-width: 72ch; }
+    .legend { display: flex; flex-wrap: wrap; gap: .6rem 1rem; margin: 1.25rem 0; padding: .8rem 1rem; border: 1px solid var(--line); background: var(--surface); }
+    .key, .label { display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; padding: .16rem .48rem; border-radius: 999px; }
+    .key.required, .label.required { background: #d9f2ef; color: #075966; }
+    .key.optional, .label.optional { background: #fff0bf; color: #735600; }
+    .key.decision, .label.decision { background: #dceeff; color: #164c78; }
+    .key.review, .label.review { background: #eadcff; color: #5a2d82; }
+    .flow { display: grid; gap: 0; max-width: 850px; margin: 1.5rem auto; }
+    .node { position: relative; padding: 1rem 1.15rem; border: 1px solid var(--line); border-left: 5px solid var(--teal); background: #fff; border-radius: .35rem; }
+    .node h3 { margin: .25rem 0 .45rem; font-size: 1.1rem; }
+    .node p { margin: .35rem 0 0; }
+    .node .detail { color: var(--muted); font-size: .93rem; }
+    .connector { height: 1.4rem; margin-left: 50%; border-left: 2px solid var(--teal); }
+    .connector::after { content: ""; display: block; width: .45rem; height: .45rem; margin: 0 0 0 -.29rem; transform: translateY(.95rem) rotate(45deg); border-right: 2px solid var(--teal); border-bottom: 2px solid var(--teal); }
+    .optional-node { border-left-style: dashed; background: var(--optional); }
+    .optional-connector { border-left-style: dashed; }
+    .branch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; }
+    .branch .node { min-height: 100%; }
+    .branch-intro { grid-column: 1 / -1; }
+    .merge { text-align: center; color: var(--muted); font-size: .9rem; padding: .5rem 0; }
+    .review-node { border-left-color: #7e4ca0; background: var(--review); }
+    .dependencies { display: grid; gap: .7rem; }
+    .dependency-row { display: grid; grid-template-columns: minmax(14rem, 1fr) auto minmax(18rem, 1.6fr); align-items: center; gap: .8rem; padding: .9rem 1rem; border: 1px solid var(--line); background: var(--surface); }
+    .dependency-row strong { color: var(--teal-dark); }
+    .arrow { color: var(--teal-dark); font-weight: 700; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
+    a { color: var(--teal-dark); }
+    a:focus-visible { outline: 3px solid #f5a623; outline-offset: 3px; border-radius: 2px; }
+    @media (max-width: 760px) { .page { width: min(100% - 1.25rem, 1120px); } .branch, .dependency-row { grid-template-columns: 1fr; } .dependency-row .arrow { display: none; } }
+    @media print { body { font-size: 10pt; } .page { width: 100%; padding: 0; } .skip-link { display: none; } .node, .dependency-row { break-inside: avoid; } a { color: inherit; text-decoration: none; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#workflow">Skip to workflow</a>
+  <main class="page">
+    <header>
+      <p class="label required">Required workflow</p>
+      <h1>QXYCell technical workflow</h1>
+      <p class="lede">A staged QuPath-to-AnnData workflow with explicit checkpoints, a mutually exclusive threshold branch, and targeted rerun dependencies.</p>
+    </header>
+
+    <aside class="legend" aria-label="Workflow legend">
+      <span class="key required">Required</span><span>solid connector</span>
+      <span class="key optional">Optional</span><span>dashed treatment</span>
+      <span class="key decision">Decision</span><span>choose exactly one path</span>
+      <span class="key review">Expert review</span><span>human approval gate</span>
+    </aside>
+
+    <section id="workflow" aria-labelledby="workflow-heading">
+      <h2 id="workflow-heading">Forward workflow</h2>
+      <p class="checkpoint">Successful stages refresh the active H5AD, <code>tables/cells_obs.csv</code>, and <code>tables/markers_var.csv</code>.</p>
+      <div class="flow">
+        <article class="node" id="prepare"><span class="label required">Required</span><h3>Prepare QuPath project</h3><p>Export the measurements and spatial assets that define the run inputs.</p><p class="detail">Verify image calibration and prepare measurement, annotation, cell, and threshold assets before import.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node optional-node" id="check"><span class="label optional">Optional</span><h3>Optional preflight — <code>qxy.check(...)</code></h3><p>Validate the QuPath project before creating an analysis checkpoint.</p><p class="detail">Writes a timestamped check report without applying thresholds, generating a prompt, or assigning cell types.</p></article>
+        <div class="connector optional-connector" aria-hidden="true"></div>
+        <article class="node" id="stage-1"><span class="label required">Required</span><h3>Stage 1 — <code>qxy.import_cells(...)</code></h3><p>Create the base AnnData checkpoint from the QuPath measurement table.</p><p class="detail">Initializes the active output folder and the measurements stage.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node" id="stage-2"><span class="label required">Required</span><h3>Stage 2 — <code>qxy.add_annotations(...)</code></h3><p>Refresh GeoJSON-derived annotations, samples, and cell polygons.</p><p class="detail">Use the verified square-pixel value with <code>pixel_size_um</code> to scale GeoJSON coordinates.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node optional-node" id="stage-2b"><span class="label optional">Optional</span><h3>Optional Stage 2b — <code>qxy.remove_cells(..., remove_cells=&quot;ignore&quot;)</code></h3><p>Remove cells inside Ignore-labelled tissue or staining-artifact polygons.</p><p class="detail">This changes the shared checkpoint; rebuild stages 1–2 before rerunning it when Ignore polygons change.</p></article>
+        <div class="connector optional-connector" aria-hidden="true"></div>
+        <div class="branch">
+          <article class="node branch-intro"><span class="label decision">Decision</span><h3>Stage 3 decision — choose exactly one threshold source</h3><p>Apply marker positivity from either classifiers or a reviewed table.</p><p class="detail">The two paths are deliberately independent and never fall back to one another.</p></article>
+          <article class="node" id="stage-3a"><span class="label required">Required path</span><h3>Stage 3A — <code>qxy.threshold_from_classifiers(...)</code></h3><p>Apply thresholds from QuPath classifier JSON files only.</p><p class="detail">Saves <code>thresholds/classifier_thresholds.tsv</code> with the exact applied values.</p></article>
+          <article class="node" id="stage-3b"><span class="label required">Required path</span><h3>Stage 3B — <code>qxy.threshold_from_table(..., table)</code></h3><p>Apply thresholds from a reviewed table selected explicitly by the caller.</p><p class="detail">Uses only the explicitly named table and never falls back to classifier JSON.</p></article>
+        </div>
+        <p class="merge">Selected Stage 3 path rejoins the workflow.</p>
+        <article class="node" id="stage-4"><span class="label required">Required</span><h3>Stage 4 — <code>qxy.celltype_prompt(...)</code></h3><p>Create the project-specific prompt for drafting cell-type logic.</p><p class="detail">Writes prompt context for review while preserving an existing expert-edited YAML.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node review-node" id="expert-review"><span class="label review">Expert review</span><h3>Expert review — review and save <code>celltype_logic.yaml</code></h3><p>Validate and correct the proposed biological logic before cell typing.</p><p class="detail">Save the reviewed YAML at the configured path used by Stage 5.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node" id="stage-5"><span class="label required">Required</span><h3>Stage 5 — <code>qxy.celltype(...)</code></h3><p>Assign cell types from the expert-reviewed YAML rules.</p><p class="detail">Updates cell-type, feature, derived-feature, count, and rule-summary outputs.</p></article>
+        <div class="connector" aria-hidden="true"></div>
+        <article class="node optional-node" id="stage-6"><span class="label optional">Optional</span><h3>Optional Stage 6 — <code>qxy.plot_spatial(...)</code></h3><p>Create spatial plots of the assigned cell types.</p><p class="detail">Use <code>show=False</code> for scripted runs; output PNGs can be grouped by Sample or Image.</p></article>
+        <div class="connector optional-connector" aria-hidden="true"></div>
+        <article class="node" id="downstream"><span class="label required">Downstream</span><h3>Downstream analysis — Scanpy, Squidpy, pandas, or custom Python</h3><p>Use the staged AnnData checkpoint and exported tables for analysis.</p><p class="detail">Continue in the scientific Python ecosystem without reimporting unchanged QuPath measurements.</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="rerun-heading">
+      <h2 id="rerun-heading">Rerun dependencies</h2>
+      <div class="dependencies">
+        <div class="dependency-row"><strong>Annotation/cell GeoJSON changed</strong><span class="arrow" aria-hidden="true">→</span><span>Stage 2, optional Stage 2b, then Stages 3–5</span></div>
+        <div class="dependency-row"><strong>Ignore polygons changed</strong><span class="arrow" aria-hidden="true">→</span><span>rebuild Stages 1–2, then Stage 2b and Stages 3–5</span></div>
+        <div class="dependency-row"><strong>Thresholds changed</strong><span class="arrow" aria-hidden="true">→</span><span>selected Stage 3 path, then Stages 4–5</span></div>
+        <div class="dependency-row"><strong>Prompt context changed</strong><span class="arrow" aria-hidden="true">→</span><span>Stage 4; preserve expert-edited YAML</span></div>
+        <div class="dependency-row"><strong>Cell-type YAML changed</strong><span class="arrow" aria-hidden="true">→</span><span>Stage 5 and optional Stage 6</span></div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Supporting documentation: <a href="qupath_preparation.md">QuPath preparation</a> · <a href="QXYCell_overview.html">QXYCell overview</a> · <a href="QXYCell_function_reference.html">Function reference</a> · <a href="../examples/staged_workflow/README.md">staged workflow examples</a>.</p>
+    </footer>
+  </main>
+</body>
+</html>
