@@ -28,7 +28,8 @@
     .pipeline-route::before { content: ""; position: absolute; left: 39px; top: 23px; bottom: 23px; width: 10px; border-radius: 999px; background: var(--route); box-shadow: 0 0 0 3px var(--route-halo); }
     .route-stop { position: relative; display: grid; grid-template-columns: 88px minmax(0, 1fr); break-inside: avoid; }
     .station { position: relative; z-index: 1; display: grid; place-items: center; width: 46px; height: 46px; margin-left: 21px; border: 7px solid var(--route); border-radius: 50%; background: var(--page); color: var(--route-dark); font-weight: 850; }
-    .route-card { margin: 0 0 1.35rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-left: 5px solid var(--route); border-radius: .55rem; background: var(--page); box-shadow: 0 3px 10px rgb(15 81 87 / .07); }
+    .station.prep { font-size: .65rem; line-height: 1; letter-spacing: -.02em; white-space: nowrap; }
+    .route-card { min-width: 0; margin: 0 0 1.35rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-left: 5px solid var(--route); border-radius: .55rem; background: var(--page); box-shadow: 0 3px 10px rgb(15 81 87 / .07); }
     .route-card h3 { margin: .25rem 0 .45rem; font-size: 1.1rem; }
     .route-card p { margin: .35rem 0 0; }
     .route-card .detail { color: var(--muted); font-size: .93rem; }
@@ -37,13 +38,13 @@
     .route-stop.review .station, .route-stop.review .route-card { border-color: var(--review-strong); }
     .route-stop.review .route-card { background: var(--review-soft); }
     .threshold-choices { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .8rem; }
-    .threshold-choice { padding: .75rem .8rem; border: 1px solid var(--route-soft-line); border-radius: .45rem; background: var(--route-soft); }
+    .threshold-choice { min-width: 0; padding: .75rem .8rem; border: 1px solid var(--route-soft-line); border-radius: .45rem; background: var(--route-soft); }
     .threshold-choice h4 { margin: 0; }
     .dependencies { display: grid; gap: .7rem; }
     .dependency-row { display: grid; grid-template-columns: minmax(14rem, 1fr) auto minmax(18rem, 1.6fr); align-items: center; gap: .8rem; padding: .9rem 1rem; border: 1px solid var(--line); background: var(--surface); }
     .dependency-row strong { color: var(--teal-dark); }
     .arrow { color: var(--teal-dark); font-weight: 700; }
-    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; overflow-wrap: anywhere; }
     footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); }
     a { color: var(--teal-dark); }
     a:focus-visible { outline: 3px solid #f5a623; outline-offset: 3px; border-radius: 2px; }
@@ -78,7 +79,7 @@
       <h2 id="workflow-heading">Forward workflow</h2>
       <p class="checkpoint">Stages 1–5 update the active H5AD and refresh both <code>tables/cells_obs.csv</code> and <code>tables/markers_var.csv</code>. Optional Stage 2b refreshes the filtered H5AD and <code>cells_obs.csv</code>; preflight and Stage 6 create reports or plots without changing the active checkpoint.</p>
       <ol class="pipeline-route">
-        <li class="route-stop"><span class="station" aria-hidden="true">PREP</span><article class="route-card" id="prepare"><span class="label required">Required</span><h3>Prepare QuPath project</h3><p>Export the measurements and spatial assets that define the run inputs.</p><p class="detail">Verify image calibration and prepare measurement, annotation, cell, and threshold assets before import.</p></article></li>
+        <li class="route-stop"><span class="station prep" aria-hidden="true">PREP</span><article class="route-card" id="prepare"><span class="label required">Required</span><h3>Prepare QuPath project</h3><p>Export the measurements and spatial assets that define the run inputs.</p><p class="detail">Verify image calibration and prepare measurement, annotation, cell, and threshold assets before import.</p></article></li>
         <li class="route-stop optional"><span class="station" aria-hidden="true">✓</span><article class="route-card" id="check"><span class="label optional">Optional</span><h3>Optional preflight — <code>qxy.check(...)</code></h3><p>Validate the QuPath project before creating an analysis checkpoint.</p><p class="detail">Writes a timestamped check report without applying thresholds, generating a prompt, or assigning cell types.</p></article></li>
         <li class="route-stop"><span class="station" aria-hidden="true">1</span><article class="route-card" id="stage-1"><span class="label required">Required</span><h3>Stage 1 — <code>qxy.import_cells(...)</code></h3><p>Create the base AnnData checkpoint from the QuPath measurement table.</p><p class="detail">Initializes the active output folder and the measurements stage.</p></article></li>
         <li class="route-stop"><span class="station" aria-hidden="true">2</span><article class="route-card" id="stage-2"><span class="label required">Required</span><h3>Stage 2 — <code>qxy.add_annotations(...)</code></h3><p>Refresh GeoJSON-derived annotations, samples, and cell polygons.</p><p class="detail">Use the verified square-pixel value with <code>pixel_size_um</code> to scale GeoJSON coordinates.</p></article></li>
