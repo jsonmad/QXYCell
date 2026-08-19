@@ -47,6 +47,7 @@
     .branch-merge span:nth-child(1) { left: 25%; }
     .branch-merge span:nth-child(2) { left: 75%; }
     .branch-merge span:nth-child(3) { left: 50%; top: .55rem; height: .7rem; }
+    .branch-or { display: none; }
     .merge { text-align: center; color: var(--muted); font-size: .9rem; padding: .5rem 0; }
     .review-node { border-left-color: #7e4ca0; background: var(--review); }
     .dependencies { display: grid; gap: .7rem; }
@@ -63,6 +64,7 @@
       .branch-split::before, .branch-merge::before { display: none; }
       .branch-split span:nth-child(1), .branch-merge span:nth-child(3) { left: 50%; top: 0; height: 100%; }
       .branch-split span:nth-child(2), .branch-split span:nth-child(3), .branch-merge span:nth-child(1), .branch-merge span:nth-child(2) { display: none; }
+      .branch-or { display: flex; align-items: center; justify-content: center; min-height: 1.5rem; color: var(--teal-dark); font-size: .78rem; font-weight: 700; letter-spacing: .08em; }
       .dependency-row .arrow { display: none; }
     }
     @media print { body { font-size: 10pt; } .page { width: 100%; padding: 0; } .skip-link { display: none; } .node, .dependency-row { break-inside: avoid; } a { color: inherit; text-decoration: none; } }
@@ -102,6 +104,7 @@
           <article class="node branch-intro"><span class="label decision">Decision</span><h3>Stage 3 decision — choose exactly one threshold source</h3><p>Apply marker positivity from either classifiers or a reviewed table.</p><p class="detail">The two paths are deliberately independent and never fall back to one another.</p></article>
           <div class="branch-split" aria-hidden="true"><span></span><span></span><span></span></div>
           <article class="node" id="stage-3a"><span class="label required">Required path</span><h3>Stage 3A — <code>qxy.threshold_from_classifiers(...)</code></h3><p>Apply thresholds from QuPath classifier JSON files only.</p><p class="detail">Saves <code>thresholds/classifier_thresholds.tsv</code> with the exact applied values.</p></article>
+          <div class="branch-or" aria-hidden="true">OR</div>
           <article class="node" id="stage-3b"><span class="label required">Required path</span><h3>Stage 3B — <code>qxy.threshold_from_table(..., table)</code></h3><p>Apply thresholds from a reviewed table selected explicitly by the caller.</p><p class="detail">Uses only the explicitly named table and never falls back to classifier JSON.</p></article>
           <div class="branch-merge" aria-hidden="true"><span></span><span></span><span></span></div>
         </div>
