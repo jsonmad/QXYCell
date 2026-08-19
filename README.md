@@ -408,6 +408,36 @@ Each column in the metadata file is broadcast to every cell belonging to that sa
 
 ## Cell typing
 
+### How thresholds are used for cell typing
+
+Cell typing uses marker-positive calls rather than the raw measurement values
+directly. First apply thresholds using one of the two explicit threshold stages:
+
+- `qxy.threshold_from_classifiers(adata)` reads the simple thresholds from the
+  QuPath object-classifier JSON files, applies them, and saves the values used
+  to `thresholds/classifier_thresholds.tsv` in the active output folder.
+- `qxy.threshold_from_table(adata, threshold_file)` ignores classifier JSON
+  thresholds and applies only the reviewed threshold table supplied by the
+  user.
+
+For each marker, QXYCell compares the selected QuPath measurement value with
+the applicable threshold. Thresholds can be global or specific to each image.
+A value greater than or equal to the threshold is recorded as marker-positive
+in `adata.obs["<MARKER>_pos"]`; a value below the threshold is recorded as
+marker-negative.
+
+The cell-type YAML then refers to these positivity columns by marker name.
+`positive` requires all listed markers to be positive, `negative` requires the
+listed markers to be negative, and `any_positive` requires at least one listed
+marker to be positive. Rules are evaluated from top to bottom, and the first
+matching rule assigns `adata.obs["celltype"]`. Put specific cell types before
+broader populations so broad rules do not capture them first.
+
+If thresholds are changed and either threshold stage is rerun, QXYCell replaces
+the previous marker-positive calls and removes threshold-dependent cell-type
+and feature columns. Rerun `qxy.celltype()` afterwards to recreate the cell
+typing results from the updated thresholds.
+
 Generate a first-pass cell type prompt for an LLM:
 
 ```python
