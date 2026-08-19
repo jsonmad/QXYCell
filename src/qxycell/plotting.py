@@ -11,6 +11,36 @@ from typing import Iterable
 from qxycell.paths import resolve_output_dir
 
 
+_MISSING_GROUP_LABELS = {"", "nan", "none", "<na>"}
+
+
+def _missing_group_label_mask(values):
+    """Return a boolean mask for missing or blank plotting-group labels."""
+
+    text = values.astype("string").str.strip()
+    return text.isna() | text.str.lower().fillna("").isin(_MISSING_GROUP_LABELS)
+
+
+def _resolve_sample_col(adata, sample_col: str | None, *other_adata) -> str:
+    """Resolve automatic plot grouping to usable Sample labels, then Image."""
+
+    if sample_col is not None:
+        return str(sample_col)
+
+    objects = (adata, *other_adata)
+    for candidate in ("Sample", "Image"):
+        if all(
+            candidate in obj.obs.columns
+            and bool((~_missing_group_label_mask(obj.obs[candidate])).any())
+            for obj in objects
+        ):
+            return candidate
+    raise KeyError(
+        "No usable automatic plotting group was found. Add usable labels to "
+        "adata.obs['Sample'] or adata.obs['Image'], or pass sample_col explicitly."
+    )
+
+
 def _resolve_plot_dir(adata, output_dir: str | Path | None) -> Path:
     if output_dir is not None:
         return Path(output_dir).expanduser().resolve()
@@ -767,7 +797,7 @@ def plot_spatial(
     *,
     underlay_adata=None,
     category_col: str = "celltype",
-    sample_col: str = "Image",
+    sample_col: str | None = None,
     subset_col: str | None = None,
     subset_value: str | None = None,
     samples: Iterable[str] | None = None,
@@ -807,8 +837,9 @@ def plot_spatial(
     Set ``underlay_adata`` to a second AnnData object when the grey all-cell
     underlay should come from a fuller dataset than the coloured overlay. Both
     objects must use the same spatial coordinate system and ``sample_col``
-    labels. Set ``sample_col`` to use a shortened image label column such as ``ImageID``
-    instead of the default QuPath ``Image`` column. By default, all selected
+    labels. When ``sample_col`` is omitted, usable ``Sample`` labels are
+    preferred and QXYCell falls back to ``Image``. Set ``sample_col`` explicitly
+    to use another grouping column such as ``ImageID``. By default, all selected
     samples are plotted in a shared centered window based on each sample's
     spatial bounding box. Pass ``center_method="median"`` or ``"mean"`` to
     center on cell-distribution summaries instead. Pass
@@ -830,6 +861,7 @@ def plot_spatial(
     spatial_key = _resolve_spatial_key(adata, spatial_key)
     underlay_source = adata if underlay_adata is None else underlay_adata
     underlay_spatial_key = _resolve_spatial_key(underlay_source, spatial_key)
+    sample_col = _resolve_sample_col(adata, sample_col, underlay_source)
     if sample_col not in underlay_source.obs.columns:
         raise KeyError(
             f"sample_col not found in underlay_adata.obs: {sample_col}"
@@ -846,7 +878,7 @@ def plot_spatial(
         samples=samples if samples is not None else images,
         categories=celltypes,
     )
-    missing_sample_mask = adata.obs[sample_col].isna()
+    missing_sample_mask = _missing_group_label_mask(adata.obs[sample_col])
     n_missing_sample_cells = int(missing_sample_mask.sum())
     if not include_missing_samples and n_missing_sample_cells:
         obs_plot = obs_plot.loc[~missing_sample_mask.reindex(obs_plot.index).fillna(False)]
@@ -1161,6 +1193,7 @@ def plot_spatial(
         "underlay_adata_is_plot_adata": underlay_source is adata,
         "underlay_n_obs": int(underlay_source.n_obs),
         "include_missing_samples": bool(include_missing_samples),
+        "sample_col": sample_col,
         "n_missing_sample_cells_excluded": (
             0 if include_missing_samples else n_missing_sample_cells
         ),
@@ -2281,7 +2314,7 @@ def plot_cn_heatmap(
     *,
     cn_col: str = "cn",
     category_col: "str | None" = None,
-    sample_col: str = "Image",
+    sample_col: "str | None" = None,
     include_missing_samples: bool = False,
     condition_col: "str | None" = None,
     normalize: str = "sample",
@@ -2317,7 +2350,8 @@ def plot_cn_heatmap(
         Alias for ``cn_col`` for consistency with other plotting functions.
         If provided, it must not conflict with ``cn_col``.
     sample_col:
-        Column in ``adata.obs`` containing sample labels (default ``"Image"``).
+        Column in ``adata.obs`` containing sample labels. When omitted, usable
+        ``Sample`` labels are preferred and QXYCell falls back to ``Image``.
     include_missing_samples:
         Include cells whose sample label is missing (default False). Missing
         values and blank/``"nan"``/``"none"``/``"<NA>"`` labels are excluded
@@ -2376,6 +2410,7 @@ def plot_cn_heatmap(
         raise ValueError(
             f"'{cn_col}' not found in adata.obs. Run qxy.cn_kmeans() first."
         )
+    sample_col = _resolve_sample_col(adata, sample_col)
     if sample_col not in adata.obs.columns:
         raise ValueError(f"'{sample_col}' not found in adata.obs.")
     if condition_col is not None and condition_col not in adata.obs.columns:
@@ -2386,11 +2421,7 @@ def plot_cn_heatmap(
     saved: dict[str, list] = {}
 
     obs_plot = adata.obs.copy()
-    sample_text = obs_plot[sample_col].astype("string").str.strip()
-    missing_sample_mask = (
-        sample_text.isna()
-        | sample_text.str.lower().fillna("").isin({"", "nan", "none", "<na>"})
-    )
+    missing_sample_mask = _missing_group_label_mask(obs_plot[sample_col])
     if not include_missing_samples:
         obs_plot = obs_plot.loc[~missing_sample_mask].copy()
     if obs_plot.empty:

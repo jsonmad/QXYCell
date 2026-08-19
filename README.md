@@ -497,14 +497,20 @@ segments are collapsed, and trailing spaces or periods are stripped.
 Plot cell type distributions in tissue space:
 
 ```python
-# One plot per sample
+# Automatically use Sample when available, otherwise Image
 qxy.plot_spatial(adata)
+
+# Force one plot per QuPath image
+qxy.plot_spatial(adata, sample_col="Image")
+
+# One plot per Sample annotation, when a Sample column is available
+qxy.plot_spatial(adata, sample_col="Sample")
 
 # Combined multi-panel figure
 qxy.plot_spatial(adata, combined=True, max_cols=3)
 
-# Selected samples only
-qxy.plot_spatial(adata, samples=["sample_A", "sample_B"])
+# Selected images only when explicitly using Image grouping
+qxy.plot_spatial(adata, samples=["image_A.ome.tif", "image_B.ome.tif"])
 
 # Fixed square window (microns)
 qxy.plot_spatial(adata, fixed_window_um=11500)
@@ -521,6 +527,13 @@ qxy.plot_spatial(adata, flip_y=False)
 # Plot CNs instead of cell types
 qxy.plot_spatial(adata, category_col="cn")
 ```
+
+When `sample_col` is omitted, `qxy.plot_spatial()` uses
+`adata.obs["Sample"]` when that column contains usable labels and otherwise
+falls back to `adata.obs["Image"]`. This allows datasets without QuPath Sample
+annotations to plot normally. Pass `sample_col="Sample"` or
+`sample_col="Image"` to force one grouping method. The `samples=` argument
+always selects values from the resolved `sample_col`.
 
 Cells with a missing value in `adata.obs[sample_col]` are excluded by default.
 Use `include_missing_samples=True` only when a separate `"nan"` panel is wanted.
@@ -701,8 +714,11 @@ for older code.
 CN abundance heatmaps:
 
 ```python
-# CN fraction per sample — columns sum to 1 (colorbar: f ↓)
-qxy.plot_cn_heatmap(adata)  # missing sample labels are excluded by default
+# CN fraction per Sample, falling back to Image — columns sum to 1 (colorbar: f ↓)
+qxy.plot_cn_heatmap(adata)
+
+# Force one heatmap column per QuPath image
+qxy.plot_cn_heatmap(adata, sample_col="Image")
 
 # CN composition per CN — rows sum to 1 (colorbar: f →)
 qxy.plot_cn_heatmap(adata, normalize="cn")
@@ -717,7 +733,11 @@ qxy.plot_cn_heatmap(adata, condition_col="group")
 qxy.plot_cn_heatmap(adata, category_col="cn")
 ```
 
-Reads from `adata.obs["cn"]` by default, or `adata.obs[category_col]` when supplied, plus `adata.obs[sample_col]`. Rows and columns are reordered by hierarchical clustering (no dendrogram). Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
+Reads from `adata.obs["cn"]` by default, or `adata.obs[category_col]` when
+supplied. When `sample_col` is omitted, usable `Sample` labels are preferred
+and QXYCell falls back to `Image`; an explicit `sample_col` is always honored.
+Rows and columns are reordered by hierarchical clustering (no dendrogram).
+Pass `cluster_rows=False` or `cluster_cols=False` to preserve input order.
 
 ## Colormaps
 

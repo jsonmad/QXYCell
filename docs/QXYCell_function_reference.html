@@ -647,9 +647,14 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
         <td>20 mm per bar column instead of the 15 mm default.</td>
       </tr>
       <tr>
-        <td>Spatial plot by sample</td>
-        <td><code>qxy.plot_spatial(adata, sample_col="ImageID")</code></td>
-        <td>One spatial figure per sample.</td>
+        <td>Spatial plot with automatic grouping</td>
+        <td><code>qxy.plot_spatial(adata)</code></td>
+        <td>Uses usable <code>Sample</code> labels when available, otherwise falls back to <code>Image</code>.</td>
+      </tr>
+      <tr>
+        <td>Spatial plot forced by image</td>
+        <td><code>qxy.plot_spatial(adata, sample_col="Image")</code></td>
+        <td>One spatial figure per QuPath image, even when <code>Sample</code> labels exist.</td>
       </tr>
       <tr>
         <td>Combined spatial panel</td>
@@ -724,7 +729,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr>
         <td>CN abundance heatmap (by sample)</td>
         <td><code>qxy.plot_cn_heatmap(adata)</code></td>
-        <td>CN fraction per sample (columns sum to 1). Clustered rows + cols. Batlow colormap. Colorbar label: <code>f (↓)</code>. PDF plus CSV by default; optional PNG/SVG/TIFF.</td>
+        <td>CN fraction per <code>Sample</code>, falling back to <code>Image</code> when usable sample labels are unavailable (columns sum to 1). Clustered rows + cols. Batlow colormap. Colorbar label: <code>f (↓)</code>. PDF plus CSV by default; optional PNG/SVG/TIFF.</td>
       </tr>
       <tr>
         <td>CN heatmap with condition strip</td>
@@ -793,6 +798,7 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
     <thead><tr><th>Function</th><th>Parameter</th><th>Default</th><th>Meaning</th></tr></thead>
     <tbody>
       <tr><td><code>plot_spatial</code></td><td><code>underlay_adata</code></td><td><code>None</code></td><td>Use another AnnData for grey cells and panel bounds; the primary <code>adata</code> supplies coloured categories.</td></tr>
+      <tr><td><code>plot_spatial</code></td><td><code>sample_col</code></td><td><code>None</code></td><td>Automatically prefer usable <code>Sample</code> labels shared by the plotted and underlay objects, otherwise use <code>Image</code>. Pass a column name to force it.</td></tr>
       <tr><td><code>plot_spatial</code></td><td><code>include_missing_samples</code></td><td><code>False</code></td><td>Exclude cells where <code>adata.obs[sample_col]</code> is NaN. Set true to include a <code>nan</code> panel.</td></tr>
       <tr><td><code>plot_spatial</code></td><td><code>save_png</code> / <code>save_pdf</code></td><td><code>True</code> / <code>False</code></td><td>PNG-only by default; enable either format or both.</td></tr>
       <tr><td><code>plot_annotation_polygons</code></td><td><code>project_dir</code></td><td><code>None</code></td><td>Falls back to <code>adata.uns["qxycell"]["project_dir"]</code>.</td></tr>
@@ -867,8 +873,8 @@ pd.crosstab(adata.obs["cn"], adata.obs["celltype"], normalize="index")</code></p
       <tr>
         <td><code>sample_col</code></td>
         <td><code>plot_cn_heatmap</code></td>
-        <td><code>"Image"</code></td>
-        <td>Column in <code>adata.obs</code> used as columns (one column per sample).</td>
+        <td><code>None</code></td>
+        <td>Automatically use usable <code>Sample</code> labels, otherwise <code>Image</code>. Pass a column name to force it.</td>
       </tr>
       <tr>
         <td><code>condition_col</code></td>

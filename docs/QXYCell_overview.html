@@ -384,13 +384,13 @@ qxy.plot_spatial(adata_cn, underlay_adata=adata,
 
     <h2>Current Plotting Defaults</h2>
     <ul>
-      <li><code>plot_spatial()</code>: PNG only; cells with missing <code>sample_col</code> are excluded; a separate full-data underlay can be supplied with <code>underlay_adata=</code>.</li>
+      <li><code>plot_spatial()</code>: automatically uses usable <code>Sample</code> labels and otherwise falls back to <code>Image</code>; PNG only; cells with missing labels are excluded; a separate full-data underlay can be supplied with <code>underlay_adata=</code>.</li>
       <li><code>plot_stacked_bar()</code>: PDF only plus CSV tables.</li>
       <li><code>plot_cell_boundaries()</code>: PNG only.</li>
       <li><code>plot_annotation_polygons()</code>: PNG-only QC, low-resolution cell-density underlay, and boundary-only polygons (<code>fill=False</code>).</li>
       <li><code>plot_marker_positivity_heatmap()</code>: fraction positive (0–1), PDF plus CSV.</li>
       <li><code>plot_marker_intensity_heatmap()</code>: category mean intensity followed by per-marker Z-scoring, PDF plus CSV. Default markers are those actually applied by thresholding.</li>
-      <li><code>plot_cn_heatmap()</code>: PDF plus CSV.</li>
+      <li><code>plot_cn_heatmap()</code>: automatically uses usable <code>Sample</code> labels and otherwise falls back to <code>Image</code>; PDF plus CSV.</li>
     </ul>
 
     <h2>Verification</h2>

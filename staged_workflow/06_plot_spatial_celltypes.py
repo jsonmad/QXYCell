@@ -11,7 +11,7 @@ def main() -> None:
         adata,
         underlay_adata=None,
         category_col="celltype",
-        sample_col="Image",
+        sample_col=None,  # Prefer usable Sample labels, otherwise use Image.
         subset_col=None,
         subset_value=None,
         samples=None,

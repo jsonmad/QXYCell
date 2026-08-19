@@ -92,7 +92,8 @@ python .\05_apply_celltypes.py
 
 ### Optional step 6: plot spatial cell types
 
-After cell typing, create one spatial PNG per image:
+After cell typing, create one spatial PNG per Sample label when available,
+falling back to one PNG per QuPath image:
 
 ```bash
 python 06_plot_spatial_celltypes.py
@@ -105,9 +106,12 @@ python .\06_plot_spatial_celltypes.py
 ```
 
 The script lists every `qxy.plot_spatial()` option explicitly so you can edit
-the plot settings in one place. It keeps the QXYCell defaults except for
-`show=False`, which prevents interactive plot windows during command-line or
-remote runs. With the supplied options, PNG files are written to:
+the plot settings in one place. Its `sample_col=None` setting automatically
+prefers usable `Sample` labels and otherwise uses `Image`; set it explicitly
+to `"Sample"` or `"Image"` to force either grouping. It keeps the other
+QXYCell defaults except for `show=False`, which prevents interactive plot
+windows during command-line or remote runs. With the supplied options, PNG
+files are written to:
 
 ```text
 OUTPUT_DIR/plots/spatial_celltypes/
