@@ -25,7 +25,7 @@ from qxycell.classifiers import (
     validate_classifiers,
 )
 from qxycell.geojson import discover_geojson_files, summarize_geojson_files, validate_geojson_files
-from qxycell.markers import marker_name_from_classifier_name
+from qxycell.markers import marker_name_from_classifier
 from qxycell.measurements import (
     MEASUREMENT_TEXT_ENCODING,
     discover_measurement_files,
@@ -322,7 +322,7 @@ def _marker_lookup_by_measurement_column(
             continue
         lookup.setdefault(
             str(classifier.measurement_column),
-            marker_name_from_classifier_name(classifier.name),
+            marker_name_from_classifier(classifier.name, classifier.measurement_column),
         )
     return lookup
 

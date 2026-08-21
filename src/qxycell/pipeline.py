@@ -22,7 +22,7 @@ from qxycell.geojson import (
     summarize_geojson_files,
     validate_geojson_files,
 )
-from qxycell.markers import marker_name_from_classifier_name
+from qxycell.markers import marker_name_from_classifier, marker_name_from_classifier_name
 from qxycell.measurements import (
     MEASUREMENT_COLUMN_ALIASES,
     MEASUREMENT_TEXT_ENCODING,
@@ -110,7 +110,9 @@ def _unique_marker_names(classifier_groups: list[list[ClassifierDefinition]]) ->
     seen: dict[str, int] = {}
     for group_index, group in enumerate(classifier_groups):
         classifier = group[0]
-        base = marker_name_from_classifier_name(classifier.name)
+        base = marker_name_from_classifier(
+            classifier.name, classifier.measurement_column
+        )
         count = seen.get(base, 0)
         seen[base] = count + 1
         names[group_index] = base if count == 0 else f"{base}_{count + 1}"
@@ -140,6 +142,8 @@ def _build_var_dataframe_from_measurement_columns(marker_columns, marker_names, 
                 "source_measurement_column": measurement_column,
                 "threshold": "",
                 "threshold_source": "",
+                "threshold_marker_name": "",
+                "positivity_column": "",
             }
         )
     return pd.DataFrame(rows, index=index)
@@ -373,7 +377,13 @@ def _apply_threshold_definitions(
             Path(threshold_table_writer()).expanduser().resolve()
         )
 
-    for column in ("classifier_name", "threshold", "threshold_source"):
+    for column in (
+        "classifier_name",
+        "threshold",
+        "threshold_source",
+        "threshold_marker_name",
+        "positivity_column",
+    ):
         if column in adata.var.columns:
             adata.var[column] = ""
     n_pos_columns = _apply_marker_thresholds(
@@ -392,6 +402,12 @@ def _apply_threshold_definitions(
         adata.var.iloc[marker_index, adata.var.columns.get_loc("threshold_source")] = "|".join(
             str(item.path) for item in group
         )
+        adata.var.iloc[
+            marker_index, adata.var.columns.get_loc("threshold_marker_name")
+        ] = marker_names[group_index]
+        adata.var.iloc[
+            marker_index, adata.var.columns.get_loc("positivity_column")
+        ] = f"{marker_names[group_index]}_pos"
 
     summary = {
         "project_dir": str(Path(project_dir).expanduser().resolve()),
