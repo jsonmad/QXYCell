@@ -106,16 +106,26 @@ def _group_simple_classifiers(
 
 
 def _unique_marker_names(classifier_groups: list[list[ClassifierDefinition]]) -> dict[int, str]:
+    bases = [
+        marker_name_from_classifier(group[0].name, group[0].measurement_column)
+        for group in classifier_groups
+    ]
+    return _allocate_unique_names(bases)
+
+
+def _allocate_unique_names(bases: list[str]) -> dict[int, str]:
+    """Allocate deterministic names without colliding with earlier outputs."""
+
     names: dict[int, str] = {}
-    seen: dict[str, int] = {}
-    for group_index, group in enumerate(classifier_groups):
-        classifier = group[0]
-        base = marker_name_from_classifier(
-            classifier.name, classifier.measurement_column
-        )
-        count = seen.get(base, 0)
-        seen[base] = count + 1
-        names[group_index] = base if count == 0 else f"{base}_{count + 1}"
+    used: set[str] = set()
+    for index, base in enumerate(bases):
+        candidate = base
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        used.add(candidate)
+        names[index] = candidate
     return names
 
 
@@ -168,17 +178,14 @@ def _unique_marker_names_for_measurement_columns(
     classifiers: list[ClassifierDefinition],
 ) -> dict[int, str]:
     classifier_marker_lookup = _marker_name_lookup_by_measurement_column(classifiers)
-    names: dict[int, str] = {}
-    seen: dict[str, int] = {}
-    for index, column in enumerate(columns):
-        base = classifier_marker_lookup.get(
+    bases = [
+        classifier_marker_lookup.get(
             str(column),
             marker_name_from_measurement_column(column),
         )
-        count = seen.get(base, 0)
-        seen[base] = count + 1
-        names[index] = base if count == 0 else f"{base}_{count + 1}"
-    return names
+        for column in columns
+    ]
+    return _allocate_unique_names(bases)
 
 
 def _apply_marker_thresholds(
@@ -346,6 +353,12 @@ def _apply_threshold_definitions(
             + ", ".join(sorted(dict.fromkeys(missing_columns)))
         )
 
+    matched = sorted(
+        zip(marker_indices, matched_groups, strict=True),
+        key=lambda item: item[0],
+    )
+    marker_indices = [marker_index for marker_index, _group in matched]
+    matched_groups = [group for _marker_index, group in matched]
     marker_names = _unique_marker_names(matched_groups)
     active_pos_columns = [
         f"{marker_names[index]}_pos" for index in range(len(matched_groups))

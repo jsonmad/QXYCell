@@ -2012,8 +2012,8 @@ def _build_heatmap_figure(
 
 # ── Public heatmap functions ─────────────────────────────────────────────────
 
-def _resolve_thresholded_marker_mappings(adata) -> list[tuple[str, str, str]]:
-    """Return ``(display_name, intensity_var_name, positivity_column)`` mappings."""
+def _resolve_thresholded_marker_mappings(adata) -> list[tuple[str, int, str]]:
+    """Return ``(display_name, var_position, positivity_column)`` mappings."""
 
     import pandas as pd
 
@@ -2021,8 +2021,11 @@ def _resolve_thresholded_marker_mappings(adata) -> list[tuple[str, str, str]]:
     if not required.issubset(adata.var.columns):
         return []
 
-    mappings: list[tuple[str, str, str]] = []
-    for intensity_var_name, row in adata.var.iterrows():
+    mappings: list[tuple[str, int, str]] = []
+    marker_positions: dict[str, int] = {}
+    positivity_positions: dict[str, int] = {}
+    for var_position in range(adata.n_vars):
+        row = adata.var.iloc[var_position]
         display_name = row["threshold_marker_name"]
         positivity_column = row["positivity_column"]
         if pd.isna(display_name) or pd.isna(positivity_column):
@@ -2030,7 +2033,18 @@ def _resolve_thresholded_marker_mappings(adata) -> list[tuple[str, str, str]]:
         display_name = str(display_name).strip()
         positivity_column = str(positivity_column).strip()
         if display_name and positivity_column:
-            mappings.append((display_name, str(intensity_var_name), positivity_column))
+            duplicate_position = marker_positions.get(display_name)
+            duplicate_positivity_position = positivity_positions.get(positivity_column)
+            if duplicate_position is not None or duplicate_positivity_position is not None:
+                raise ValueError(
+                    "Duplicate canonical threshold marker mapping identity in "
+                    f"adata.var: marker={display_name!r}, "
+                    f"positivity_column={positivity_column!r}. "
+                    "Rerun thresholding to create unambiguous mappings."
+                )
+            marker_positions[display_name] = var_position
+            positivity_positions[positivity_column] = var_position
+            mappings.append((display_name, var_position, positivity_column))
     return mappings
 
 
@@ -2177,19 +2191,19 @@ def plot_marker_heatmap(
             if marker_mappings is None:
                 valid = [marker for marker in marker_names if marker in adata.var_names]
                 display_markers = valid
+                midx = [list(adata.var_names).index(marker) for marker in valid]
             else:
-                valid = [mapping[1] for mapping in marker_mappings]
                 display_markers = [mapping[0] for mapping in marker_mappings]
-            if not valid:
+                midx = [mapping[1] for mapping in marker_mappings]
+            if not midx:
                 raise ValueError(
                     "None of the specified markers found in adata.var_names."
                 )
-            midx  = [list(adata.var_names).index(m) for m in valid]
             X_sub = X[:, midx]
             obs_df = adata.obs[[category_col]].copy()
             obs_df["_idx"] = range(len(obs_df))
             groups = obs_df.groupby(category_col, observed=True)["_idx"].apply(list)
-            mat = np.zeros((len(groups), len(valid)))
+            mat = np.zeros((len(groups), len(midx)))
             for r, (_, idxs) in enumerate(groups.items()):
                 mat[r] = X_sub[idxs].mean(axis=0)
             col_std = mat.std(axis=0)

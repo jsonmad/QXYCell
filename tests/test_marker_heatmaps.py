@@ -4,6 +4,7 @@ import anndata as ad
 import matplotlib
 import numpy as np
 import pandas as pd
+import pytest
 
 import qxycell as qxy
 
@@ -101,3 +102,127 @@ def test_explicit_marker_keeps_existing_intensity_selection(tmp_path):
     intensity = pd.read_csv(_csv_path(result, "intensity"), index_col=0)
     assert intensity.columns.tolist() == ["CD3"]
     assert intensity.loc["High", "CD3"] < intensity.loc["Low", "CD3"]
+
+
+def test_default_intensity_uses_mapped_position_with_duplicate_var_names(tmp_path):
+    obs = pd.DataFrame(
+        {"celltype": ["Low", "Low", "High", "High"]},
+        index=[f"cell_{index}" for index in range(4)],
+    )
+    var = pd.DataFrame(
+        {
+            "threshold_marker_name": ["", "CD3-nuc"],
+            "positivity_column": ["", "CD3-nuc_pos"],
+        },
+        index=["first", "second"],
+    )
+    X = np.array(
+        [
+            [10.0, 1.0],
+            [10.0, 1.0],
+            [1.0, 10.0],
+            [1.0, 10.0],
+        ]
+    )
+    adata = ad.AnnData(X=X, obs=obs, var=var)
+    adata.var_names = ["CD3", "CD3"]
+
+    result = qxy.plot_marker_intensity_heatmap(
+        adata,
+        markers=None,
+        cluster_rows=False,
+        cluster_cols=False,
+        save_pdf=True,
+        output_dir=tmp_path,
+        show=False,
+        verbose=False,
+    )
+
+    intensity = pd.read_csv(_csv_path(result, "intensity"), index_col=0)
+    assert intensity.loc["High", "CD3-nuc"] > intensity.loc["Low", "CD3-nuc"]
+
+
+def test_default_heatmaps_preserve_mapped_var_order(tmp_path):
+    obs = pd.DataFrame(
+        {
+            "celltype": ["Low", "Low", "High", "High"],
+            "Marker-A_pos": [0, 0, 1, 1],
+            "Marker-B_pos": [1, 1, 0, 0],
+        },
+        index=[f"cell_{index}" for index in range(4)],
+    )
+    var = pd.DataFrame(
+        {
+            "threshold_marker_name": ["Marker-B", "Marker-A"],
+            "positivity_column": ["Marker-B_pos", "Marker-A_pos"],
+        },
+        index=["internal-b", "internal-a"],
+    )
+    adata = ad.AnnData(
+        X=np.array(
+            [
+                [9.0, 1.0],
+                [9.0, 1.0],
+                [1.0, 9.0],
+                [1.0, 9.0],
+            ]
+        ),
+        obs=obs,
+        var=var,
+    )
+
+    positivity_result = qxy.plot_marker_positivity_heatmap(
+        adata,
+        markers=None,
+        cluster_rows=False,
+        cluster_cols=False,
+        save_pdf=True,
+        output_dir=tmp_path / "positivity",
+        show=False,
+        verbose=False,
+    )
+    intensity_result = qxy.plot_marker_intensity_heatmap(
+        adata,
+        markers=None,
+        cluster_rows=False,
+        cluster_cols=False,
+        save_pdf=True,
+        output_dir=tmp_path / "intensity",
+        show=False,
+        verbose=False,
+    )
+
+    positivity = pd.read_csv(_csv_path(positivity_result, "positivity"), index_col=0)
+    intensity = pd.read_csv(_csv_path(intensity_result, "intensity"), index_col=0)
+    assert positivity.columns.tolist() == ["Marker-B", "Marker-A"]
+    assert intensity.columns.tolist() == ["Marker-B", "Marker-A"]
+
+
+def test_default_heatmaps_reject_duplicate_canonical_mapping_identities(tmp_path):
+    obs = pd.DataFrame(
+        {"celltype": ["Low", "High"]},
+        index=["cell_1", "cell_2"],
+    )
+    var = pd.DataFrame(
+        {
+            "threshold_marker_name": ["CD3-nuc", "CD3-nuc"],
+            "positivity_column": ["CD3-nuc_pos", "CD3-nuc-other_pos"],
+        },
+        index=["first", "second"],
+    )
+    adata = ad.AnnData(X=np.zeros((2, 2)), obs=obs, var=var)
+
+    with pytest.raises(
+        ValueError,
+        match="Duplicate canonical threshold marker mapping.*CD3-nuc",
+    ):
+        qxy.plot_marker_intensity_heatmap(
+            adata,
+            markers=None,
+            cluster_rows=False,
+            cluster_cols=False,
+            save_pdf=True,
+            output_dir=tmp_path,
+            show=False,
+            verbose=False,
+        )
