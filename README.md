@@ -345,6 +345,13 @@ CD3       CD3: Mean             0.42            0.38
 CD8       CD8: Median           0.31            0.29
 ```
 
+Classifier marker names include non-cellular compartments: `-nuc`, `-mem`,
+and `-cyto`. Cell measurements keep the unsuffixed marker name. For example,
+a nucleus classifier named `CD3` produces the classifier marker `CD3-nuc`,
+while the cell measurement remains `CD3`. AnnData objects imported before this
+change must be re-imported before thresholding so the threshold-to-intensity
+mapping is available.
+
 ## Annotations
 
 Remove cells inside annotations drawn around tissue artifacts, tissue folds,
@@ -432,6 +439,11 @@ listed markers to be negative, and `any_positive` requires at least one listed
 marker to be positive. Rules are evaluated from top to bottom, and the first
 matching rule assigns `adata.obs["celltype"]`. Put specific cell types before
 broader populations so broad rules do not capture them first.
+
+After changing to compartment-aware marker names, regenerate the cell-type
+prompt and update YAML marker references before applying cell types again. For
+example, a rule that previously referenced `CD3` for a nucleus classifier must
+reference `CD3-nuc`.
 
 If thresholds are changed and either threshold stage is rerun, QXYCell replaces
 the previous marker-positive calls and removes threshold-dependent cell-type
@@ -710,6 +722,11 @@ heatmap. Positivity is the positive-cell count divided by all cells in that
 category. Both functions save one PDF plus the plotted matrix as CSV by
 default. The legacy `plot_marker_heatmap(values=...)` entry point remains only
 for older code.
+
+When `markers=None`, the default marker heatmaps use the exact classifier source
+measurement recorded during thresholding, including whether QuPath used `Mean`
+or `Median`, and display its canonical compartment-aware marker name. Explicit
+`markers=[...]` selections retain their existing behavior.
 
 CN abundance heatmaps:
 

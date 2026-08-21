@@ -32,7 +32,6 @@ This explicit relationship is authoritative. Numeric `adata.var_names` suffixes 
 - With `markers=None`, marker positivity and intensity heatmaps use the explicit threshold mapping and display canonical marker names.
 - The intensity heatmap reads the exact intensity variable referenced by the classifier, including its configured Mean or Median statistic.
 - Explicit `markers=[...]` calls retain their existing behavior.
-- For older AnnData objects without the new mapping columns, plotting uses a compatibility fallback based on existing threshold metadata and classifier/source-measurement fields.
 
 ## Migration
 
@@ -43,7 +42,6 @@ Cell-compartment classifiers remain unchanged (`CD3`), limiting migration to non
 ## Error handling
 
 - Unknown or absent compartments receive no suffix, preserving current naming.
-- Plotting ignores incomplete legacy mapping entries and uses its compatibility path.
 - If no valid threshold-to-intensity mapping can be resolved, the existing clear heatmap errors remain in effect.
 
 ## Testing
@@ -53,9 +51,10 @@ Tests will verify:
 1. Canonical naming for Cell, Nucleus, Membrane, Cytoplasm, and unspecified measurements.
 2. Threshold application creates compartment-aware positivity columns and stores the exact mapping on the matched intensity variable.
 3. Both default heatmaps include every thresholded marker, display canonical names, and use the exact configured intensity source.
-4. Compatibility behavior for older AnnData objects without the new mapping fields.
-5. Existing explicit marker selection remains unchanged.
+4. Existing explicit marker selection remains unchanged.
 
 ## Scope
 
 The change is limited to classifier-derived marker naming, threshold provenance, heatmap auto-selection, focused documentation, and regression tests. Imported raw intensity variable naming is not redesigned.
+
+AnnData objects imported before this change are outside the compatibility scope and should be re-imported before rerunning thresholding.
