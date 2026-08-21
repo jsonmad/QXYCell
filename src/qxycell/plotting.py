@@ -2012,6 +2012,28 @@ def _build_heatmap_figure(
 
 # ── Public heatmap functions ─────────────────────────────────────────────────
 
+def _resolve_thresholded_marker_mappings(adata) -> list[tuple[str, str, str]]:
+    """Return ``(display_name, intensity_var_name, positivity_column)`` mappings."""
+
+    import pandas as pd
+
+    required = {"threshold_marker_name", "positivity_column"}
+    if not required.issubset(adata.var.columns):
+        return []
+
+    mappings: list[tuple[str, str, str]] = []
+    for intensity_var_name, row in adata.var.iterrows():
+        display_name = row["threshold_marker_name"]
+        positivity_column = row["positivity_column"]
+        if pd.isna(display_name) or pd.isna(positivity_column):
+            continue
+        display_name = str(display_name).strip()
+        positivity_column = str(positivity_column).strip()
+        if display_name and positivity_column:
+            mappings.append((display_name, str(intensity_var_name), positivity_column))
+    return mappings
+
+
 def plot_marker_heatmap(
     adata,
     *,
@@ -2049,10 +2071,9 @@ def plot_marker_heatmap(
     category_col:
         Column in ``adata.obs`` to group cells by (default ``"celltype"``).
     markers:
-        List of marker names to include. By default, uses only markers with a
-        corresponding ``adata.obs["<marker>_pos"]`` column, i.e. markers
-        actually applied from the active threshold table. Pass an explicit
-        list to override this selection.
+        List of marker names to include. By default, uses the explicit marker
+        mappings written by thresholding. Pass an explicit list to override
+        this selection.
     values:
         ``"positivity"`` — mean fraction of cells positive (from ``_pos``
         columns in ``adata.obs``); colormap defaults to ``"cividis"``,
@@ -2103,15 +2124,12 @@ def plot_marker_heatmap(
     # so the row strip uses the same colours as plot_spatial / plot_stacked_bar.
     _cat_palette = _get_category_palette(adata, category_col) if row_strip else None
 
+    marker_mappings = None
     if markers is not None:
         marker_names = list(markers)
     else:
-        marker_names = [
-            str(marker)
-            for marker in adata.var_names
-            if f"{marker}_pos" in adata.obs.columns
-        ]
-        if not marker_names:
+        marker_mappings = _resolve_thresholded_marker_mappings(adata)
+        if not marker_mappings:
             raise ValueError(
                 "No thresholded markers found. Run qxy.threshold(adata, ...) first, "
                 "or pass markers=[...] explicitly to plot unthresholded intensities."
@@ -2121,13 +2139,25 @@ def plot_marker_heatmap(
 
     for mode in modes:
         if mode == "positivity":
-            pos_cols = [f"{m}_pos" for m in marker_names
-                        if f"{m}_pos" in adata.obs.columns]
+            if marker_mappings is None:
+                pos_cols = [
+                    f"{marker}_pos"
+                    for marker in marker_names
+                    if f"{marker}_pos" in adata.obs.columns
+                ]
+                display_markers = [column.removesuffix("_pos") for column in pos_cols]
+            else:
+                valid_mappings = [
+                    mapping
+                    for mapping in marker_mappings
+                    if mapping[2] in adata.obs.columns
+                ]
+                pos_cols = [mapping[2] for mapping in valid_mappings]
+                display_markers = [mapping[0] for mapping in valid_mappings]
             if not pos_cols:
                 raise ValueError(
                     "No '_pos' columns found. Run qxy.threshold(adata, ...) first."
                 )
-            display_markers = [c.removesuffix("_pos") for c in pos_cols]
             matrix_df  = adata.obs.groupby(category_col, observed=True)[pos_cols].mean()
             matrix_df.columns = display_markers
             matrix     = matrix_df.values.astype(float)
@@ -2144,7 +2174,12 @@ def plot_marker_heatmap(
             if hasattr(X, "toarray"):
                 X = X.toarray()
             X = np.asarray(X, dtype=float)
-            valid = [m for m in marker_names if m in adata.var_names]
+            if marker_mappings is None:
+                valid = [marker for marker in marker_names if marker in adata.var_names]
+                display_markers = valid
+            else:
+                valid = [mapping[1] for mapping in marker_mappings]
+                display_markers = [mapping[0] for mapping in marker_mappings]
             if not valid:
                 raise ValueError(
                     "None of the specified markers found in adata.var_names."
@@ -2161,7 +2196,7 @@ def plot_marker_heatmap(
             col_std[col_std == 0] = 1
             matrix     = (mat - mat.mean(axis=0)) / col_std
             row_labels = list(groups.index)
-            col_labels = valid
+            col_labels = display_markers
             matrix_df  = pd.DataFrame(matrix, index=row_labels, columns=col_labels)
             cbar_label = "z (↓)"
             _cmap      = _resolve_cmap(cmap) if cmap is not None else "coolwarm"
