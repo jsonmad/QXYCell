@@ -68,12 +68,8 @@ conda env update -f environment.yml --prune
 ![QXYCell workflow from multiplex tissue imaging through QuPath, QXYCell,
 AnnData, spatial plots, and downstream analysis](docs/assets/qxycell_workflow.png)
 
-> **QuPath notice:** [QuPath](https://qupath.github.io/) is third-party
-> open-source software licensed under the
-> [GNU General Public License v3.0](https://github.com/qupath/qupath/blob/main/LICENSE).
-> QXYCell is an independent project and is not affiliated with or endorsed by
-> the QuPath project or the University of Edinburgh. The QuPath name is used
-> only to describe workflow compatibility and integration.
+> QXYCell is independent and is not affiliated with or endorsed by
+> [QuPath](https://qupath.github.io/) ([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
 
 ## Prepare data in QuPath
 
