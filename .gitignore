@@ -46,6 +46,7 @@ output/
 
 # Exported notebooks and scratch HTML in repo root
 /*.html
+/*.pptx
 
 # Images in repo root (keep assets/ folder only)
 /*.png
