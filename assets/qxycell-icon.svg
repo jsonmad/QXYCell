@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="700" viewBox="0 0 200 200" role="img" aria-labelledby="title desc">
+  <title id="title">QXYCell logo</title>
+  <desc id="desc">Three outlined cells connected across a light spatial grid within a rounded navy square.</desc>
+  <rect width="200" height="200" fill="#FFFFFF"/>
+  <rect x="18" y="18" width="164" height="164" rx="34" fill="#FAFCFD" stroke="#14233A" stroke-width="11"/>
+  <g stroke="#DCE6ED" stroke-width="2">
+    <path d="M51 25V175M84 24V176M117 24V176M150 25V175"/>
+    <path d="M25 51H175M24 84H176M24 117H176M25 150H175"/>
+  </g>
+  <g transform="translate(100 100) scale(1.07) translate(-100 -100)">
+    <path d="M69 67L126 61" stroke="#D25C9B" stroke-width="5" stroke-linecap="round"/>
+    <path d="M126 61L103 116" stroke="#6B82C4" stroke-width="5" stroke-linecap="round"/>
+    <path d="M86 93C92 89 113 84 124 96C137 108 134 130 119 142C104 154 82 147 73 130C65 115 70 104 80 97L86 93Z" fill="#0797A8" stroke="#056875" stroke-width="2.8" stroke-linejoin="round"/>
+    <circle cx="103" cy="119" r="9" fill="#D3F1F3"/>
+    <path d="M45 50C59 37 79 40 87 56C95 71 91 90 86 93L80 97C67 101 51 94 43 80C35 66 36 58 45 50Z" fill="#D8267A" stroke="#9F1557" stroke-width="2.8" stroke-linejoin="round"/>
+    <circle cx="66" cy="65" r="8" fill="#F8D9E9"/>
+    <path d="M114 50C124 42 138 47 141 59C144 71 133 81 121 77C109 74 104 58 114 50Z" fill="#9B6BD6" stroke="#6743A0" stroke-width="2.8"/>
+    <circle cx="126" cy="61" r="5" fill="#E8DDF7"/>
+  </g>
+</svg>
