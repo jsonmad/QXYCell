@@ -29,13 +29,19 @@ def workflow(
     from qxycell.metadata import add_metadata
     from qxycell.pipeline import add_annotations, import_cells
     from qxycell.pipeline import apply_thresholds as apply_thresholds_to_adata
+    from qxycell.paths import resolve_output_dir
     from qxycell.plotting import plot_spatial, plot_stacked_bar
     from qxycell.summary import dataset_summary
     from qxycell.stage_state import checkpoint_outputs
 
+    output_path = resolve_output_dir(
+        output_dir,
+        project_dir=project_dir,
+        project_output_kind="run",
+    )
     adata = import_cells(
         project_dir,
-        output_dir=output_dir,
+        output_dir=output_path,
         verbose=verbose,
     )
     add_annotations(adata, project_dir=project_dir, pixel_size_um=0.28, verbose=verbose)
@@ -44,7 +50,7 @@ def workflow(
             adata,
             project_dir=project_dir,
             threshold_file=threshold_file,
-            output_dir=output_dir,
+            output_dir=output_path,
             verbose=verbose,
         )
 
@@ -67,7 +73,7 @@ def workflow(
         dataset_summary(
             adata,
             sample_col=sample_col,
-            output_dir=output_dir,
+            output_dir=output_path,
             verbose=verbose,
         )
 
