@@ -249,10 +249,10 @@
         <td>Adds metadata columns to every cell by sample.</td>
       </tr>
       <tr>
-        <td><code>qxy.qc</code></td>
-        <td>Create QC tables and an HTML QC report.</td>
-        <td><code>qc = qxy.qc(adata, sample_col="ImageID")</code></td>
-        <td>QC TSV tables and <code>qc_report.html</code>.</td>
+        <td><code>qxy.dataset_summary</code></td>
+        <td>Create descriptive dataset-summary tables and an HTML report.</td>
+        <td><code>summary = qxy.dataset_summary(adata, sample_col="Sample")</code></td>
+        <td>Dataset-summary TSV tables and <code>dataset_summary.html</code>.</td>
       </tr>
       <tr>
         <td><code>qxy.plot_stacked_bar</code></td>
@@ -316,7 +316,7 @@
       </tr>
       <tr>
         <td><code>qxy.workflow</code></td>
-        <td>Convenience wrapper for run, metadata, ignore removal, celltyping, QC, plots, and save.</td>
+        <td>Convenience wrapper for run, metadata, ignore removal, celltyping, dataset summary, plots, and save.</td>
         <td><code>adata = qxy.workflow(qupath_project)</code></td>
         <td>Completed AnnData workflow.</td>
       </tr>
@@ -377,7 +377,7 @@ qxy.add_metadata(
     sample_col="ImageID",
 )
 
-qxy.qc(adata, sample_col="ImageID")
+qxy.dataset_summary(adata, sample_col="Sample")
 
 qxy.plot_spatial(
     adata,
@@ -1062,7 +1062,7 @@ adata.obs["ImageID"] = image.map(image_name_map).fillna(image)</code></pre>
       <tr><td>Marker metadata table</td><td><code>&lt;run-folder&gt;/tables/markers_var.csv</code></td></tr>
       <tr><td>Annotation assignment audit</td><td><code>&lt;run-folder&gt;/tables/annotation_assignments.csv</code></td></tr>
       <tr><td>Celltype prompt and summaries</td><td><code>&lt;run-folder&gt;/celltype/</code></td></tr>
-      <tr><td>QC report</td><td><code>&lt;run-folder&gt;/qc/qc_report.html</code></td></tr>
+      <tr><td>Dataset summary</td><td><code>&lt;run-folder&gt;/dataset_summary/dataset_summary.html</code></td></tr>
       <tr><td>Plots</td><td><code>&lt;run-folder&gt;/plots/</code></td></tr>
     </tbody>
   </table>

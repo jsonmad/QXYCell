@@ -31,7 +31,7 @@ from qxycell.plotting import (
     plot_stacked_bar,
 )
 from qxycell.prompts import celltype_prompt
-from qxycell.qc import qc
+from qxycell.summary import dataset_summary
 from qxycell.neighbourhoods import cn_knn, cn_kmeans, cn_name
 from qxycell.workflow import workflow
 
@@ -67,7 +67,7 @@ __all__ = [
     "plot_marker_positivity_heatmap",
     "plot_spatial",
     "plot_stacked_bar",
-    "qc",
+    "dataset_summary",
     "remove_annotations",
     "remove_cells",
     "save",

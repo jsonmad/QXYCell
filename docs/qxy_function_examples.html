@@ -607,9 +607,9 @@
               <pre><code>threshold_path = qxy.generate_threshold_table(project_dir, output_dir=out_dir)</code></pre>
               <div class="output"><p><code>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/threshold_example/thresholds/thresholds_YYMMDD-HHMM.tsv</code></p></div>
             </section><section class="card">
-              <h3>qxy.qc()</h3>
-              <p>Write QC tables for markers, annotations, samples, and cell types.</p>
-              <pre><code>qc_summary = qxy.qc(adata, sample_col=&#x27;Sample&#x27;, output_dir=out_dir)</code></pre>
+              <h3>qxy.dataset_summary()</h3>
+              <p>Write descriptive tables for cells, markers, annotations, samples, and cell types already present in AnnData.</p>
+              <pre><code>summary = qxy.dataset_summary(adata, sample_col=&#x27;Sample&#x27;, output_dir=out_dir)</code></pre>
               <div class="output"><table class="dataframe data-table">
   <thead>
     <tr style="text-align: right;">
@@ -620,7 +620,7 @@
   <tbody>
     <tr>
       <td>output_dir</td>
-      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/qc</td>
+      <td>REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/dataset_summary</td>
     </tr>
     <tr>
       <td>n_cells</td>
