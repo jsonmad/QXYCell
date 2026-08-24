@@ -5,8 +5,7 @@
 </p>
 
 QXYCell converts single-cell measurements and spatial assets from a QuPath
-project folder into analysis-ready AnnData `.h5ad` objects for cell typing,
-spatial analysis, and plotting.
+project into analysis-ready AnnData `.h5ad` spatial data object for cell typing, plotting, and spatial analysis.
 
 The resulting AnnData object can be used with downstream tools such as
 [Scanpy](https://scanpy.readthedocs.io/en/stable/),
@@ -23,7 +22,7 @@ label, or shape elements are also needed.
 - [Documentation and support](#documentation-and-support)
 - [QuPath inputs](#qupath-inputs)
 - [Annotations](#annotations)
-- [QC](#qc)
+- [Dataset summary](#dataset-summary)
 - [Metadata](#metadata)
 - [Cell typing](#cell-typing)
 - [Cellular neighbourhoods](#cellular-neighbourhoods)
@@ -65,24 +64,25 @@ git pull
 conda env update -f environment.yml --prune
 ```
 
+### QXYCell Overview
+
 ![QXYCell workflow from multiplex tissue imaging through QuPath, QXYCell,
 AnnData, spatial plots, and downstream analysis](docs/assets/qxycell_workflow.png)
 
-> QXYCell is independent and is not affiliated with or endorsed by
+> QXYCell is independent and is not affiliated with
 > [QuPath](https://qupath.github.io/) ([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
 
-## Prepare data in QuPath
+## Prepare image data in QuPath
 
-Before running QXYCell, follow the
-[QuPath preparation guide](docs/qupath_preparation.md) ([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)).
-It covers image and pixel-size verification, annotations, InstanSeg cell
-segmentation, measurement and classifier export, GeoJSON export, filenames,
-and the required preflight check. The workflow targets QuPath 0.7.0 and is
-applicable to multiplex immunofluorescence data from any acquisition platform.
+Before running QXYCell, follow the [QuPath preparation guide](docs/qupath_preparation.md) ([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)). The guide covers the following multiplex immunofluorescence image-processing steps:
 
-A multichannel OME-TIFF does not need to originate from COMET, but it must open
-correctly in QuPath and have verified channels, dimensions, registration, and
-physical pixel calibration. QXYCell supports square pixels only.
+- Creating sample, tissue-artifact, and tissue-feature annotations
+- Exporting annotations as GeoJSON
+- Performing cell segmentation
+- Measuring and exporting cell-level features
+- Defining marker thresholds using single-object classifiers
+
+The workflow targets QuPath 0.7.0 and is applicable to multiplex immunofluorescence data from any acquisition platform. Images must open correctly in QuPath with their channels, dimensions, registration, and physical pixel calibration verified. QXYCell supports square pixels only and uses a default pixel size of 0.28 µm.
 
 ## Quick start
 
@@ -95,10 +95,11 @@ report = qxy.check("/path/to/qupath_project")
 # Stage 1: import the measurement table into AnnData
 adata = qxy.import_cells("/path/to/qupath_project")
 
-# Stage 2: add or refresh GeoJSON annotations and cell polygons
+# Stage 2: add or refresh GeoJSON annotations and cell polygons.
+# Annotations whose names contain the string `sample` are automatically used to define the `Sample` variable.
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
-# Optional Stage 2b: remove cells in tissue or staining artifact regions
+# Optional Stage 2b: remove cells in regions whose annotation names contain "ignore"
 qxy.remove_cells(adata, remove_cells="ignore")
 
 # Stage 3A: use QuPath classifier JSON thresholds only
@@ -116,18 +117,13 @@ qxy.celltype_prompt(adata, context="Describe the tissue and expected populations
 # Stage 5: assign cell types from the reviewed YAML
 qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 
-# Optional Stage 6: plot assigned cell types without opening GUI windows
-qxy.plot_spatial(adata, category_col="celltype", show=False)
+# Optional Stage 6: plot assigned cell types
+qxy.plot_spatial(adata, category_col="celltype", show=True)
 ```
 
-### Why the workflow is staged
+### Notes on staged workflow
 
-Stage 1 creates the base measurement checkpoint. Stages 2–5 update that same
-H5AD and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, so the
-analysis can be reviewed and revised without reimporting the measurements. The
-optional Stage 2b removes cells inside user-labelled regions containing tissue
-artifacts, folds, debris, edge artifacts, or staining artifacts, then refreshes
-the filtered H5AD and `tables/cells_obs.csv`.
+Stage 1 imports the cell measurements, creates the AnnData object (adata), and saves the initial H5AD measurement checkpoint. Stages 2–5 update the same H5AD file and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, allowing the analysis to be reviewed and revised without reimporting the measurements. The optional Stage 2b removes cells within user-labelled regions containing tissue artifacts, folds, debris, edge artifacts, or staining artifacts, then refreshes the filtered H5AD file and `tables/cells_obs.csv`. To remove cells within an annotation, its name must contain the identifier string specified for removal.
 
 | When an input changes | Rerun | What QXYCell replaces |
 |---|---|---|
@@ -153,7 +149,7 @@ For runnable files with one Python script per stage, see the
 and numbered scripts implement the same staged workflow; choose the notebook
 for a cell-by-cell experience or the scripts for terminal use.
 
-When the verified QuPath pixel size differs from 0.28 µm, supply the single
+When the verified imnage pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
 ```python
@@ -216,11 +212,13 @@ second input directory. The measurement table is the
 only unconditional input. Threshold definitions and GeoJSON files are needed
 only for the corresponding downstream features:
 
-- **Cell measurement table** — `measurements.csv` or `measurements.tsv` exported from QuPath. One table may contain cells from multiple images.
-- **Threshold TSV/CSV** *(required for thresholding)* — the source of truth for marker positivity thresholds. Use a filled table such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`. Generated tables are written under the QXYCell output folder in `thresholds/`.
-- **Object classifier JSONs** *(alternative threshold-template source)* — single-measurement classifiers saved under `classifiers/object_classifiers/*.json`. When no threshold table exists, QXYCell can convert these JSONs into a fresh timestamped table for review. Existing threshold tables remain the active source.
-- **Annotation GeoJSON** *(optional)* — exported QuPath annotation polygons, with measurements excluded. Regular annotation classification/name labels become boolean `annotation__<label>` columns in `adata.obs`. Annotations with `Sample` in the label define sample boundaries and are collapsed into one `adata.obs["Sample"]` column; annotations labelled `Ignore` mark regions to exclude. Annotation labels never create or replace `CoreID` values.
-- **Cell segmentation GeoJSON** *(optional)* — exported cell objects for all cells, measurements excluded. Provides geometry for spatial analysis.
+| Input | QuPath 0.7 menu path | Requirements and use |
+|---|---|---|
+| **Annotation GeoJSON** *(optional)* | Select the annotation objects, then choose **File > Export objects as GeoJSON** | Export a GeoJSON `FeatureCollection` with measurements excluded. Regular annotation labels become boolean `annotation__<label>` columns in `adata.obs`. Labels containing `Sample` define sample boundaries and are collapsed into `adata.obs["Sample"]`; labels containing the removal identifier, such as `Ignore`, mark regions whose cells can be excluded. |
+| **Cell segmentation GeoJSON** *(optional)* | Select the cell detection objects, then choose **File > Export objects as GeoJSON** | Export a GeoJSON `FeatureCollection` with measurements excluded and QuPath Object IDs preserved. This file provides cell-boundary geometry for spatial analysis. |
+| **Cell measurement table** | **Measure > Export measurements** | Select the required project images, set **Export type** to cells, and save as `measurements.csv` or `measurements.tsv`. One table may contain measurements exported from multiple images. |
+| **Object classifier JSONs** *(alternative threshold source)* | **Classify > Object classification > Create single measurement classifier** | Create and save one simple classifier per marker. QuPath stores project classifiers under `classifiers/object_classifiers/*.json`. When no threshold table exists, QXYCell can convert these JSONs into a fresh timestamped table for review; an existing threshold table remains the active table source. |
+| **Threshold TSV/CSV** *(required for table-based thresholding)* | Not created in QuPath | Generate a template with `qxy.generate_threshold_table(...)`, then review and fill the per-image thresholds. Use a file such as `thresholds.tsv` or `thresholds_YYMMDD-HHMM.tsv`. Generated tables are written under the QXYCell output folder in `thresholds/`. A threshold table is not required when applying object-classifier JSON thresholds directly. |
 
 Required measurement columns: `Image`, `Object ID`, `Centroid X µm`, `Centroid Y µm`.
 The known encoding variants `Centroid X ¬µm` and `Centroid Y ¬µm` are accepted and
@@ -360,37 +358,55 @@ mapping is available.
 
 ## Annotations
 
-Remove cells inside annotations drawn around tissue artifacts, tissue folds,
-debris, edge artifacts, or staining artifacts:
+Annotations can define samples or identify regions whose cells should be
+removed. Matching annotation names is case-insensitive.
+
+### Define samples
+
+Include `Sample` in the name of each annotation that defines a sample boundary.
+When `qxy.add_annotations()` imports the annotation GeoJSON, it automatically
+combines these annotations into one categorical `adata.obs["Sample"]` column:
+
+```python
+qxy.add_annotations(adata, pixel_size_um=0.28)
+adata.obs["Sample"].value_counts(dropna=False)
+```
+
+Cells inside exactly one sample annotation receive the complete annotation
+name as their sample value. Cells inside more than one sample annotation are
+labelled `Ambiguous` and a warning is emitted. The assignment summary is stored
+in `adata.uns["qxycell_sample_annotations"]`.
+
+### Remove cells from annotated regions
+
+Use a shared identifier such as `Ignore` in the names of annotations drawn
+around tissue artifacts, tissue folds, debris, edge artifacts, or staining
+artifacts. Pass the same identifier to `remove_cells`:
 
 ```python
 adata = qxy.remove_cells(adata, remove_cells="ignore")
 ```
 
-The match is case-insensitive. Rows inside matching annotation polygons are
-removed from `adata.obs` in place.
+Cells inside any matching annotation polygon are removed from `adata` in
+place. For example, `remove_cells="ignore"` matches annotations named
+`Ignore_fold`, `Ignore_edge`, or `Ignore_staining`.
 
-`qxy.add_annotations()` converts annotations with `Sample` in the label into one `Sample`
-column. Cells inside more than one sample annotation are labelled `Ambiguous`
-and a warning is emitted. You can rerun sample assignment explicitly:
+## Dataset summary
 
-```python
-sample_summary = qxy.assign_samples(adata)
-adata.obs["Sample"].value_counts()
-```
-
-Adds `adata.obs["Sample"]` (string). Summary stored in `adata.uns["qxycell_sample_annotations"]`.
-
-## QC
-
-Generate per-sample QC tables and an HTML report:
+Generate descriptive tables and an HTML report for the cells, markers,
+annotations, samples, and cell types already present in AnnData:
 
 ```python
-qc = qxy.qc(adata, sample_col="Image")
+summary = qxy.dataset_summary(adata, sample_col="Sample")
 ```
 
-Results stored in `adata.uns["qxycell_qc"]`. HTML report and TSV tables are
-written to the active output folder under `qc/`.
+Results are stored in `adata.uns["qxycell_dataset_summary"]`. The HTML report
+and TSV tables are written to the active output folder under
+`dataset_summary/`, including `dataset_summary.html` and
+`dataset_overview.tsv`.
+
+This is descriptive reporting, not validation of image quality, segmentation,
+staining, thresholds, batch effects, or spatial alignment.
 
 ## Metadata
 
@@ -880,7 +896,7 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.uns["qxycell_thresholding"]` | explicit threshold stages | Threshold source and positivity-column summary |
 | `adata.uns["qxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
 | `adata.uns["qxycell_core_ids_from_measurements"]` | `qxy.assign_core_ids_from_measurements()` | Measurement-derived CoreID assignment summary |
-| `adata.uns["qxycell_qc"]` | `qxy.qc()` | QC metrics per sample |
+| `adata.uns["qxycell_dataset_summary"]` | `qxy.dataset_summary()` | Paths to descriptive dataset-summary tables and HTML report |
 | `adata.uns["qxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
 | `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
