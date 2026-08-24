@@ -23,7 +23,7 @@ label, or shape elements are also needed.
 - [Documentation and support](#documentation-and-support)
 - [QuPath inputs](#qupath-inputs)
 - [Annotations](#annotations)
-- [Dataset summary](#dataset-summary)
+- [QC](#qc)
 - [Metadata](#metadata)
 - [Cell typing](#cell-typing)
 - [Cellular neighbourhoods](#cellular-neighbourhoods)
@@ -381,22 +381,16 @@ adata.obs["Sample"].value_counts()
 
 Adds `adata.obs["Sample"]` (string). Summary stored in `adata.uns["qxycell_sample_annotations"]`.
 
-## Dataset summary
+## QC
 
-Generate descriptive tables and an HTML report for the cells, markers,
-annotations, samples, and cell types already present in AnnData:
+Generate per-sample QC tables and an HTML report:
 
 ```python
-summary = qxy.dataset_summary(adata, sample_col="Sample")
+qc = qxy.qc(adata, sample_col="Image")
 ```
 
-Results are stored in `adata.uns["qxycell_dataset_summary"]`. The HTML report
-and TSV tables are written to the active output folder under
-`dataset_summary/`, including `dataset_summary.html` and
-`dataset_overview.tsv`.
-
-This is descriptive reporting, not validation of image quality, segmentation,
-staining, thresholds, batch effects, or spatial alignment.
+Results stored in `adata.uns["qxycell_qc"]`. HTML report and TSV tables are
+written to the active output folder under `qc/`.
 
 ## Metadata
 
@@ -886,7 +880,7 @@ adata = qxy.load("path/to/qxycell.h5ad")
 | `adata.uns["qxycell_thresholding"]` | explicit threshold stages | Threshold source and positivity-column summary |
 | `adata.uns["qxycell_sample_annotations"]` | `qxy.assign_samples()` | Sample assignment summary |
 | `adata.uns["qxycell_core_ids_from_measurements"]` | `qxy.assign_core_ids_from_measurements()` | Measurement-derived CoreID assignment summary |
-| `adata.uns["qxycell_dataset_summary"]` | `qxy.dataset_summary()` | Paths to descriptive dataset-summary tables and HTML report |
+| `adata.uns["qxycell_qc"]` | `qxy.qc()` | QC metrics per sample |
 | `adata.uns["qxycell_sample_metadata"]` | `qxy.add_metadata()` | Metadata match summary |
 | `adata.uns["qxycell_celltyping"]` | `qxy.celltype()` | Cell typing rule summary |
 | `adata.uns["cn"]` | `qxy.cn_knn()` / `qxy.cn_kmeans()` | CN run parameters, cell type list, label map |
