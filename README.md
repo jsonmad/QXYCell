@@ -7,15 +7,18 @@
   </picture>
 </p>
 
-QXYCell converts single-cell measurements and spatial assets from a QuPath
-project into analysis-ready AnnData `.h5ad` spatial data object for cell typing, plotting, and spatial analysis.
+QXYCell converts cell measurements and spatial assets from multiplex
+immunofluorescence images processed in QuPath into an analysis-ready AnnData
+`.h5ad` spatial data object for cell typing, plotting, and spatial analysis.
 
 The resulting AnnData object can be used with downstream tools such as
 [Scanpy](https://scanpy.readthedocs.io/en/stable/),
 [Squidpy](https://squidpy.readthedocs.io/en/stable/), and
 [scimap](https://scimap.xyz/), or incorporated into a
-[SpatialData](https://spatialdata.scverse.org/en/stable/) workflow when image,
-label, or shape elements are also needed.
+[SpatialData](https://spatialdata.scverse.org/en/stable/) workflow.
+
+QXYCell is independent and is not affiliated with
+[QuPath](https://qupath.github.io/) ([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
 
 ## Contents
 
@@ -58,7 +61,7 @@ qxycell --help
 
 ### Updating QXYCell
 
-When a new QXYCell version is announced, update it manually from inside the
+When a new QXYCell version is available, update it manually from inside the
 cloned repository:
 
 ```bash
@@ -72,20 +75,24 @@ conda env update -f environment.yml --prune
 ![QXYCell workflow from multiplex tissue imaging through QuPath, QXYCell,
 AnnData, spatial plots, and downstream analysis](docs/assets/qxycell_workflow.png)
 
-> QXYCell is independent and is not affiliated with
-> [QuPath](https://qupath.github.io/) ([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
-
 ## Prepare image data in QuPath
 
-Before running QXYCell, follow the [QuPath preparation guide](docs/qupath_preparation.md) ([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)). The guide covers the following multiplex immunofluorescence image-processing steps:
+Before running QXYCell, follow the
+[QuPath preparation guide](docs/qupath_preparation.md)
+([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)). The guide covers the
+following multiplex immunofluorescence image-processing steps:
 
-- Creating sample, tissue-artifact, and tissue-feature annotations
-- Exporting annotations as GeoJSON
+- Creating _sample_, _tissue-artifact_, and _tissue-feature_ **annotations**
+- Exporting annotations as GeoJSON files
 - Performing cell segmentation
 - Measuring and exporting cell-level features
 - Defining marker thresholds using single-object classifiers
 
-The workflow targets QuPath 0.7.0 and is applicable to multiplex immunofluorescence data from any acquisition platform. Images must open correctly in QuPath with their channels, dimensions, registration, and physical pixel calibration verified. QXYCell supports square pixels only and uses a default pixel size of 0.28 µm.
+The workflow targets QuPath 0.7.0 and is applicable to multiplex
+immunofluorescence data from any acquisition platform. Images must open
+correctly in QuPath with their channels, dimensions, registration, and physical
+pixel calibration verified. QXYCell supports square pixels only and uses a
+default pixel size of 0.28 µm.
 
 ## Quick start
 
@@ -99,18 +106,20 @@ report = qxy.check("/path/to/qupath_project")
 adata = qxy.import_cells("/path/to/qupath_project")
 
 # Stage 2: add or refresh GeoJSON annotations and cell polygons.
-# Annotations whose names contain the string `sample` are automatically used to define the `Sample` variable.
+# Annotations whose names contain `sample` automatically define the
+# `Sample` column in adata.obs.
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
-# Optional Stage 2b: remove cells in regions whose annotation names contain "ignore"
+# Optional Stage 2b: remove cells where annotation names contain the chosen identifier.
 qxy.remove_cells(adata, remove_cells="ignore")
 
-# Stage 3A: use QuPath classifier JSON thresholds only
+# Stage 3A: use thresholds from QuPath single-object-classifier JSONs
 qxy.threshold_from_classifiers(adata)
-# Saves the applied values to thresholds/classifier_thresholds.tsv
+# Applies thresholds and saves the applied values to thresholds/classifier_thresholds.tsv
 
 # Alternatively, stage 3B uses one named threshold table only:
 # table = qxy.generate_threshold_table("/path/to/qupath_project")
+# You can also review and reuse classifier_thresholds.tsv generated in Stage 3A.
 # qxy.threshold_from_table(adata, table)
 
 # Stage 4: create the prompt used to draft celltype_logic.yaml
@@ -120,13 +129,23 @@ qxy.celltype_prompt(adata, context="Describe the tissue and expected populations
 # Stage 5: assign cell types from the reviewed YAML
 qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 
-# Optional Stage 6: plot assigned cell types
-qxy.plot_spatial(adata, category_col="celltype", show=True)
+# Stage 6: plot assigned cell types by Image
+qxy.plot_spatial(adata, category_col="celltype", sample_col="Image", show=True)
+# Plot assigned cell types by Sample annotation
+qxy.plot_spatial(adata, category_col="celltype", sample_col="Sample", show=True)
 ```
 
 ### Notes on staged workflow
 
-Stage 1 imports the cell measurements, creates the AnnData object (adata), and saves the initial H5AD measurement checkpoint. Stages 2–5 update the same H5AD file and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`, allowing the analysis to be reviewed and revised without reimporting the measurements. The optional Stage 2b removes cells within user-labelled regions containing tissue artifacts, folds, debris, edge artifacts, or staining artifacts, then refreshes the filtered H5AD file and `tables/cells_obs.csv`. To remove cells within an annotation, its name must contain the identifier string specified for removal.
+Stage 1 imports the cell measurements, creates the AnnData object (`adata`),
+and saves the initial H5AD measurement checkpoint. Stages 2–5 update the same
+H5AD file and refresh `tables/cells_obs.csv` and `tables/markers_var.csv`,
+allowing the analysis to be reviewed and revised without reimporting the
+measurements (that is, without rerunning `qxy.import_cells()`). The optional
+Stage 2b removes cells within user-labelled regions containing tissue artifacts,
+folds, debris, edge artifacts, or staining artifacts, then refreshes the
+filtered H5AD file and `tables/cells_obs.csv`. To remove cells within an
+annotation, its name must contain the identifier string specified for removal.
 
 | When an input changes | Rerun | What QXYCell replaces |
 |---|---|---|
@@ -134,25 +153,18 @@ Stage 1 imports the cell measurements, creates the AnnData object (adata), and s
 | Ignore annotation polygons | Stages 1 and 2, then `qxy.remove_cells(adata, remove_cells="ignore")` | Rebuilds all cells before removing those inside tissue or staining artifact regions |
 | QuPath classifier JSON thresholds | `qxy.threshold_from_classifiers(adata)` | Marker `_pos` columns and `thresholds/classifier_thresholds.tsv`; prompt, cell types, and post-analysis become stale |
 | A reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Marker `_pos` columns; prompt, cell types, and post-analysis become stale |
-| Biological context for the prompt | `qxy.celltype_prompt(adata, context=...)` | `celltype/current_prompt.txt`; an expert-edited YAML is preserved |
 | Cell-type YAML | `qxy.celltype(adata)` | `celltype`, feature, derived-feature, count, and rule-summary outputs |
 
-The two threshold functions are deliberately separate. Classifier-only
-thresholding ignores tables; table-only thresholding uses the named table and
-does not fall back to classifier JSON.
+The two threshold functions are deliberately separate. Classifier-only thresholding ignores tables; table-only thresholding uses the named table and does not fall back to classifier JSON.
 
-Each successful classifier-only threshold run replaces
-`thresholds/classifier_thresholds.tsv` in the active output folder. This table
-records the classifier-derived values that were applied and can be reviewed or
-passed later to `qxy.threshold_from_table()`.
+Each successful classifier-only threshold run replaces `thresholds/classifier_thresholds.tsv` in the active output folder. This table
+records the classifier-derived values that were applied and can be reviewed or passed later to `qxy.threshold_from_table()`.
 
-For runnable files with one Python script per stage, see the
-[staged workflow examples](staged_workflow/README.md). The
-[interactive notebook](staged_workflow/QXYCell_staged_workflow.ipynb)
-and numbered scripts implement the same staged workflow; choose the notebook
+For runnable files with one Python script per stage, see the [staged workflow examples](staged_workflow/README.md). The
+[interactive notebook](staged_workflow/QXYCell_staged_workflow.ipynb) and numbered scripts implement the same staged workflow; choose the notebook
 for a cell-by-cell experience or the scripts for terminal use.
 
-When the verified imnage pixel size differs from 0.28 µm, supply the single
+When the verified image pixel size differs from 0.28 µm, supply the single
 square-pixel value during import:
 
 ```python
