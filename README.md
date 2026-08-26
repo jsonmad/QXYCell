@@ -1,7 +1,10 @@
 # QXYCell
 
 <p align="center">
-  <img src="assets/qxycell-icon.png" alt="QXYCell icon" width="180">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/qxycell-badge-dark.png">
+    <img src="assets/qxycell-badge.png" alt="QXYCell badge" width="180">
+  </picture>
 </p>
 
 QXYCell converts single-cell measurements and spatial assets from a QuPath
