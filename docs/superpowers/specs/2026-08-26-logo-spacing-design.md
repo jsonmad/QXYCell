@@ -1,53 +1,60 @@
-# QXYCell Logo Spacing Design
+# QXYCell Badge and Full-Lockup Design
 
 ## Objective
 
-Use the approved balanced spacing (visual option B) between the QXYCell badge
-and wordmark in every light and dark logo asset. The current PNG wordmark is too
-far below the badge, while the current SVG wordmark needs slightly more space.
+Use the QXYCell badge without the wordmark at the top of the GitHub README.
+Retain the existing badge-plus-wordmark lockups for larger branded documents,
+including guides, PDFs, and presentations.
 
-## Canonical geometry
+## Asset structure
 
-The light and dark SVG files are the canonical sources. Both variants will use
-the same badge and wordmark coordinates, differing only in theme colours.
-
-At the existing 600 × 790 output size, the clear optical gap between the last
-painted badge row and first painted wordmark row will target 60 px (12 SVG
-viewBox units). A tolerance of 2 px is acceptable for antialiasing. Typography,
-badge artwork, canvas dimensions, and horizontal alignment remain unchanged.
-
-The wordmark placement will avoid renderer-dependent baseline behaviour. The
-PNG files will be regenerated from the updated canonical SVG geometry, not
-positioned or retouched independently.
-
-## Repository-wide propagation
-
-Update these four source assets:
+The existing light and dark full-lockup assets remain unchanged:
 
 - `assets/qxycell-icon.svg`
 - `assets/qxycell-icon-dark.svg`
 - `assets/qxycell-icon.png`
 - `assets/qxycell-icon-dark.png`
 
+Add light and dark square badge variants derived from the same badge geometry:
+
+- `assets/qxycell-badge.svg`
+- `assets/qxycell-badge-dark.svg`
+- `assets/qxycell-badge.png`
+- `assets/qxycell-badge-dark.png`
+
+The badge variants use a 600 x 600 canvas, preserve the existing badge artwork,
+colours, border treatment, and centred alignment, and omit only the QXYCell
+wordmark. The raster files are rendered from the SVG sources rather than edited
+independently.
+
+## README presentation
+
+Replace the README's full-lockup PNG with a theme-aware HTML `picture` element.
+Use the dark badge on dark colour schemes and the light badge as the fallback.
+Keep the existing `# QXYCell` Markdown heading as the project name.
+
+## Repository-wide propagation
+
 Search all checked-in Markdown, HTML, PDF, generated-image, example, and source
-surfaces for logo use. Rebuild every generated document that embeds one of the
-changed assets, including `docs/QXYCell_QuPath_Preparation_Guide.pdf` when its
-embedded logo is affected. Do not alter unrelated document content.
+surfaces for logo use. Do not replace full lockups in larger documents merely
+because the README changes; the project intentionally supports both badge and
+full-lockup variants. Rebuild a generated document only if its logo consumer is
+changed.
 
 ## Verification
 
-- Measure the painted badge-to-wordmark gap in both PNG files at native size.
-- Render both SVG files in Chrome and confirm the same balanced optical gap.
-- Compare light and dark variants side by side for identical geometry.
-- Confirm all four files retain their current canvas dimensions and centred
-  alignment.
-- Search the repository for logo references and rebuild affected generated
-  documents.
-- Visually inspect every page of each rebuilt PDF or other generated document.
+- Confirm all four new badge files are 600 x 600.
+- Confirm light and dark badge SVGs contain no wordmark text.
+- Render the SVG files in Chrome and compare them with their PNG counterparts.
+- Render the README header in Chrome in light and dark colour schemes.
+- Confirm the existing full-lockup assets are byte-for-byte unchanged.
+- Search the repository for logo references and confirm each consumer uses the
+  intended badge or full-lockup variant.
 - Run `git diff --check` and confirm only intended branding surfaces changed.
 
 ## Acceptance criteria
 
-The four logo assets show the approved option-B spacing, light and dark variants
-match geometrically, PNG and SVG presentation no longer diverges visibly, and
-all checked-in logo consumers are current and visually verified.
+The GitHub README shows a centred badge without a duplicated wordmark, switches
+between light and dark badge variants with the viewer's colour scheme, and keeps
+the `# QXYCell` heading. Existing full-lockup assets and larger branded documents
+remain unchanged.

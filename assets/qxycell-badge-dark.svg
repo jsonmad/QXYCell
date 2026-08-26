@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="50 12 120 120" role="img" aria-labelledby="title desc">
+  <title id="title">QXYCell dark badge</title>
+  <desc id="desc">The QXYCell spatial tissue tile reversed on a deep navy background.</desc>
+  <defs>
+    <clipPath id="tile-clip"><rect x="59" y="21" width="102" height="102" rx="14"/></clipPath>
+  </defs>
+  <rect width="220" height="220" fill="#091824"/>
+  <g clip-path="url(#tile-clip)">
+    <g transform="translate(59 21) scale(1.02)">
+      <rect width="100" height="100" fill="#183B49"/>
+      <g stroke-width="2.4" stroke-linejoin="round" fill-opacity=".28">
+        <path stroke="#F06F65" fill="#F06F65" d="M-9 5C-3-4 9-2 14-4c8-2 14 5 12 12-1 5 4 10 1 16-4 7-11 7-15 11C5 40-5 34-7 27c-2-6-7-8-5-14 1-3 2-6 3-8Z"/>
+        <path stroke="#38B6A5" fill="#38B6A5" d="M28 4c6-9 16-6 22-4 8 2 10 9 7 16-2 5 2 9-3 14-5 5-12 1-18 3-7 2-13-6-12-13 1-6-1-11 4-16Z"/>
+        <path stroke="#F2BC48" fill="#F2BC48" d="M70-5c8-4 13 3 19 2 8-1 13 8 10 15-2 6 3 10-1 16-5 6-13 3-19 5-7 3-15-5-15-13 0-5-2-8 0-13 2-5 2-9 6-12Z"/>
+        <path stroke="#38B6A5" fill="#38B6A5" d="M8 43c4-9 12-9 18-12 7-2 13 3 13 10 0 5 4 9 1 14-3 6-9 5-13 10-5 6-15 3-19-3-3-6-7-9-4-15 2-2 3-3 4-4Z"/>
+        <path stroke="#F2BC48" fill="#F2BC48" d="M49 40c5-10 15-8 22-9 8 0 13 8 10 16-2 5 2 10-2 15-5 5-11 3-16 7-7 5-17-2-17-10 0-6-3-10-1-15l4-4Z"/>
+        <path stroke="#F06F65" fill="#F06F65" d="M80 71c5-9 14-7 20-9 8-1 14 6 12 14-1 5 3 10-2 15-5 6-12 3-18 7-7 4-16-4-16-12 0-6-3-10 1-14l3-1Z"/>
+        <path stroke="#38B6A5" fill="#38B6A5" d="M18 75c6-9 15-7 22-7 8 0 12 8 8 15-2 5 2 10-3 15-5 6-12 3-18 6-7 3-15-5-14-13 1-6-3-10 1-14l4-2Z"/>
+        <path stroke="#8B6FD6" fill="#8B6FD6" d="M88 38c3-5 8-5 12-1 4 3 3 8 1 11-2 5-8 7-12 3-4-3-4-9-1-13Z"/>
+        <path stroke="#8B6FD6" fill="#8B6FD6" d="M54 73c4-4 10-2 12 2 3 5 0 10-5 12-5 2-10-2-10-7 0-3 1-5 3-7Z"/>
+        <path stroke="#8B6FD6" fill="#8B6FD6" d="M2 92c4-4 10-2 12 3 2 5-2 10-7 11-5 0-9-4-8-9 0-2 1-4 3-5Z"/>
+      </g>
+      <g fill="#F4FFFF">
+        <path d="M7 17c0-3 3-5 6-3 3 1 3 5 1 7-3 2-7 0-7-4Z"/><path d="M37 15c1-3 4-4 6-2 2 2 1 5-1 7-3 1-6-2-5-5Z"/><path d="M81 14c0-3 3-5 6-3 3 1 4 5 1 7-3 3-7 0-7-4Z"/><path d="M19 49c0-3 3-5 6-3 3 1 3 5 1 7-3 3-7 0-7-4Z"/><path d="M60 49c1-3 4-5 7-2 3 2 2 5 0 7-3 2-7-1-7-5Z"/><path d="M92 45c0-2 2-3 4-2 2 1 2 3 0 5-2 1-4-1-4-3Z"/><path d="M28 86c0-3 3-5 6-3 3 2 3 5 0 7-3 2-6-1-6-4Z"/><path d="M57 80c0-2 2-3 4-2 2 1 2 4 0 5-2 1-4-1-4-3Z"/><path d="M90 80c0-3 3-5 6-3 3 2 3 5 0 7-3 2-6-1-6-4Z"/><path d="M5 98c0-2 2-4 4-2 2 1 2 3 0 5-2 1-4-1-4-3Z"/>
+      </g>
+      <rect width="100" height="100" fill="#67D5FF" fill-opacity=".10"/>
+      <g fill="none" stroke="#D2F7FF" stroke-opacity=".48" stroke-width="1">
+        <path d="M25 0v100M50 0v100M75 0v100M0 25h100M0 50h100M0 75h100"/>
+      </g>
+    </g>
+  </g>
+  <rect x="59" y="21" width="102" height="102" rx="14" fill="none" stroke="#B9C5CB" stroke-width="7"/>
+</svg>
