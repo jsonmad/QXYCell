@@ -118,6 +118,9 @@ cell set, then refresh annotations and repeat removal.
 The two threshold functions are deliberately separate. Classifier mode ignores
 tables; table mode uses only the named table. Each classifier-mode run replaces
 `thresholds/classifier_thresholds.tsv` with the values actually applied.
+To refine those values in table mode, first copy or rename that file so a later
+classifier-mode run cannot overwrite the manual edits. See
+[Refine Stage 3A thresholds with Stage 3B](qupath_inputs.md#refine-stage-3a-thresholds-with-stage-3b).
 
 ## Annotation and measurement outputs
 
@@ -161,10 +164,12 @@ adata = qxy.workflow(
 )
 ```
 
-## Continue the analysis
+## Continue after the staged workflow
 
-- Add metadata, cell types, and neighbourhoods with the
-  [analysis guide](analysis.md).
+- Add experimental fields with the [sample-metadata guide](metadata.md).
+- Create and review assignments with the [cell-typing guide](cell_typing.md).
+- Analyse local composition with the
+  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
 - Create figures with the [plotting guide](plotting.md).
 - Save, reload, and inspect the object with
   [AnnData and outputs](anndata_and_outputs.md).

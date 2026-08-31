@@ -238,7 +238,10 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
 
 ## Related documentation
 
-- Prepare analysis columns with the [analysis guide](analysis.md).
+- Add plot grouping fields with the [sample-metadata guide](metadata.md).
+- Prepare reviewed labels with the [cell-typing guide](cell_typing.md).
+- Build neighbourhood labels with the
+  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
 - Review the stored object in [AnnData and outputs](anndata_and_outputs.md).
 - See every plotting parameter in the
   [function reference](QXYCell_function_reference.html).

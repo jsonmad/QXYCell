@@ -17,7 +17,7 @@ The resulting `.h5ad` object can be used with downstream tools such as
 [scimap](https://scimap.xyz/), and
 [SpatialData](https://spatialdata.scverse.org/en/stable/).
 
-QXYCell is independent and is not affiliated with
+QXYCell is not affiliated with
 [QuPath](https://qupath.github.io/)
 ([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
 
@@ -72,14 +72,13 @@ pixel size of 0.28 µm.
 
 ## Quick start
 
-QXYCell analyses can run in parallel when every process uses a different
-explicit `output_dir`. Never share an output folder between active runs: they
-would write the same H5AD, tables, thresholds, and plots. Automatic run-folder
-names use minute-level timestamps, so use explicit unique paths when starting
-concurrent runs. The same QuPath project can be read concurrently provided its
-exported inputs are not being changed during the runs. Use a separate Python
-process or notebook and AnnData object for each run, subject to available RAM
-and CPU.
+To begin, define the path to the QuPath project directory and an output
+directory for the QXYCell results. You can run multiple QXYCell analyses,
+provided that each process uses a different explicit `output_dir`. Never share
+an output directory between active runs, as they would write to the same
+`.h5ad`, tables, thresholds, and plots. Automatic output directory names use
+minute-level timestamps. Multiple runs can read from the same QuPath project.
+Use a separate Python process or notebook and AnnData object for each run.
 
 ```python
 import qxycell as qxy
@@ -101,9 +100,19 @@ qxy.add_annotations(adata, pixel_size_um=0.28)
 qxy.remove_cells(adata, remove_cells="ignore")
 # qxy.remove_cells(adata, remove_cells="folded_tissue")
 
-# Stage 3: choose one threshold source.
+# Stage 3: choose either 3A or 3B. Do not run both.
+
+# Stage 3A: apply thresholds from QuPath object-classifier JSON files.
 qxy.threshold_from_classifiers(adata)
-# qxy.threshold_from_table(adata, "/path/to/thresholds.tsv")
+
+# Stage 3B: generate, review, and apply a threshold table instead.
+# threshold_table = qxy.generate_threshold_table(
+#     project_dir,
+#     output_dir=output_dir,
+# )
+
+# Pause here to review and fill every per-image threshold in the generated TSV.
+# qxy.threshold_from_table(adata, threshold_table)
 
 # Stage 4: generate the prompt used to draft celltype_logic.yaml.
 qxy.celltype_prompt(
@@ -115,8 +124,34 @@ qxy.celltype_prompt(
 # Stage 5: assign cell types from cell type logic.
 qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 
-# Stage 6: Sanity check - spatial plot assigned cell types.
+# Stage 6: sanity check the assigned cell types spatially.
 qxy.plot_spatial(adata, category_col="celltype", show=True)
+
+# Stage 7: plot marker positivity and intensity by assigned cell type.
+qxy.plot_marker_positivity_heatmap(
+    adata,
+    category_col="celltype",
+    show=True,
+    )
+
+qxy.plot_marker_intensity_heatmap(
+    adata,
+    category_col="celltype",
+    show=True,
+    )
+
+# Stage 8: compare marker positivity and intensity between samples.
+qxy.plot_marker_positivity_heatmap(
+    adata,
+    category_col="Sample",
+    show=True,
+    )
+
+qxy.plot_marker_intensity_heatmap(
+    adata,
+    category_col="Sample",
+    show=True,
+    )
 ```
 
 Classifier thresholding saves the applied values to
@@ -139,9 +174,11 @@ For runnable numbered scripts and an interactive notebook, see the
 | [QuPath preparation](docs/qupath_preparation.md) ([PDF](docs/QXYCell_QuPath_Preparation_Guide.pdf)) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
 | [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
 | [Running the staged workflow](docs/running_qxycell.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
-| [Analysis workflows](docs/analysis.md) | Dataset summaries, metadata, cell typing, and cellular neighbourhoods |
+| [Sample metadata](docs/metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
+| [Cell typing](docs/cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
+| [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
 | [Plotting](docs/plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
-| [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, provenance, output files, and save/load behavior |
+| [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
 | [Staged scripts and notebook](staged_workflow/README.md) | Running one Python script per stage or working interactively |
 
 Additional reference material:

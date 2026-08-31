@@ -72,6 +72,39 @@ qupath_project_run_YYMMDD_HHMM/
 Only outputs created by the stages that were run will be present. Downstream
 functions reuse the active folder when `output_dir` is omitted.
 
+## Dataset summary
+
+Generate descriptive tables and an HTML report for the cells, markers,
+annotations, samples, and cell types already present in AnnData:
+
+```python
+summary = qxy.dataset_summary(adata, sample_col="Sample")
+```
+
+Use `sample_col="Image"` when sample annotations are unavailable. The report is
+written under `dataset_summary/` in the active output folder. Depending on the
+fields available in AnnData, outputs include:
+
+- `dataset_summary.html`;
+- `dataset_overview.tsv`;
+- `cells_per_sample.tsv`;
+- `celltype_counts.tsv` and `celltypes_per_sample.tsv`;
+- `marker_positivity.tsv` and `marker_positivity_by_sample.tsv`;
+- `annotation_counts.tsv`; and
+- `ignore_cells.tsv`.
+
+The returned dictionary contains the generated tables and paths. Paths are
+also stored in `adata.uns["qxycell_dataset_summary"]`. Save the AnnData object
+afterward if that provenance should be retained in the H5AD:
+
+```python
+qxy.save(adata)
+```
+
+This is descriptive reporting. It does not validate image quality,
+segmentation, staining, thresholds, batch effects, cell-type accuracy, or
+spatial alignment.
+
 ## Save
 
 `qxy.save(adata)` writes a compressed H5AD containing the full analysis state:
@@ -133,4 +166,8 @@ analysis rather than reconstructing state from these flat files.
   [Running the staged workflow](running_qxycell.md).
 - Review annotation and threshold provenance in
   [QuPath inputs, annotations, and thresholds](qupath_inputs.md).
-- Continue with the [analysis](analysis.md) and [plotting](plotting.md) guides.
+- Add experimental fields with the [sample-metadata guide](metadata.md).
+- Assign reviewed labels with the [cell-typing guide](cell_typing.md).
+- Analyse local composition with the
+  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
+- Create figures with the [plotting guide](plotting.md).

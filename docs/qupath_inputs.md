@@ -146,6 +146,36 @@ for every image column, then pass that exact file to
 `qxy.threshold_from_table()`. If thresholds change, rerun thresholding and then
 rerun `qxy.celltype()` to recreate threshold-dependent results.
 
+### Refine Stage 3A thresholds with Stage 3B
+
+A successful Stage 3A classifier run writes the thresholds it applied to
+`thresholds/classifier_thresholds.tsv` in the active output folder. This table
+can be used as the starting point for Stage 3B. Copy or rename it to a manual
+filename such as `manual_thresholds.tsv` before editing it, because another
+Stage 3A run will replace `classifier_thresholds.tsv`.
+
+After reviewing and changing the copied values, apply that exact table with
+Stage 3B:
+
+```python
+manual_threshold_table = (
+    "/path/to/output/thresholds/manual_thresholds.tsv"
+)
+qxy.threshold_from_table(adata, manual_threshold_table)
+```
+
+Stage 3B ignores the object-classifier JSON files and uses only the named
+table. Rerunning thresholding replaces the active marker-positivity columns and
+marks the prompt, cell types, and post-analysis outputs as stale, so rerun
+Stages 4 onward.
+
+Classifier-derived and generated threshold tables contain one threshold column
+for every unique `Image` value discovered across all measurement tables.
+Image-specific classifier values populate their matching columns; a global
+classifier value is repeated across all image columns. Column headings must
+match `adata.obs["Image"]` exactly. Review every row and enter a numeric value
+for every image being thresholded before running Stage 3B.
+
 Recognized manual names include `thresholds.tsv`, `thresholds.csv`,
 `manual_thresholds.*`, `marker_thresholds.*`, `qxycell_thresholds.*`,
 `classifier_thresholds.*`, and timestamped `thresholds_*.tsv` or
@@ -197,5 +227,8 @@ column, QXYCell reports zero CoreIDs and does not add `CoreID`.
 ## Next steps
 
 - Follow the [staged QXYCell workflow](running_qxycell.md).
-- Review the [analysis guide](analysis.md).
+- Add experimental fields with the [sample-metadata guide](metadata.md).
+- Create reviewed assignments with the [cell-typing guide](cell_typing.md).
+- Analyse local composition with the
+  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
 - See the complete [function reference](QXYCell_function_reference.html).
