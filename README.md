@@ -73,18 +73,30 @@ pixel size of 0.28 µm.
 ## Quick start
 
 To begin, define the path to the QuPath project directory and an output
-directory for the QXYCell results. You can run multiple QXYCell analyses,
-provided that each process uses a different explicit `output_dir`. Never share
-an output directory between active runs, as they would write to the same
-`.h5ad`, tables, thresholds, and plots. Automatic output directory names use
-minute-level timestamps. Multiple runs can read from the same QuPath project.
-Use a separate Python process or notebook and AnnData object for each run.
+directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory. You can run multiple QXYCell analyses, provided that each process uses a different explicit `output_dir`. Never share an output directory between active runs, as they would write to the same `.h5ad`, tables, thresholds, and plots. Automatic output directory names use minute-level timestamps. Multiple runs can read from the same QuPath project. Use a separate Python process or notebook and AnnData object for each run.
+
+Run this quickstart in one persistent interactive Python session so the
+`adata` object remains available between stages. After activating the QXYCell
+environment, start `ipython` (recommended) or `python` from a terminal, then
+paste and execute each stage below in order. Keep the session open, and pause
+where noted to review thresholds and cell-type YAML. If you prefer a cell-based
+interface, use the [interactive notebook example](examples/QXYCell_staged_workflow.ipynb).
+
+```console
+ipython
+# Or, if IPython is not installed:
+python
+```
+
+At the interactive prompt, paste the Python code inside the block below (not
+the Markdown backticks), one stage at a time, and press Enter to run it. Enter
+`exit()` only after the workflow is finished.
 
 ```python
 import qxycell as qxy
 
 project_dir = "/path/to/qupath_project"
-output_dir = "/path/to/qxycell_outputs/run_1"
+output_dir = "/path/to/outputs/run_1"
 
 # Optional preflight: inspect inputs without running the analysis.
 report = qxy.check(project_dir)
@@ -109,7 +121,7 @@ qxy.threshold_from_classifiers(adata)
 # threshold_table = qxy.generate_threshold_table(
 #     project_dir,
 #     output_dir=output_dir,
-# )
+#     )
 
 # Pause here to review and fill every per-image threshold in the generated TSV.
 # qxy.threshold_from_table(adata, threshold_table)
@@ -118,7 +130,7 @@ qxy.threshold_from_classifiers(adata)
 qxy.celltype_prompt(
     adata,
     context="Describe the tissue and expected populations",
-)
+    )
 
 # Pause for biology domain expert review, save the reviewed cell type YAML, then continue.
 # Stage 5: assign cell types from cell type logic.
@@ -164,8 +176,8 @@ after cells have been removed, rerun
 `adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
 annotations and removing cells again.
 
-For runnable numbered scripts and an interactive notebook, see the
-[staged workflow](staged_workflow/README.md).
+For notebook setup and rerun guidance, see the
+[interactive workflow example](examples/README.md).
 
 ## Documentation
 
@@ -179,7 +191,7 @@ For runnable numbered scripts and an interactive notebook, see the
 | [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
 | [Plotting](docs/plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
 | [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
-| [Staged scripts and notebook](staged_workflow/README.md) | Running one Python script per stage or working interactively |
+| [Interactive workflow notebook](examples/README.md) | Running the staged workflow cell by cell |
 
 Additional reference material:
 

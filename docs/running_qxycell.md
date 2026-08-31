@@ -61,9 +61,9 @@ qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 qxy.plot_spatial(adata, category_col="celltype", show=True)
 ```
 
-For one runnable Python file per stage, use the
-[staged workflow scripts](../staged_workflow/README.md) or the
-[interactive notebook](../staged_workflow/QXYCell_staged_workflow.ipynb).
+Run this sample in one persistent `ipython` or `python` session so `adata`
+remains available between stages. For a cell-based interface, use the
+[interactive notebook](../examples/QXYCell_staged_workflow.ipynb).
 
 ## Checkpoints and active output folder
 

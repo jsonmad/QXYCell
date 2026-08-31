@@ -15,7 +15,6 @@ build/
 
 # Local agent, editor, and workflow state
 /.agents/
-/staged_workflow/AGENTS.md
 /.codex/
 /.superpowers/
 /.vscode/
@@ -36,7 +35,7 @@ output/
 *_check_??????_????/
 *_run_??????_????/
 *.ipynb
-!staged_workflow/QXYCell_staged_workflow.ipynb
+!examples/QXYCell_staged_workflow.ipynb
 
 # Project-specific files that should not be committed
 # YAMLs in repo root (celltype logic, scratch files)
