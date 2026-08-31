@@ -7,9 +7,9 @@
   </picture>
 </p>
 
-QXYCell converts cell measurements and spatial assets from multiplex
+QXYCell converts cell measurements and spatial data from multiplex
 immunofluorescence images processed in QuPath into an analysis-ready AnnData
-`.h5ad` object for cell typing, plotting, and spatial analysis.
+`.h5ad` object for cell typing, visualization, and spatial analysis.
 
 The resulting `.h5ad` object can be used with downstream tools such as
 [Scanpy](https://scanpy.readthedocs.io/en/stable/),
@@ -160,7 +160,7 @@ qxy.plot_marker_intensity_heatmap(
     )
 ```
 
-You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the .h5ad from the `output_dir` or the exact `.h5ad` path.
+You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the `.h5ad` from the `output_dir` or the exact `.h5ad` path.
 
 ```python
 # restarting a session
@@ -211,11 +211,7 @@ Additional reference material:
 ## Support and license
 
 Report reproducible bugs and feature requests through
-[GitHub Issues](https://github.com/jsonmad/QXYCell/issues). Do not attach
-identifiable patient or research data, credentials, or other sensitive
-material to a public issue.
-
+[GitHub Issues](https://github.com/jsonmad/QXYCell/issues).
 Report suspected vulnerabilities privately as described in
 [SECURITY.md](SECURITY.md).
-
 QXYCell is released under the [MIT License](LICENSE).
