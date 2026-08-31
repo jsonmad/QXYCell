@@ -72,16 +72,26 @@ pixel size of 0.28 µm.
 
 ## Quick start
 
+QXYCell analyses can run in parallel when every process uses a different
+explicit `output_dir`. Never share an output folder between active runs: they
+would write the same H5AD, tables, thresholds, and plots. Automatic run-folder
+names use minute-level timestamps, so use explicit unique paths when starting
+concurrent runs. The same QuPath project can be read concurrently provided its
+exported inputs are not being changed during the runs. Use a separate Python
+process or notebook and AnnData object for each run, subject to available RAM
+and CPU.
+
 ```python
 import qxycell as qxy
 
 project_dir = "/path/to/qupath_project"
+output_dir = "/path/to/qxycell_outputs/run_1"
 
 # Optional preflight: inspect inputs without running the analysis.
 report = qxy.check(project_dir)
 
 # Stage 1: import cell measurements and create the AnnData checkpoint.
-adata = qxy.import_cells(project_dir)
+adata = qxy.import_cells(project_dir, output_dir=output_dir)
 
 # Stage 2: add or refresh annotations and optional cell polygons.
 # Annotation names containing "sample" define adata.obs["Sample"].
@@ -115,8 +125,9 @@ reviewed table.
 
 Each successful stage updates the active `.h5ad` and refreshes
 `tables/cells_obs.csv` and `tables/markers_var.csv`. If annotations are updated
-after cells have been removed, rerun `adata = qxy.import_cells(project_dir)`
-before refreshing annotations and removing cells again.
+after cells have been removed, rerun
+`adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
+annotations and removing cells again.
 
 For runnable numbered scripts and an interactive notebook, see the
 [staged workflow](staged_workflow/README.md).
