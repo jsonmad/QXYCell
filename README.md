@@ -73,14 +73,9 @@ pixel size of 0.28 µm.
 ## Quick start
 
 To begin, define the path to the QuPath project directory and an output
-directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory. You can run multiple QXYCell analyses, provided that each process uses a different explicit `output_dir`. Never share an output directory between active runs, as they would write to the same `.h5ad`, tables, thresholds, and plots. Automatic output directory names use minute-level timestamps. Multiple runs can read from the same QuPath project. Use a separate Python process or notebook and AnnData object for each run.
+directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory. You can run multiple QXYCell analyses, provided that each process uses a different explicit `output_dir`. Never share an output directory between active runs, as they would write to the same `.h5ad`, tables, thresholds, and plots. Automatic output directory names use minute-level timestamps. Multiple runs can read from the same QuPath project directory. Use a separate Python process or notebook and AnnData object for each run.
 
-Run this quickstart in one persistent interactive Python session so the
-`adata` object remains available between stages. After activating the QXYCell
-environment, start `ipython` (recommended) or `python` from a terminal, then
-paste and execute each stage below in order. Keep the session open, and pause
-where noted to review thresholds and cell-type YAML. If you prefer a cell-based
-interface, use the [interactive notebook example](examples/QXYCell_staged_workflow.ipynb).
+You can run this quickstart in an interactive Python session. Each data-processing stage checkpoints the current `adata` object to the active output folder. After activating the QXYCell environment, start `ipython` (recommended) or `python` from a terminal, then paste and execute each stage below in order. Pause where noted to review thresholds and cell-type YAML. If you prefer a cell-based interface, use the [interactive notebook example](examples/QXYCell_staged_workflow.ipynb).
 
 ```console
 ipython
@@ -88,9 +83,8 @@ ipython
 python
 ```
 
-At the interactive prompt, paste the Python code inside the block below (not
-the Markdown backticks), one stage at a time, and press Enter to run it. Enter
-`exit()` only after the workflow is finished.
+At the interactive prompt, paste the Python code below, one stage at a time.
+
 
 ```python
 import qxycell as qxy
@@ -166,8 +160,22 @@ qxy.plot_marker_intensity_heatmap(
     )
 ```
 
-Classifier thresholding saves the applied values to
-`thresholds/classifier_thresholds.tsv`. Table thresholding uses only the named
+You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the .h5ad from the `output_dir` or the exact `.h5ad` path.
+
+```python
+# restarting a session
+import qxycell as qxy
+
+project_dir = "/path/to/qupath_project"
+output_dir = "/path/to/outputs/run_1"
+adata = qxy.load(output_dir)
+
+# or exact path to .h5ad
+adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
+```
+
+
+Classifier thresholding saves the applied values to `thresholds/classifier_thresholds.tsv`. Table thresholding uses only the named
 reviewed table.
 
 Each successful stage updates the active `.h5ad` and refreshes
