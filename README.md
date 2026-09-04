@@ -56,7 +56,7 @@ Before running QXYCell, follow the
 
 To begin, define the path to the QuPath project directory and an output directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory.
 
-Run this quickstart in an interactive Python session. Each data-processing stage checkpoints the current `adata` object to the active output folder. After activating the QXYCell environment, start `ipython` (recommended) or `python` from a terminal, then paste and execute each stage below in order. Pause where noted to review thresholds and cell-type YAML.
+Run this quickstart in an interactive Python session or convert to a jupyter notebook. Each data-processing stage checkpoints the current `adata` object to the active output folder. After activating the QXYCell environment, start `ipython` (recommended) or `python` from a terminal, then paste and execute each stage below in order. Pause where noted to review thresholds and cell-type YAML.
 
 ```console
 ipython
