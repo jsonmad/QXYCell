@@ -46,7 +46,7 @@ output/
 /*.html
 /*.pptx
 
-# Images in repo root (keep assets/ folder only)
+# Images in repo root
 /*.png
 /*.jpg
 /*.jpeg

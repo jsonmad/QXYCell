@@ -1,4 +1,4 @@
-<img src="../assets/qxycell-icon.png" alt="QXYCell logo" width="96">
+<img src="assets/qxycell-icon.png" alt="QXYCell logo" width="96">
 
 # QXYCell Overview
 
