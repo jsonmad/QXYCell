@@ -61,8 +61,8 @@ qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 qxy.plot_spatial(adata, category_col="celltype", show=True)
 ```
 
-Run this sample in one persistent `ipython` or `python` session so `adata`
-remains available between stages.
+Run this sample in a Jupyter notebook or in one persistent `ipython` or
+`python` session so `adata` remains available between stages.
 
 ## Checkpoints and active output folder
 
