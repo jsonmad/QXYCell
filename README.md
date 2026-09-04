@@ -52,10 +52,6 @@ Before running QXYCell, follow the
 - Single-object classifiers for channel/marker thresholds (`.json`)
 - Cell-boundary geometry exported as GeoJSON
 
-The guide targets QuPath 0.7.0 and multiplex immunofluorescence data from any
-acquisition platform. QXYCell supports square pixels only and uses a default
-pixel size of 0.28 µm.
-
 ## Quick start
 
 To begin, define the path to the QuPath project directory and an output directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory.
