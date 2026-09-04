@@ -3,7 +3,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/qxycell-badge-dark.png">
-    <img src="assets/qxycell-badge.png" alt="QXYCell badge" width="180">
+    <img src="assets/qxycell-badge.png" alt="QXYCell badge" width="96">
   </picture>
 </p>
 
