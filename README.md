@@ -189,10 +189,10 @@ annotations and removing cells again.
 
 Additional reference material:
 
-- [QXYCell overview](docs/QXYCell_overview.html)
-- [Function and command reference](docs/QXYCell_function_reference.html)
-- [Synthetic function examples](docs/qxy_function_examples.html)
-- [Documentation index](docs/index.html)
+- [QXYCell overview](docs/QXYCell_overview.md)
+- [Function and command reference](docs/QXYCell_function_reference.md)
+- [Synthetic function examples](docs/qxy_function_examples.md)
+- [Documentation index](docs/README.md)
 
 ## Support and license
 

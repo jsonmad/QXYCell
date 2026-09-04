@@ -58,7 +58,7 @@ dev = [
 qxycell = "qxycell.cli:main"
 
 [project.urls]
-Documentation = "https://jsonmad.github.io/QXYCell/"
+Documentation = "https://github.com/jsonmad/QXYCell/tree/main/docs"
 Issues = "https://github.com/jsonmad/QXYCell/issues"
 Repository = "https://github.com/jsonmad/QXYCell"
 

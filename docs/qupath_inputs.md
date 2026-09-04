@@ -231,4 +231,4 @@ column, QXYCell reports zero CoreIDs and does not add `CoreID`.
 - Create reviewed assignments with the [cell-typing guide](cell_typing.md).
 - Analyse local composition with the
   [cellular-neighbourhood guide](cellular_neighbourhoods.md).
-- See the complete [function reference](QXYCell_function_reference.html).
+- See the complete [function reference](QXYCell_function_reference.md).

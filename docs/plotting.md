@@ -244,4 +244,4 @@ adata.uns["qxycell"]["palettes"].pop("celltype")  # or "cn"
   [cellular-neighbourhood guide](cellular_neighbourhoods.md).
 - Review the stored object in [AnnData and outputs](anndata_and_outputs.md).
 - See every plotting parameter in the
-  [function reference](QXYCell_function_reference.html).
+  [function reference](QXYCell_function_reference.md).
