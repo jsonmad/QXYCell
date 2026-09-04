@@ -11,11 +11,7 @@ QXYCell converts cell measurements and spatial data from multiplex
 immunofluorescence images processed in QuPath
 ([QuPath](https://qupath.github.io/);
 [GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE))
-into an AnnData object for cell typing, visualization, and spatial analysis. The resulting `.h5ad` object can be used with downstream tools such as
-[Scanpy](https://scanpy.readthedocs.io/en/stable/),
-[Squidpy](https://squidpy.readthedocs.io/en/stable/),
-[scimap](https://scimap.xyz/), and
-[SpatialData](https://spatialdata.scverse.org/en/stable/).
+into an AnnData object for cell typing, visualization, and spatial analysis. The resulting `.h5ad` object can be used with downstream tools.
 
 ## Workflow
 
