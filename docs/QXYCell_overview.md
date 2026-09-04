@@ -136,9 +136,13 @@ QXYCell uses separate, rerunnable functions for validation and each core process
 
 Performs read-only preflight inspection and validation. It discovers measurement tables, threshold definitions, object classifier JSONs, and GeoJSON files; lists every annotation and its planned AnnData assignment; and writes text/JSON reports. It does not generate a threshold table, apply thresholds, apply cell typing, or generate an LLM prompt.
 
-### Staged API
+### Step-by-step workflow
 
-The API separates cell import, annotations, threshold-source selection, prompt generation, and cell typing. Each successful stage checkpoints its owned columns and files so later stages can be rerun explicitly.
+QXYCell provides separate functions for importing cells, adding annotations,
+applying marker thresholds, generating the cell-type prompt, and assigning cell
+types. After each successful step, QXYCell saves the updated AnnData object and
+output tables so the user can review the results before continuing or rerun
+individual steps when needed.
 
 ## AnnData Layout
 
