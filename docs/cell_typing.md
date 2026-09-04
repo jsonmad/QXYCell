@@ -1,9 +1,11 @@
 # Cell typing
 
-QXYCell assigns cell types from expert-reviewed, ordered rules based on marker
-positivity. It does not infer cell identities directly from raw intensities.
-Threshold markers first, generate a draft rule file, review the biology and
-rule order, and then apply the reviewed YAML to AnnData.
+QXYCell reads marker thresholds from single-measurement classifiers saved in
+the QuPath project or from a threshold table and applies them to determine
+marker positivity for each cell. QXYCell then generates a prompt for drafting
+ordered cell-type rules in YAML. The user—a biology domain expert—reviews the
+YAML logic, after which QXYCell applies the reviewed rules to AnnData and
+assigns a cell-type label to each cell.
 
 ## Prerequisites
 
