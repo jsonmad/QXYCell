@@ -6,7 +6,7 @@ Python and CLI reference for converting one QuPath project folder into an AnnDat
 
 **Standard import:** `import qxycell as qxy`
 
-**Prepare first:** follow the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) ([PDF](QXYCell_QuPath_Preparation_Guide.pdf)) to verify calibration and create the required project-folder assets.
+**Prepare first:** follow the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) to verify calibration and create the required project-folder assets.
 
 **Recommended staged workflow:** `import_cells → add_annotations → optional remove_cells → threshold_from_classifiers/table → celltype_prompt → celltype → optional plot_spatial`. Stages replace their outputs in the same active H5AD and exported tables. If ignore polygons change after cells have been removed, rebuild stages 1 and 2 before running the optional removal stage again.
 

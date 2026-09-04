@@ -1,8 +1,8 @@
 # QXYCell Function Examples
 
-A Markdown reference for the public `qxy` API. Examples were generated from a small synthetic QuPath export and include real tables and plots produced by the current package code.
+A Markdown reference for the public `qxy` API. Examples were generated from a small synthetic QuPath export and include real tables and plotting calls produced by the current package code.
 
-**Before using real data:** follow the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) ([PDF](QXYCell_QuPath_Preparation_Guide.pdf)). Verify square-pixel calibration and pass it to `qxy.add_annotations(pixel_size_um=...)`; the default is `0.28` µm/pixel. These synthetic examples deliberately use `1.0`.
+**Before using real data:** follow the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md). Verify square-pixel calibration and pass it to `qxy.add_annotations(pixel_size_um=...)`; the default is `0.28` µm/pixel. These synthetic examples deliberately use `1.0`.
 
 | Cells | Markers | Samples | Functions |
 |---:|---:|---:|---:|
@@ -394,15 +394,11 @@ Plot cell type frequencies by sample.
 
     qxy.plot_stacked_bar(adata, sample_col='Sample', show_axis_labels=False, show=False)
 
-![Stacked bar plot](assets/examples/stacked-bar-png.png)
-
 ### qxy.plot_spatial()
 
 Plot spatial cell locations by category. Missing sample labels are excluded by default; underlay_adata can provide a full-data grey underlay for a filtered plot object.
 
     qxy.plot_spatial(adata_cn, underlay_adata=adata, sample_col='Sample', category_col='cn', show=False)
-
-![Spatial plot](assets/examples/spatial-img-a-ome-tiff-png.png)
 
 ### qxy.plot_cell_boundaries()
 
@@ -410,15 +406,11 @@ Plot cell boundary polygons by category.
 
     qxy.plot_cell_boundaries(adata, sample_col='Sample', label_celltypes='Tumour', save_pdf=False, show=False)
 
-![Cell boundaries](assets/examples/cell-boundaries-sample-a-png.png)
-
 ### qxy.plot_annotation_polygons()
 
 Reload QuPath annotation geometry for PNG-only QC. Defaults to a low-resolution cell-density underlay and boundary-only polygons (fill=False).
 
     qxy.plot_annotation_polygons(adata, show=False)
-
-![Annotation polygons](assets/examples/annotation-polygons-img-a-ome-tiff-png.png)
 
 ### qxy.plot_marker_positivity_heatmap()
 
@@ -426,15 +418,11 @@ Plot positive-cell count divided by category cell count for each thresholded mar
 
     qxy.plot_marker_positivity_heatmap(adata, annotate=True, show=False)
 
-![Marker positivity heatmap](assets/examples/marker-heatmap-positivity-png.png)
-
 ### qxy.plot_marker_intensity_heatmap()
 
 Plot category mean intensity followed by per-marker Z-scoring. This is not a median or count heatmap.
 
     qxy.plot_marker_intensity_heatmap(adata, annotate=True, show=False)
-
-![Marker intensity heatmap](assets/examples/marker-heatmap-intensity-png.png)
 
 ### qxy.plot_marker_heatmap()
 
@@ -442,12 +430,8 @@ Compatibility entry point for older code. New code should call the explicit posi
 
     qxy.plot_marker_heatmap(adata, values='positivity', show=False)
 
-![Marker positivity heatmap with revised settings](assets/examples/marker-heatmap-positivity-png-2.png)
-
 ### qxy.plot_cn_heatmap()
 
 Plot CN abundance heatmap across samples.
 
     qxy.plot_cn_heatmap(adata, sample_col='Sample', condition_col='condition', show=False)
-
-![Cellular-neighbourhood heatmap by sample](assets/examples/cn-heatmap-by-sample-png.png)

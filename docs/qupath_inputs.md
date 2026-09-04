@@ -2,7 +2,7 @@
 
 QXYCell reads cell measurements and optional spatial assets from a QuPath
 project folder. Complete the [QuPath preparation guide](qupath_preparation.md)
-([PDF](QXYCell_QuPath_Preparation_Guide.pdf)) before assembling these inputs.
+before assembling these inputs.
 Keep every exported input somewhere inside the QuPath project folder and pass
 that one folder to QXYCell.
 

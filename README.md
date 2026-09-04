@@ -44,8 +44,7 @@ conda env update -f environment.yml --prune
 ## Prepare data in QuPath
 
 Before running QXYCell, follow the
-[QuPath preparation guide](docs/qupath_preparation.md)
-([PDF](docs/QXYCell_QuPath_Preparation_Guide.pdf)). It covers:
+[QuPath preparation guide](docs/qupath_preparation.md). It covers:
 
 - Sample, tissue-feature, and imaging-artifact annotations exported as GeoJSON
 - Cell segmentation and cell measurements exported as `.tsv` or `.csv`
@@ -170,7 +169,7 @@ annotations and removing cells again.
 
 | Guide | Use it for |
 |---|---|
-| [QuPath preparation](docs/qupath_preparation.md) ([PDF](docs/QXYCell_QuPath_Preparation_Guide.pdf)) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
+| [QuPath preparation](docs/qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
 | [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
 | [Running the staged workflow](docs/running_qxycell.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
 | [Sample metadata](docs/metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
