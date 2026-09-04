@@ -62,8 +62,7 @@ qxy.plot_spatial(adata, category_col="celltype", show=True)
 ```
 
 Run this sample in one persistent `ipython` or `python` session so `adata`
-remains available between stages. For a cell-based interface, use the
-[interactive notebook](../examples/QXYCell_staged_workflow.ipynb).
+remains available between stages.
 
 ## Checkpoints and active output folder
 

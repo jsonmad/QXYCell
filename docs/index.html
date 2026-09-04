@@ -64,8 +64,7 @@ qxy.celltype_prompt(adata, context="Describe the tissue and expected populations
 qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 qxy.plot_spatial(adata, category_col="celltype", show=False)</code></pre>
         <p><strong>Designed for iteration:</strong> new GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results. Because ignored-region removal deletes cells, changed ignore polygons require rerunning measurements, annotations, and ignored-region removal in order.</p>
-        <p>The <a href="https://github.com/jsonmad/QXYCell/blob/main/examples/QXYCell_staged_workflow.ipynb">interactive notebook</a> implements the staged workflow one cell at a time, keeping the active AnnData object available between stages.</p>
-        <p><a href="https://github.com/jsonmad/QXYCell/tree/main/examples">Open the interactive example</a> · <a href="QXYCell_overview.html">Read the staged workflow guide</a> · <a href="QXYCell_function_reference.html">See every stage parameter</a></p>
+        <p><a href="QXYCell_overview.html">Read the staged workflow guide</a> · <a href="QXYCell_function_reference.html">See every stage parameter</a></p>
       </section>
 
       <h2>User guides</h2>

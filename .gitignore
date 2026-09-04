@@ -35,7 +35,6 @@ output/
 *_check_??????_????/
 *_run_??????_????/
 *.ipynb
-!examples/QXYCell_staged_workflow.ipynb
 
 # Project-specific files that should not be committed
 # YAMLs in repo root (celltype logic, scratch files)

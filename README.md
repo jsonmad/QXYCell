@@ -8,48 +8,38 @@
 </p>
 
 QXYCell converts cell measurements and spatial data from multiplex
-immunofluorescence images processed in QuPath into an analysis-ready AnnData
-`.h5ad` object for cell typing, visualization, and spatial analysis.
-
-The resulting `.h5ad` object can be used with downstream tools such as
+immunofluorescence images processed in QuPath
+([QuPath](https://qupath.github.io/);
+[GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE))
+into an AnnData object for cell typing, visualization, and spatial analysis. The resulting `.h5ad` object can be used with downstream tools such as
 [Scanpy](https://scanpy.readthedocs.io/en/stable/),
 [Squidpy](https://squidpy.readthedocs.io/en/stable/),
 [scimap](https://scimap.xyz/), and
 [SpatialData](https://spatialdata.scverse.org/en/stable/).
-
-QXYCell is not affiliated with
-[QuPath](https://qupath.github.io/)
-([GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE)).
 
 ## Workflow
 
 ![QXYCell workflow from multiplex tissue imaging through QuPath, QXYCell,
 AnnData, spatial plots, and downstream analysis](docs/assets/qxycell_workflow.png)
 
-Prepare the QuPath inputs first, then use the compact workflow below and open
-the focused guides when more detail is needed.
-
 ## Installation
 
 QXYCell requires Python 3.10 or newer.
 
 ```bash
+# Install in new environment
 git clone https://github.com/jsonmad/QXYCell.git
 cd QXYCell
 conda env create -f environment.yml
 conda activate qxycell
 ```
-
-Verify the installation:
-
 ```bash
+# Verify the installation
 python -c "import qxycell; print('QXYCell import OK')"
 qxycell --help
 ```
-
-### Updating
-
 ```bash
+# update if required
 conda activate qxycell
 git pull
 conda env update -f environment.yml --prune
@@ -59,7 +49,7 @@ conda env update -f environment.yml --prune
 
 Before running QXYCell, follow the
 [QuPath preparation guide](docs/qupath_preparation.md)
-([PDF version](docs/QXYCell_QuPath_Preparation_Guide.pdf)). It covers:
+([PDF](docs/QXYCell_QuPath_Preparation_Guide.pdf)). It covers:
 
 - Sample, tissue-feature, and imaging-artifact annotations exported as GeoJSON
 - Cell segmentation and cell measurements exported as `.tsv` or `.csv`
@@ -72,10 +62,9 @@ pixel size of 0.28 µm.
 
 ## Quick start
 
-To begin, define the path to the QuPath project directory and an output
-directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory. You can run multiple QXYCell analyses, provided that each process uses a different explicit `output_dir`. Never share an output directory between active runs, as they would write to the same `.h5ad`, tables, thresholds, and plots. Automatic output directory names use minute-level timestamps. Multiple runs can read from the same QuPath project directory. Use a separate Python process or notebook and AnnData object for each run.
+To begin, define the path to the QuPath project directory and an output directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory.
 
-You can run this quickstart in an interactive Python session. Each data-processing stage checkpoints the current `adata` object to the active output folder. After activating the QXYCell environment, start `ipython` (recommended) or `python` from a terminal, then paste and execute each stage below in order. Pause where noted to review thresholds and cell-type YAML. If you prefer a cell-based interface, use the [interactive notebook example](examples/QXYCell_staged_workflow.ipynb).
+Run this quickstart in an interactive Python session. Each data-processing stage checkpoints the current `adata` object to the active output folder. After activating the QXYCell environment, start `ipython` (recommended) or `python` from a terminal, then paste and execute each stage below in order. Pause where noted to review thresholds and cell-type YAML.
 
 ```console
 ipython
@@ -107,15 +96,16 @@ qxy.remove_cells(adata, remove_cells="ignore")
 # qxy.remove_cells(adata, remove_cells="folded_tissue")
 
 # Stage 3: choose either 3A or 3B. Do not run both.
+# Classifier thresholding saves the applied values to thresholds/classifier_thresholds.tsv. Table thresholding uses only the named reviewed table.
 
 # Stage 3A: apply thresholds from QuPath object-classifier JSON files.
 qxy.threshold_from_classifiers(adata)
 
 # Stage 3B: generate, review, and apply a threshold table instead.
-# threshold_table = qxy.generate_threshold_table(
-#     project_dir,
-#     output_dir=output_dir,
-#     )
+threshold_table = qxy.generate_threshold_table(
+    project_dir,
+    output_dir=output_dir,
+    )
 
 # Pause here to review and fill every per-image threshold in the generated TSV.
 # qxy.threshold_from_table(adata, threshold_table)
@@ -184,9 +174,6 @@ after cells have been removed, rerun
 `adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
 annotations and removing cells again.
 
-For notebook setup and rerun guidance, see the
-[interactive workflow example](examples/README.md).
-
 ## Documentation
 
 | Guide | Use it for |
@@ -199,7 +186,6 @@ For notebook setup and rerun guidance, see the
 | [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
 | [Plotting](docs/plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
 | [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
-| [Interactive workflow notebook](examples/README.md) | Running the staged workflow cell by cell |
 
 Additional reference material:
 
