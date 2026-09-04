@@ -58,9 +58,6 @@ as `CD3-nuc`, `CD3-mem`, or `CD3-cyto`.
 sorted(column for column in adata.obs.columns if column.endswith("_pos"))
 ```
 
-Review thresholds before writing cell-type rules. A cell-type schema cannot
-correct inappropriate positivity calls.
-
 ## Generate a first-pass prompt
 
 QXYCell can create a prompt containing the available thresholded markers and
