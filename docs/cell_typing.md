@@ -9,13 +9,46 @@ assigns a cell-type label to each cell.
 
 ## Prerequisites
 
-Apply exactly one threshold source before cell typing:
+Apply exactly one threshold source before cell typing. Use one of the following
+routes, not both.
+
+### Apply saved QuPath classifiers
 
 ```python
 qxy.threshold_from_classifiers(adata)
-# or
-qxy.threshold_from_table(adata, "/path/to/thresholds.tsv")
 ```
+
+This reads the saved single-measurement classifier JSON files from the QuPath
+project, applies their thresholds, and writes the applied values to
+`thresholds/classifier_thresholds.tsv` in the active output folder.
+
+### Generate and apply a threshold table
+
+QXYCell can generate a fresh editable table from the measurement columns and
+available classifier thresholds in the QuPath project:
+
+```python
+threshold_table = qxy.generate_threshold_table(
+    "/path/to/qupath_project",
+    output_dir="/path/to/output",
+)
+```
+
+The returned path points to a timestamped TSV in the output folder's
+`thresholds/` directory. The table has one threshold column for each image.
+Review every row and enter a numeric value for every image before applying it.
+Conflict-marked rows may contain blank image values that must be resolved
+during this review.
+
+Apply the reviewed table using the returned path:
+
+```python
+qxy.threshold_from_table(adata, threshold_table)
+```
+
+An existing reviewed CSV or TSV can be supplied directly instead. Table-based
+thresholding uses only the named file and does not fall back to the classifier
+JSON files.
 
 Thresholding creates `adata.obs["<MARKER>_pos"]` columns. Cell-type rules use
 the marker portion of those names exactly, including compartment suffixes such
