@@ -7,7 +7,7 @@
   </picture>
 </p>
 
-QXYCell converts cell measurements and spatial data from multiplex
+A Python bridge from a QuPath project folder to AnnData. QXYCell converts cell measurements and spatial data from multiplex
 immunofluorescence images processed in QuPath
 ([QuPath](https://qupath.github.io/);
 [GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE))
