@@ -146,7 +146,12 @@ qxy.plot_marker_intensity_heatmap(
     )
 ```
 
-You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the `.h5ad` from the `output_dir` or the exact `.h5ad` path.
+- Each successful stage updates the active `.h5ad` and refreshes `tables/cells_obs.csv` and `tables/markers_var.csv`.
+- If annotations are updated after cells have been removed, rerun `adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
+annotations and removing cells again.
+- Classifier thresholding `qxy.threshold_from_classifiers(adata)` saves the applied values to *thresholds/classifier_thresholds.tsv*.
+- Table thresholding `qxy.threshold_from_table(adata, "thresholds/classifier_thresholds.tsv")` uses only the named reviewed table. Run classifier thresholding once, update the classifier_thresholds.tsv table as required and rerun table thresholding.
+- You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the `.h5ad` from the `output_dir` or the exact `.h5ad` path.
 
 ```python
 # restarting a session
@@ -159,16 +164,6 @@ adata = qxy.load(output_dir)
 # or exact path to .h5ad
 adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 ```
-
-
-Classifier thresholding saves the applied values to `thresholds/classifier_thresholds.tsv`. Table thresholding uses only the named
-reviewed table.
-
-Each successful stage updates the active `.h5ad` and refreshes
-`tables/cells_obs.csv` and `tables/markers_var.csv`. If annotations are updated
-after cells have been removed, rerun
-`adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
-annotations and removing cells again.
 
 ## Documentation
 
