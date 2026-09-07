@@ -64,12 +64,14 @@ Before running QXYCell, follow the
 For an interactive Python session, start `ipython` or `python` from a terminal:
 
 ```console
-# Activate the qxycell environment and start an interactive Python session, or use a Jupyter notebook with the qxycell kernel.
+# Activate the qxycell environment and start an interactive Python session.
+# Alternatively, use a Jupyter notebook with the qxycell kernel.
 
 conda activate qxycell
 
 ipython
-# Or:
+
+# Or, for the standard Python interpreter:
 python
 ```
 
