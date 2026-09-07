@@ -108,14 +108,14 @@ qxy.remove_cells(adata, remove_cells="folded_tissue")
 
 qxy.threshold_from_classifiers(adata)
 
-# Stage 3B: generate, review, and apply a threshold table instead.
+# Stage 3B: generate, review, and apply a threshold table intstead.
 
 threshold_table = qxy.generate_threshold_table(
     project_dir,
     output_dir=output_dir,
     )
 
-# Pause here to review and fill every per-image threshold in the generated TSV.
+# Pause here to review and fill every per-image threshold in the generated TSV found at <output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv.
 
 qxy.threshold_from_table(adata, threshold_table)
 ```
@@ -183,8 +183,8 @@ qxy.plot_marker_intensity_heatmap(
 - Each successful stage updates the active `.h5ad` and refreshes `tables/cells_obs.csv` and `tables/markers_var.csv`.
 - If annotations are updated after cells have been removed, rerun `adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
 annotations and removing cells again.
-- Classifier thresholding `qxy.threshold_from_classifiers(adata)` saves the applied values to *thresholds/classifier_thresholds.tsv*.
-- Table thresholding `qxy.threshold_from_table(adata, "thresholds/classifier_thresholds.tsv")` uses only the named reviewed table. Run classifier thresholding once, update the classifier_thresholds.tsv table as required and rerun table thresholding.
+- Classifier thresholding `qxy.threshold_from_classifiers(adata)` saves the applied values to *<output_dir>/thresholds/classifier_thresholds.tsv*.
+- Table thresholding `qxy.threshold_from_table(adata, "<output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv")` uses only the named reviewed table. Run classifier thresholding once, update the classifier_thresholds.tsv table as required and rerun table thresholding.
 - You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the `.h5ad` from the `output_dir` or the exact `.h5ad` path.
 
 ```python
