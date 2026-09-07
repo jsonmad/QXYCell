@@ -53,13 +53,13 @@ Before running QXYCell, follow the
 
 ## Quick start
 
-To begin, define the path to the QuPath project directory and an output directory for the QXYCell results. The output directory can be anywhere but should not sit inside of the QuPath project directory.
+- Run this quickstart in an interactive Python session or a Jupyter notebook.
+- Each data-processing stage checkpoints (saves) the current `adata` object to the active output folder.
+- Run each stage below in order, using a separate notebook cell or executing it at an interactive Python prompt.
+- Pause where noted to review thresholds and cell-type YAML.
+- To begin, define the path to the QuPath project directory and an output directory for the QXYCell results.
+- The output directory can be anywhere but should not sit inside of the QuPath project directory.
 
-Run this quickstart in an interactive Python session or a Jupyter notebook.
-Each data-processing stage checkpoints the current `adata` object to the active
-output folder. Run each stage below in order, using a separate notebook cell or
-executing it at an interactive Python prompt. Pause where noted to review
-thresholds and cell-type YAML.
 
 For an interactive Python session, start `ipython` or `python` from a terminal:
 
@@ -79,20 +79,26 @@ output_dir = "/path/to/outputs/run_1"
 
 # Optional preflight: inspect inputs without running the analysis.
 report = qxy.check(project_dir)
+```
 
+```python
 # Stage 1: import cell measurements and create the AnnData checkpoint.
 adata = qxy.import_cells(project_dir, output_dir=output_dir)
+```
 
+```python
 # Stage 2: add or refresh annotations and optional cell polygons.
-# Annotation names containing "sample" define adata.obs["Sample"].
+# Annotation names containing "sample" automatically define adata.obs["Sample"].
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
 # Optional Stage 2b: choose the identifier string used in annotation names.
 qxy.remove_cells(adata, remove_cells="ignore")
 # qxy.remove_cells(adata, remove_cells="folded_tissue")
-
+```
+```python
 # Stage 3: choose either 3A or 3B. Do not run both.
-# Classifier thresholding saves the applied values to thresholds/classifier_thresholds.tsv. Table thresholding uses only the named reviewed table.
+# 3A Classifier thresholding saves the applied values to thresholds/classifier_thresholds.tsv.
+# 3B Table thresholding uses only the named reviewed table.
 
 # Stage 3A: apply thresholds from QuPath object-classifier JSON files.
 qxy.threshold_from_classifiers(adata)
@@ -102,9 +108,10 @@ threshold_table = qxy.generate_threshold_table(
     project_dir,
     output_dir=output_dir,
     )
-
 # Pause here to review and fill every per-image threshold in the generated TSV.
-# qxy.threshold_from_table(adata, threshold_table)
+qxy.threshold_from_table(adata, threshold_table)
+```
+```python
 
 # Stage 4: generate the prompt used to draft celltype_logic.yaml.
 qxy.celltype_prompt(
@@ -113,11 +120,23 @@ qxy.celltype_prompt(
     )
 
 # Pause for biology domain expert review, save the reviewed cell type YAML, then continue.
-# Stage 5: assign cell types from cell type logic.
-qxy.celltype(adata, "/path/to/celltype_logic.yaml")
+```
+```python
 
-# Stage 6: sanity check the assigned cell types spatially.
+# Stage 5: assign cell types using the reviewed cell-type logic.
+celltype_summary = qxy.celltype(
+    adata,
+    "/path/to/celltype_logic.yaml",
+)
+# If no path is specified, QXYCell defaults to the newest .yaml or .yml file in the active output folder’s celltype/ directory.
+
+```
+```python
+
+# Stage 6: Visaully sanity check the assigned cell types spatially.
 qxy.plot_spatial(adata, category_col="celltype", show=True)
+```
+```python
 
 # Stage 7: plot marker positivity and intensity by assigned cell type.
 qxy.plot_marker_positivity_heatmap(
@@ -131,6 +150,8 @@ qxy.plot_marker_intensity_heatmap(
     category_col="celltype",
     show=True,
     )
+```
+```python
 
 # Stage 8: compare marker positivity and intensity between samples.
 qxy.plot_marker_positivity_heatmap(
@@ -138,6 +159,8 @@ qxy.plot_marker_positivity_heatmap(
     category_col="Sample",
     show=True,
     )
+```
+```python
 
 qxy.plot_marker_intensity_heatmap(
     adata,
