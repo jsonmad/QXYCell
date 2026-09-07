@@ -83,37 +83,46 @@ report = qxy.check(project_dir)
 
 ```python
 # Stage 1: import cell measurements and create the AnnData checkpoint.
+
 adata = qxy.import_cells(project_dir, output_dir=output_dir)
 ```
 
 ```python
 # Stage 2: add or refresh annotations and optional cell polygons.
 # Annotation names containing "sample" automatically define adata.obs["Sample"].
+
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
 # Optional Stage 2b: choose the identifier string used in annotation names.
+
 qxy.remove_cells(adata, remove_cells="ignore")
-# qxy.remove_cells(adata, remove_cells="folded_tissue")
+qxy.remove_cells(adata, remove_cells="folded_tissue")
 ```
+
 ```python
 # Stage 3: choose either 3A or 3B. Do not run both.
 # 3A Classifier thresholding saves the applied values to thresholds/classifier_thresholds.tsv.
 # 3B Table thresholding uses only the named reviewed table.
 
 # Stage 3A: apply thresholds from QuPath object-classifier JSON files.
+
 qxy.threshold_from_classifiers(adata)
 
 # Stage 3B: generate, review, and apply a threshold table instead.
+
 threshold_table = qxy.generate_threshold_table(
     project_dir,
     output_dir=output_dir,
     )
+
 # Pause here to review and fill every per-image threshold in the generated TSV.
+
 qxy.threshold_from_table(adata, threshold_table)
 ```
-```python
 
+```python
 # Stage 4: generate the prompt used to draft celltype_logic.yaml.
+
 qxy.celltype_prompt(
     adata,
     context="Describe the tissue and expected populations",
@@ -121,24 +130,27 @@ qxy.celltype_prompt(
 
 # Pause for biology domain expert review, save the reviewed cell type YAML, then continue.
 ```
-```python
 
+```python
 # Stage 5: assign cell types using the reviewed cell-type logic.
+
 celltype_summary = qxy.celltype(
     adata,
     "/path/to/celltype_logic.yaml",
 )
+
 # If no path is specified, QXYCell defaults to the newest .yaml or .yml file in the active output folder’s celltype/ directory.
-
 ```
-```python
 
+```python
 # Stage 6: Visaully sanity check the assigned cell types spatially.
+
 qxy.plot_spatial(adata, category_col="celltype", show=True)
+
 ```
 ```python
-
 # Stage 7: plot marker positivity and intensity by assigned cell type.
+
 qxy.plot_marker_positivity_heatmap(
     adata,
     category_col="celltype",
@@ -151,16 +163,15 @@ qxy.plot_marker_intensity_heatmap(
     show=True,
     )
 ```
-```python
 
+```python
 # Stage 8: compare marker positivity and intensity between samples.
+
 qxy.plot_marker_positivity_heatmap(
     adata,
     category_col="Sample",
     show=True,
     )
-```
-```python
 
 qxy.plot_marker_intensity_heatmap(
     adata,
