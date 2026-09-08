@@ -80,8 +80,8 @@ Run the Python code below one stage at a time.
 ```python
 import qxycell as qxy
 
-project_dir = "/path/to/qupath_project"
-output_dir = "/path/to/outputs/run_1"
+project_dir = r"\path\to\qupath_project"
+output_dir = r"\path\to\outputs\run_1"
 
 # Optional preflight: inspect inputs without running the analysis.
 report = qxy.check(project_dir)
