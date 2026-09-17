@@ -22,21 +22,21 @@ AnnData, spatial plots, and downstream analysis](docs/assets/qxycell_workflow.pn
 
 QXYCell requires Python 3.10 or newer.
 
+#### Install in new environment
 ```bash
-# Install in new environment
 git clone https://github.com/jsonmad/QXYCell.git
 cd QXYCell
 conda env create -f environment.yml
 conda activate qxycell
 ```
+#### Verify the installation
 ```bash
-# Verify the installation
 python -c "import qxycell; print('QXYCell import OK')"
 qxycell --help
 ```
+
+#### Update if required (Navigate to the cloned repository before running)
 ```bash
-# update if required
-# Navigate to the cloned repository before running
 conda activate qxycell
 git pull
 conda env update -f environment.yml --prune
@@ -45,35 +45,34 @@ conda env update -f environment.yml --prune
 ## Prepare data in QuPath
 
 Before running QXYCell, follow the
-[QuPath preparation guide](docs/qupath_preparation.md). It covers:
+[QuPath preparation guide](docs/qupath_preparation.md). to create these four inputs:
 
-- Sample, tissue-feature, and imaging-artifact annotations exported as GeoJSON
-- Cell segmentation and cell measurements exported as `.tsv` or `.csv`
-- Single-object classifiers for channel/marker thresholds (`.json`)
-- Cell-boundary geometry exported as GeoJSON
+1. Sample, tissue-feature, and imaging-artifact annotations exported as GeoJSON
+   - QuPath > File > Export objects as GeoJSON
+2. Cell segmentation and cell measurements exported as `.tsv` or `.csv`
+   - QuPath > Measure > Export measurements
+4. Single-object classifiers for channel/marker thresholds (`.json`)
+   - QuPath > Classify > Object classification > Create single measurement classifier
+6. Cell-boundary geometry exported as GeoJSON
+   - QuPath > Objects > Select > Select detections > Select cells
+   - QuPath > File > Object data.. > Export as GeoJSON
 
 ## Quick start
 
 - Run this quickstart in an interactive Python session or a Jupyter notebook.
 - Each data-processing stage checkpoints (saves) the current `adata` object to the active output folder.
 - Run each stage below in order, using a separate notebook cell or executing it at an interactive Python prompt.
-- Pause where noted to review thresholds and cell-type YAML.
+- Pause where noted to review thresholds and cell-type logic YAML.
 - To begin, define the path to the QuPath project directory and an output directory for the QXYCell results.
 - The output directory can be anywhere but should not sit inside of the QuPath project directory.
 
 
-For an interactive Python session, start `ipython` or `python` from a terminal:
+
+#### Activate the qxycell environment and start an interactive Python session. Alternatively, use a Jupyter notebook with the qxycell kernel.
 
 ```console
-# Activate the qxycell environment and start an interactive Python session.
-
 conda activate qxycell
-ipython
-# Or, for the standard Python interpreter:
 python
-
-# Alternatively, use a Jupyter notebook with the qxycell kernel.
-
 ```
 
 Run the Python code below one stage at a time.
@@ -84,8 +83,6 @@ import qxycell as qxy
 project_dir = r"\path\to\qupath_project"
 output_dir = r"\path\to\outputs\run_1"
 
-# Optional preflight: inspect inputs without running the analysis.
-report = qxy.check(project_dir)
 ```
 
 ```python
@@ -122,7 +119,7 @@ threshold_table = qxy.generate_threshold_table(
     output_dir=output_dir,
     )
 
-# Pause here to review and fill every per-image threshold in the generated TSV found at <output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv.
+# Pause here to review and fill every per-image threshold at <output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv.
 
 qxy.threshold_from_table(adata, threshold_table)
 ```
