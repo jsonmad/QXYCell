@@ -36,7 +36,7 @@ qxycell --help
 ```
 ```bash
 # update if required
-cd path/to/QXYCell  # Navigate to the cloned repository first
+# Navigate to the cloned repository before running
 conda activate qxycell
 git pull
 conda env update -f environment.yml --prune
