@@ -23,6 +23,25 @@ first-appearance order; cells belonging to the same image share one name.
 Missing values remain missing. The returned dictionary maps original names to
 short names. Only these two observation columns are changed.
 
+Annotation assignment and default image-specific threshold matching use
+`Image_original` when present, so existing QuPath exports still match after
+renaming. Annotation plots also match geometry and cell underlays using the
+original names while displaying the short names. Keep `Image_original` intact.
+
+By default, changes stay in memory. To overwrite the loaded H5AD with the
+updated AnnData object:
+
+```python
+adata = qxy.load("my_data.h5ad")
+mapping = qxy.simple_image_names(adata, save=True)
+```
+
+`save=True` writes the entire current AnnData object, including other unsaved
+changes. CSV files are not updated. The save path must be known and exist;
+use `qxy.load()` (or `qxy.load_latest()`) to record the file actually opened.
+For an object loaded with another library, first use
+`qxy.save(adata, "my_data.h5ad")` to establish the intended save path.
+
 When matching metadata that still contains the full image names, use
 `sample_col="Image_original"` with `qxy.add_metadata()`.
 

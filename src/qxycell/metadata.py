@@ -5,17 +5,36 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from qxycell.io_utils import save as save_h5ad
 from qxycell.paths import resolve_output_dir
 
 
-def simple_image_names(adata) -> dict[str, str]:
+def simple_image_names(adata, *, save: bool = False) -> dict[str, str]:
     """Shorten ``Image`` in place while preserving ``Image_original``.
 
     Keep the text after the last underscore and remove a trailing ``.ome.tiff``.
     Distinct originals sharing a short name receive ``_2``, ``_3``, etc., in
     first-appearance order. Missing values remain missing. Repeated calls use
     the preserved original column. Return the original-to-short-name mapping.
+
+    With ``save=True`` write the renamed object back to the H5AD recorded in
+    ``adata.uns["qxycell"]["h5ad_path"]``; require that known path to exist
+    before any ``obs`` changes.
     """
+    h5ad_path = None
+    if save:
+        metadata = getattr(adata, "uns", {}).get("qxycell", {})
+        h5ad_path = metadata.get("h5ad_path") if isinstance(metadata, dict) else None
+        if not h5ad_path:
+            raise ValueError(
+                "No known h5ad_path in adata.uns['qxycell']. Use "
+                "qxy.load(path) to load with an explicit path, or "
+                "qxy.save(adata, path=...) to record one before save=True."
+            )
+        h5ad_path = Path(h5ad_path).expanduser().resolve()
+        if not h5ad_path.is_file():
+            raise FileNotFoundError(f"h5ad_path does not exist: {h5ad_path}")
+
     if "Image" not in adata.obs.columns:
         raise KeyError("Image column not found in adata.obs")
     if "Image_original" not in adata.obs.columns:
@@ -39,6 +58,8 @@ def simple_image_names(adata) -> dict[str, str]:
         mapping[original] = name
 
     adata.obs["Image"] = originals.map(mapping).astype("category")
+    if save:
+        save_h5ad(adata, path=h5ad_path)
     return mapping
 
 

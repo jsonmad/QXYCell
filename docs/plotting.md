@@ -99,6 +99,11 @@ so this function reloads GeoJSON from the project folder and applies the saved
 pixel size. A low-resolution cell-density underlay is enabled by default.
 Polygons use boundary-only rendering unless `fill=True`.
 
+After `qxy.simple_image_names()`, the default `image_col="Image"` uses
+`Image_original` to match GeoJSON and cell locations, while titles and filenames
+use the short `Image` labels. The `images` filter accepts either short labels or
+original image names. An explicit alternative `image_col` is used as supplied.
+
 Useful controls include `images`, `colors`, `underlay_cmap`,
 `underlay_alpha`, `fill_alpha`, `boundary_linewidth`, `cell_underlay`,
 `underlay_bins`, `flip_y`, `figsize`, and `dpi`. Annotation-polygon diagnostic

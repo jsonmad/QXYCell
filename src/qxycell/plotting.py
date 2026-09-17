@@ -573,6 +573,10 @@ def plot_annotation_polygons(
     By default, cell locations are shown beneath boundary-only polygons as a
     coarse 2D density raster. Pass ``fill=True`` to add translucent polygon
     fills. The raster avoids drawing millions of individual cell points.
+    With the default ``image_col="Image"``, ``Image_original`` is used for
+    matching when present, while ``Image`` supplies display labels. ``images``
+    accepts either display labels or original filenames/stems. Explicit other
+    image columns are used as supplied.
     """
     import json
 
@@ -607,11 +611,26 @@ def plot_annotation_polygons(
             return str(classification)
         return str(properties.get("name") or "Unclassified")
 
+    source_col = (
+        "Image_original"
+        if image_col == "Image" and "Image_original" in adata.obs.columns
+        else image_col
+    )
     display_by_key: dict[str, str] = {}
     if image_col in adata.obs.columns:
-        for value in adata.obs[image_col].astype(str).unique():
-            display_by_key[image_key(value)] = str(value)
-    selected_keys = None if images is None else {image_key(value) for value in images}
+        pairs = adata.obs[[source_col, image_col]].drop_duplicates()
+        for source, display in pairs.astype(str).itertuples(index=False, name=None):
+            display_by_key[image_key(source)] = display
+    selected_keys = None
+    if images is not None:
+        selected_keys = set()
+        for value in images:
+            key = image_key(value)
+            matches = {
+                source for source, display in display_by_key.items()
+                if image_key(display) == key
+            }
+            selected_keys.update(matches or {key})
 
     if cell_underlay:
         if image_col not in adata.obs.columns:
@@ -623,7 +642,7 @@ def plot_annotation_polygons(
 
     cell_positions_by_key: dict[str, object] = {}
     if cell_underlay:
-        all_image_keys = adata.obs[image_col].astype(str).map(image_key).to_numpy()
+        all_image_keys = adata.obs[source_col].astype(str).map(image_key).to_numpy()
         spatial = np.asarray(adata.obsm["spatial"])
         for key in set(all_image_keys):
             if selected_keys is not None and key not in selected_keys:

@@ -197,6 +197,8 @@ def _apply_marker_thresholds(
 ) -> int:
     import numpy as _np
 
+    if image_col == "Image" and "Image_original" in adata.obs.columns:
+        image_col = "Image_original"
     n_pos_columns = 0
     for group_index, group in enumerate(classifier_groups):
         marker_name = marker_names[group_index]
@@ -768,6 +770,13 @@ def _apply_annotations(
     pixel_size_um: float,
     skip_annotation_labels: set[str] | None = None,
 ):
+    """Match GeoJSON annotations onto ``adata.obs`` cells by image stem.
+
+    When ``simple_image_names()`` has backed up the original names in
+    ``Image_original``, that column is used for matching so shortened
+    ``Image`` labels still resolve to the original GeoJSON filenames. Without
+    the backup, ``Image`` is matched directly.
+    """
     try:
         from shapely.geometry import Point
     except ImportError:
@@ -797,7 +806,8 @@ def _apply_annotations(
         obs[column] = False
 
     spatial = adata.obsm["spatial"]
-    image_keys = obs["Image"].astype(str).map(_image_key)
+    image_source_col = "Image_original" if "Image_original" in obs.columns else "Image"
+    image_keys = obs[image_source_col].astype(str).map(_image_key)
 
     for image_key, annotation_features in annotations_by_image.items():
         indices = list(obs.index[image_keys == image_key])

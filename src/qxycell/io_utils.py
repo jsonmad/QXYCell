@@ -106,7 +106,11 @@ def load(path_or_output_dir: str | Path):
     import anndata as ad
 
     h5ad_path = _resolve_h5ad_input(path_or_output_dir)
-    return ad.read_h5ad(h5ad_path)
+    adata = ad.read_h5ad(h5ad_path)
+    qxycell = adata.uns.setdefault("qxycell", {})
+    if isinstance(qxycell, dict):
+        qxycell["h5ad_path"] = str(h5ad_path)
+    return adata
 
 
 def load_latest(base_dir: str | Path = "."):
