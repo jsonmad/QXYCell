@@ -8,6 +8,40 @@ from typing import Any
 from qxycell.paths import resolve_output_dir
 
 
+def simple_image_names(adata) -> dict[str, str]:
+    """Shorten ``Image`` in place while preserving ``Image_original``.
+
+    Keep the text after the last underscore and remove a trailing ``.ome.tiff``.
+    Distinct originals sharing a short name receive ``_2``, ``_3``, etc., in
+    first-appearance order. Missing values remain missing. Repeated calls use
+    the preserved original column. Return the original-to-short-name mapping.
+    """
+    if "Image" not in adata.obs.columns:
+        raise KeyError("Image column not found in adata.obs")
+    if "Image_original" not in adata.obs.columns:
+        adata.obs["Image_original"] = adata.obs["Image"].copy()
+
+    originals = adata.obs["Image_original"].astype("string")
+    unique = originals.dropna().drop_duplicates()
+    short = unique.str.rsplit("_", n=1).str[-1].str.removesuffix(".ome.tiff")
+    reserved = set(short)
+    used = set()
+    mapping = {}
+    for original, base in zip(unique, short):
+        name = base
+        suffix = 2
+        if name in used:
+            name = f"{base}_{suffix}"
+            while name in used or name in reserved:
+                suffix += 1
+                name = f"{base}_{suffix}"
+        used.add(name)
+        mapping[original] = name
+
+    adata.obs["Image"] = originals.map(mapping).astype("category")
+    return mapping
+
+
 def _read_metadata_table(metadata: str | Path | Any):
     import pandas as pd
 

@@ -5,6 +5,27 @@ an AnnData object. Typical fields include treatment group, patient or animal
 identifier, time point, tissue site, batch, and outcome. Metadata import does
 not change marker measurements, annotations, thresholds, or cell types.
 
+## Shorten image names
+
+Use `qxy.simple_image_names()` to retain the text after the last underscore
+and remove a trailing `.ome.tiff`:
+
+```python
+mapping = qxy.simple_image_names(adata)
+adata.obs[["Image_original", "Image"]].drop_duplicates()
+```
+
+For example, `scan_Buckingham_21P10459A1.ome.tiff` becomes `21P10459A1`.
+The function updates `Image` in place and copies the original column to
+`Image_original` on its first call. Subsequent calls use that preserved column.
+Distinct images with the same short name receive `_2`, `_3`, and so on, in
+first-appearance order; cells belonging to the same image share one name.
+Missing values remain missing. The returned dictionary maps original names to
+short names. Only these two observation columns are changed.
+
+When matching metadata that still contains the full image names, use
+`sample_col="Image_original"` with `qxy.add_metadata()`.
+
 ## Prepare the metadata table
 
 Use a CSV or TSV with one row per sample and one column containing the sample

@@ -11,7 +11,7 @@ from qxycell.filtering import assign_samples
 from qxycell.filtering import remove_annotations
 from qxycell.filtering import remove_cells
 from qxycell.io_utils import load, load_latest, save
-from qxycell.metadata import add_metadata
+from qxycell.metadata import add_metadata, simple_image_names
 from qxycell.pipeline import (
     add_annotations,
     apply_thresholds,
@@ -71,6 +71,7 @@ __all__ = [
     "remove_annotations",
     "remove_cells",
     "save",
+    "simple_image_names",
     "threshold",
     "threshold_from_classifiers",
     "threshold_from_table",
