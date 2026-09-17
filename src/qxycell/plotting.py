@@ -853,6 +853,10 @@ def plot_spatial(
     orientation; pass ``flip_y=False`` to use the raw coordinate orientation.
     Cells where ``adata.obs[sample_col]`` is missing are excluded by default;
     pass ``include_missing_samples=True`` to plot them as a ``"nan"`` sample.
+    Default filenames are ``<category_col>_<sample>`` for individual plots
+    and ``<category_col>_combined`` for combined plots, with filename-unsafe
+    characters replaced by underscores. Subset labels are included when set;
+    ``save_prefix`` and ``filename_prefix`` override these defaults.
     """
 
     plt, mtick, np, pd, Line2D, hsv_to_rgb, to_hex = _require_plotting()
@@ -1087,7 +1091,7 @@ def plot_spatial(
                     borderaxespad=0.0,
                 )
 
-            prefix_parts = ["spatial"]
+            prefix_parts = [_safe_name(category_col)]
             if subset_value:
                 prefix_parts.append(_safe_name(subset_value))
             prefix_parts.append(_safe_name(image))
@@ -1158,7 +1162,7 @@ def plot_spatial(
                     fontsize=8,
                     borderaxespad=0.0,
                 )
-            prefix_parts = ["spatial_combined"]
+            prefix_parts = [_safe_name(category_col), "combined"]
             if subset_value:
                 prefix_parts.append(_safe_name(subset_value))
             prefix = save_prefix or filename_prefix or "_".join(prefix_parts)

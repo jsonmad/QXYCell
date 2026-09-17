@@ -23,6 +23,12 @@ When `sample_col` is omitted, usable `Sample` labels are preferred and QXYCell
 falls back to `Image`. Pass a value explicitly to force the grouping.
 `samples=` always selects values from the resolved sample column.
 
+Default filenames use `<category_col>_<sample>.png`, such as `cn_sample_A.png`
+or `celltype_sample_A.png`. Combined plots use `<category_col>_combined.png`.
+Subset labels are included when set, and filename-unsafe characters are replaced
+by underscores. PDF output uses the same names with a `.pdf` extension.
+Explicit `save_prefix` or `filename_prefix` values override the default naming.
+
 Cells with missing sample values are excluded by default. Use
 `include_missing_samples=True` only when a separate `nan` panel is wanted.
 
