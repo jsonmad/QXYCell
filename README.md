@@ -97,7 +97,7 @@ adata = qxy.import_cells(project_dir, output_dir=output_dir)
 
 qxy.add_annotations(adata, pixel_size_um=0.28)
 
-# Optional Stage 2b: choose the identifier string used in annotation names.
+# Optional Stage 2b: choose the identifier string used in annotation names to remove cells in regions with imaging or tissue artifacts.
 
 qxy.remove_cells(adata, remove_cells="ignore")
 qxy.remove_cells(adata, remove_cells="folded_tissue")
@@ -169,7 +169,7 @@ qxy.plot_marker_intensity_heatmap(
 ```
 
 ```python
-# Stage 8: compare marker positivity and intensity between samples.
+# Stage 8: Use sample annotations instead of whole images.
 
 qxy.plot_marker_positivity_heatmap(
     adata,
