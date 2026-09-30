@@ -72,6 +72,9 @@ Stage 2: add or replace annotation, sample, and cell-polygon data using the veri
 
 Stage 3A: apply only QuPath classifier JSON thresholds and save the applied values as a stable table.
 
+Copy or rename the saved table before manually refining its values, then apply
+the reviewed copy with `qxy.threshold_from_table()`.
+
     summary = qxy.threshold_from_classifiers(adata)
 
 | field | value |

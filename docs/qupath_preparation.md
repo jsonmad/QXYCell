@@ -163,8 +163,9 @@ After segmentation, create one reviewed starting threshold per marker:
 
 QXYCell reads simple single-measurement classifier JSONs. Composite or malformed
 classifiers are reported but not converted into threshold rows. Classifier
-thresholds are starting definitions: generate and review the QXYCell threshold
-table before applying positivity.
+thresholds can be applied directly, or copied from the generated
+`classifier_thresholds.tsv` table, manually refined, and applied as a reviewed
+table.
 
 ### Cell-boundary GeoJSON
 

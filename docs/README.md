@@ -15,7 +15,7 @@ Build the analysis one checkpoint at a time. Every successful stage refreshes th
 1.  **Measurements:** create the base AnnData.
 2.  **Annotations:** add or replace GeoJSON-derived data.
 3.  **Optional artifact regions:** remove cells inside `ignore` annotations drawn around tissue or staining artifacts.
-4.  **Thresholds:** explicitly choose classifier JSON or one threshold table. Classifier mode saves the applied values as a reusable table.
+4.  **Thresholds:** use classifier JSON values directly or apply a reviewed threshold table. Classifier values can be copied into a table and refined manually.
 5.  **Prompt:** generate the LLM prompt used to draft the YAML.
 6.  **Cell types:** apply the reviewed YAML.
 7.  **Optional plotting:** save spatial cell-type plots.
@@ -29,7 +29,8 @@ qxy.add_annotations(adata, pixel_size_um=0.28)
 # Optional: remove cells in tissue/staining artifact annotations
 qxy.remove_cells(adata, remove_cells="ignore")
 
-# Choose exactly one threshold source:
+# Use classifier values directly, or copy their generated table, review it, and
+# apply that table as the final threshold source:
 qxy.threshold_from_classifiers(adata)
 # Saves/replaces thresholds/classifier_thresholds.tsv
 # qxy.threshold_from_table(adata, "thresholds.tsv")

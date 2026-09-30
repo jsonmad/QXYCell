@@ -62,7 +62,7 @@ Python and CLI reference for converting one QuPath project folder into an AnnDat
     qxy.add_annotations(adata)
     qxy.remove_cells(adata, remove_cells="ignore")  # optional artifact removal
     qxy.threshold_from_classifiers(adata)  # or threshold_from_table(...)
-    # Classifier mode saves/replaces thresholds/classifier_thresholds.tsv
+    # Copy and refine classifier_thresholds.tsv before table mode if needed.
 
     prompt = qxy.celltype_prompt(
         adata,

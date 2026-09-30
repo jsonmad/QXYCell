@@ -33,11 +33,11 @@ Stage 1 creates the base measurement checkpoint. Later stages refresh the same a
     # Optional 2b. Remove cells in tissue/staining artifact annotations
     qxy.remove_cells(adata, remove_cells="ignore")
 
-    # 3A. Use classifier JSON thresholds only
+    # 3A. Use classifier JSON thresholds directly
     qxy.threshold_from_classifiers(adata)
     # Saves/replaces thresholds/classifier_thresholds.tsv
 
-    # Or 3B. Use one named threshold table only
+    # Or 3B. Copy and refine that generated table, then use it as the final source
     # qxy.threshold_from_table(adata, "thresholds.tsv")
 
     # 4. Generate the prompt, then review and save the returned YAML
@@ -88,7 +88,7 @@ The known encoding variants `Centroid X ¬µm` and `Centroid Y ¬µm` are also a
 
 QuPath centroid columns are already in micrometres. QuPath GeoJSON is in full-resolution pixel coordinates, so `qxy.add_annotations()` scales it using `pixel_size_um` (default `0.28`). The value must be positive and finite. QXYCell supports square pixels only: verify that QuPath's pixel width and height are equal and pass their single value rather than averaging unequal values.
 
-Thresholding is an explicit choice. `qxy.threshold_from_classifiers()` reads QuPath classifier JSON files only, refuses conflicting definitions, and writes the applied values to the stable `thresholds/classifier_thresholds.tsv` file. `qxy.threshold_from_table()` reads only the named CSV/TSV table and never falls back to classifier JSON. A fresh editable table can be created with `qxy.generate_threshold_table(project_dir, output_dir=output_dir)`. Every successful stage refreshes the active H5AD and exported observation/marker tables.
+Thresholding has one final source: classifier JSON values as applied, or a reviewed table. `qxy.threshold_from_classifiers()` reads QuPath classifier JSON files only, refuses conflicting definitions, and writes the applied values to `thresholds/classifier_thresholds.tsv`. Copy or rename that file before manually refining its values, then use `qxy.threshold_from_table()` to apply the reviewed copy. Table mode reads only the named CSV/TSV and never falls back to classifier JSON. A fresh editable table can also be created with `qxy.generate_threshold_table(project_dir, output_dir=output_dir)`. Every successful stage refreshes the active H5AD and exported observation/marker tables.
 
 ## Outputs
 
@@ -201,7 +201,7 @@ In v1, QXYCell applies threshold definitions as a separate step of the form:
 
     measurement column >= threshold
 
-`qxy.threshold_from_classifiers()` searches recursively for usable single-measurement QuPath classifier JSON files, ignores supplied tables, and writes or replaces `thresholds/classifier_thresholds.tsv` with the values it applied. `qxy.threshold_from_table()` uses one reviewed table, ignores classifier JSON, and does not modify that supplied table. A separate editable table template can be created with `qxy.generate_threshold_table()`. Active threshold definitions are reported in:
+`qxy.threshold_from_classifiers()` searches recursively for usable single-measurement QuPath classifier JSON files, ignores supplied tables, and writes or replaces `thresholds/classifier_thresholds.tsv` with the values it applied. Copy or rename that file before adjusting its values manually, then use `qxy.threshold_from_table()` to apply the reviewed copy as the final threshold source. Table mode ignores classifier JSON and does not modify the supplied table. A separate editable table template can be created with `qxy.generate_threshold_table()`. Active threshold definitions are reported in:
 
     tables/classifier_report.csv
 

@@ -9,8 +9,10 @@ assigns a cell-type label to each cell.
 
 ## Prerequisites
 
-Apply exactly one threshold source before cell typing. Use one of the following
-routes, not both.
+Apply one final threshold source before cell typing: classifier JSON values as
+applied, or a reviewed threshold table. Classifier values can be used as the
+starting point for a copied and manually refined table; that reviewed table is
+then the final source.
 
 ### Apply saved QuPath classifiers
 
@@ -21,6 +23,16 @@ qxy.threshold_from_classifiers(adata)
 This reads the saved single-measurement classifier JSON files from the QuPath
 project, applies their thresholds, and writes the applied values to
 `thresholds/classifier_thresholds.tsv` in the active output folder.
+
+### Refine classifier-derived values in a table
+
+Copy or rename `thresholds/classifier_thresholds.tsv` before editing it,
+because another classifier run replaces that file. Review and change the copied
+per-marker, per-image values, then apply the copied table:
+
+```python
+qxy.threshold_from_table(adata, "/path/to/reviewed_thresholds.tsv")
+```
 
 ### Generate and apply a threshold table
 

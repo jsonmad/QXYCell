@@ -43,7 +43,8 @@ qxy.add_annotations(adata, pixel_size_um=0.28)
 # Optional Stage 2b: remove cells in matching artifact annotations.
 qxy.remove_cells(adata, remove_cells="ignore")
 
-# Stage 3: choose exactly one threshold source.
+# Stage 3: apply classifier JSON values directly, or use a reviewed table as
+# the final threshold source. Classifier values can seed that reviewed table.
 qxy.threshold_from_classifiers(adata)
 # qxy.threshold_from_table(adata, "/path/to/thresholds.tsv")
 
