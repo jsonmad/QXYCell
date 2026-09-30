@@ -11,7 +11,7 @@ QXYCell acts as a Python bridge to convert cell measurements and spatial data fr
 immunofluorescence images processed in QuPath
 ([QuPath](https://qupath.github.io/);
 [GPLv3](https://github.com/qupath/qupath/blob/main/LICENSE))
-into an AnnData object for cell typing, visualization, and spatial analysis. The resulting `.h5ad` object can be used with downstream tools.
+into an AnnData object for cell typing, visualization, and spatial analysis. The resulting `.h5ad` object can be used with downstream spatial analysis tools.
 
 ## Workflow
 
