@@ -64,7 +64,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
             adata, threshold_file
         )
 
-    Build a timestamped table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file from 3A. Review every marker and image value, then apply the table.
+    Build a timestamped table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file from 3A. Review and save every marker and image value, then run `qxy.threshold_from_table(adata, threshold_file)` using that reviewed table.
 
 6.  **Stage 4 — Python · QXYCell + LLM**
 
