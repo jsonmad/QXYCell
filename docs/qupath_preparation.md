@@ -2,16 +2,11 @@
 
 **Applies to:** QuPath 0.7.0 and QXYCell 0.1
 
-This guide covers the QuPath actions and
-exports for QXYCell; image correction, registration, unmixing,
-background removal, marker QC, and biological review remain part of the
-upstream imaging workflow.
+This guide covers the QuPath actions and exports for QXYCell.
 
 ## What QXYCell needs
 
-Keep exported inputs inside one QuPath project folder and pass that folder to
-QXYCell. It searches subfolders recursively. Keep QXYCell outputs beside—not
-inside—the project folder.
+Keep exported inputs inside one QuPath project folder and pass that folder to QXYCell. It searches subfolders recursively. Keep QXYCell outputs beside—not inside—the project folder.
 
 | Asset | When needed | QXYCell requirement |
 |---|---|---|
@@ -21,8 +16,7 @@ inside—the project folder.
 | Single-measurement classifier JSON | Classifier-derived thresholds | Simple classifier JSON saved below the project folder |
 | Reviewed threshold table | Table-derived thresholds | Reviewed per-image TSV/CSV |
 
-The only unconditional input is the cell measurement table. The others enable
-the associated QXYCell features.
+The only unconditional input is the cell measurement table. The others enable the associated QXYCell features.
 
 ## Standard route
 
@@ -38,15 +32,15 @@ annotation a meaningful classification or name, then save the image data.
 
 - Include `sample` anywhere in a sample-boundary name, for example
   `Sample_01` or `sample_tumour`. QXYCell imports the complete annotation name
-  into `adata.obs["Sample"]`.
+  into a single reference column as `adata.obs["Sample"]`.
 - Use unique, non-overlapping sample annotations. Cells in more than one sample
   annotation become `Ambiguous` and are reported as conflicts.
-- Use a shared removal word for regions to exclude, for example `Ignore_fold`
+- Use a shared text string for regions to exclude, for example `Ignore_fold`
   and `Ignore_edge`. Later use the same word with
   `qxy.remove_cells(adata, remove_cells="ignore")`.
 - Other annotations become boolean `annotation__<safe_label>` columns.
 
-For a TMA, create and label the grid before cell detection. QXYCell derives
+**Important:** For a TMA, create and label the grid before cell detection. QXYCell derives
 `CoreID` only from QuPath's measurement-table column named exactly `TMA Core`,
 not from annotation GeoJSON.
 
