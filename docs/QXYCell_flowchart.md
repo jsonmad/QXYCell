@@ -8,131 +8,81 @@ A staged QuPath-to-AnnData workflow with explicit checkpoints, a final threshold
 
 Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and `tables/markers_var.csv`. Optional Stage 2b refreshes the filtered H5AD and `cells_obs.csv`; Stage 6 creates plots without changing the active checkpoint.
 
-1.  **Prep — QuPath**
+## Prep — QuPath
 
-    ### Prepare QuPath project
+### Prepare QuPath project
 
-    Export the measurements and spatial assets that define the run inputs.
+Export `measurements.tsv`, annotation GeoJSON (`slide01.geojson`), optional cell segmentation GeoJSON (`slide01-cells.geojson`), and threshold assets before import.
 
-    Prepare the measurement table (`measurements.tsv`), annotation GeoJSON (`slide01.geojson`), cell segmentation GeoJSON (`slide01-cells.geojson`), and threshold assets (`thresholds.tsv` or `classifiers/object_classifiers/*.json`) before import.
+## Stage 1 — Python · QXYCell
 
-2.  **Stage 1 — Python · QXYCell**
+### `qxy.import_cells(project_dir)`
 
-    ### `qxy.import_cells(project_dir)`
+Create the base AnnData object from the QuPath measurement table. It stores marker intensities in `adata.X`, cell identifiers and centroids in `adata.obs`, spatial coordinates in `adata.obsm["spatial"]`, and run provenance in `adata.uns["qxycell"]`.
 
-    Create the base AnnData object from the QuPath measurement table.
+## Stage 2 — Python · QXYCell
 
-    Populates `adata.X` with marker intensities, `adata.obs` with cell identifiers and centroid coordinates (plus `TMA Core` and `CoreID` when available), `adata.var` with marker metadata, `adata.obsm["spatial"]` with x–y coordinates, and `adata.uns["qxycell"]` with run provenance and output paths.
+### `qxy.add_annotations(adata)`
 
-3.  **Stage 2 — Python · QXYCell**
+Add or refresh GeoJSON-derived annotations, sample assignments, and optional cell polygons. Verify `pixel_size_um` against image calibration.
 
-    ### `qxy.add_annotations(adata)`
+## Optional Stage 2b — Python · QXYCell
 
-    Add or refresh GeoJSON-derived annotations, sample assignments, and cell polygons.
+### `qxy.remove_cells(adata, remove_cells="<label>")`
 
-    Annotations with `Sample` in their label create `adata.obs["Sample"]`; other labels create Boolean `adata.obs["annotation__<label>"]` columns; cell segmentation GeoJSON adds `adata.obs["cell_polygon_wkt"]`. GeoJSON coordinates are converted from pixels to micrometres—confirm `pixel_size_um` matches the image calibration (default: `0.28` µm/pixel).
+Remove cells inside matching annotation polygons; the default label is `"ignore"`.
 
-4.  **Optional Stage 2b — Python · QXYCell**
+## Stage 3 — Python · QXYCell — 3A OR 3B
 
-    ### `qxy.remove_cells(adata, remove_cells="<label>")`
+### Apply marker thresholds
 
-    Remove cells where a matching `adata.obs["annotation__<label>"]` column is `True`.
+Use 3A to apply classifier JSON values directly, or use 3B to apply a reviewed threshold table.
 
-    Filters the AnnData object in place by removing cells located within the indicated annotation polygons. `<label>` is matched case-insensitively against annotation column names; the default is `"ignore"`.
+#### 3A · Apply classifier JSON directly
 
-5.  **Stage 3 — Python · QXYCell — 3A OR 3B**
+    qxy.threshold_from_classifiers(adata)
 
-    ### Apply marker thresholds
+This writes per-image values to `thresholds/classifier_thresholds.tsv`. Copy or rename it before manually adjusting images whose classifier-derived threshold needs changing, then use that reviewed copy through 3B.
 
-    Use 3A to apply classifier JSON values directly, or use 3B to apply a reviewed threshold table.
+#### 3B · Generate or refine a threshold table
 
-    #### 3A · Apply classifier JSON directly
+    threshold_file = qxy.generate_threshold_table(project_dir)
+    # Review or edit the generated table
+    qxy.threshold_from_table(adata, threshold_file)
 
-        qxy.threshold_from_classifiers(
-            adata
-        )
+Build a timestamped table, or use the reviewed copy from 3A. Review and save every marker and image value, then run `qxy.threshold_from_table(adata, threshold_file)` using that reviewed table.
 
-    Applies the QuPath classifier thresholds and saves the applied values to `thresholds/classifier_thresholds.tsv`. The table contains per-image threshold columns. Copy or rename it before editing, then manually adjust values for images whose classifier-derived threshold needs changing. Apply that reviewed copy through 3B.
+## Stage 4 — Python · QXYCell + LLM
 
-    #### 3B · Generate or refine a threshold table
+### `qxy.celltype_prompt(adata, context="<biological context>")`
 
-        threshold_file = qxy.generate_threshold_table(
-            project_dir
-        )
-        # Review or edit the generated table
-        qxy.threshold_from_table(
-            adata, threshold_file
-        )
+Creates a project-specific LLM prompt for drafting cell-type logic. Review and correct the returned YAML before use.
 
-    Build a timestamped table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file from 3A. Review and save every marker and image value, then run `qxy.threshold_from_table(adata, threshold_file)` using that reviewed table.
+## Review gate — Domain expert · YAML
 
-6.  **Stage 4 — Python · QXYCell + LLM**
+### Review and update `celltype_logic.yaml`
 
-    ### `qxy.celltype_prompt(adata, context="<biological context>")`
+A domain expert should verify marker names, phenotypes, exclusions, rule order, and fallback behaviour before cell typing.
 
-    Create a project-specific LLM prompt for drafting cell-type logic.
+## Stage 5 — Python · QXYCell
 
-    Builds the prompt from the available `adata.obs["<marker>_pos"]` columns and the supplied biological context. It prints and returns the prompt and saves it as `celltype/current_prompt.txt`. Copy the prompt into an LLM, use its response as the first draft of `celltype_logic.yaml`, then review and correct the rules before saving the file.
+### `qxy.celltype(adata)`
 
-7.  **Review gate — Domain expert · YAML**
+Apply the domain-expert-reviewed YAML to assign cell types.
 
-    ### Domain expert review — review and update `celltype_logic.yaml`
+## Optional Stage 6 — Python · QXYCell
 
-    A domain expert should verify and edit the LLM-generated logic before cell typing.
+### Plot assigned cell types spatially
 
-    Cell-type `rules` are evaluated from top to bottom, and the first matching rule assigns `adata.obs["celltype"]`; unmatched cells remain `Unknown`. Each rule can require positive and negative marker calls, so specific populations should appear before broader populations. Optional `features` and `derived_features` create additional non-exclusive columns. Update the YAML after review and save the corrected version as `celltype/celltype_logic.yaml` inside the active QXYCell run folder.
+    qxy.plot_spatial(adata, sample_col="Sample", show=False)
 
-8.  **Stage 5 — Python · QXYCell**
+Create spatial plots grouped by `Sample` or `Image`.
 
-    ### `qxy.celltype(adata)`
+## Downstream — Python analysis
 
-    Apply the domain-expert-reviewed YAML to assign cell types.
+### Scanpy, Squidpy, scimap, pandas, or custom Python
 
-    Writes assignments to `adata.obs["celltype"]`, creates any configured feature and derived-feature columns, saves `tables/celltype_counts.csv` and a rule-summary TSV, and records diagnostics in `adata.uns["qxycell_celltyping"]`.
-
-9.  **Optional Stage 6 — Python · QXYCell**
-
-    ### Plot assigned cell types spatially
-
-        # One plot per Sample annotation
-        qxy.plot_spatial(
-            adata,
-            sample_col="Sample",
-            show=False,
-        )
-
-        # One plot per QuPath image
-        qxy.plot_spatial(
-            adata,
-            sample_col="Image",
-            show=False,
-        )
-
-    Create spatial plots of the assigned cell types, grouped by `Sample` or `Image`.
-
-    If `sample_col` is omitted, QXYCell uses `Sample` when usable sample labels exist and otherwise falls back to `Image`. `show=False` is recommended for scripted runs; PNG output is enabled by default.
-
-10. **Downstream — Python analysis**
-
-    ### Downstream analysis — Scanpy, Squidpy, scimap, pandas, or custom Python
-
-    Load the completed AnnData object from the default sibling run folder:
-
-        qupath_project_run_YYMMDD_HHMM/h5ad/qxycell.h5ad
-
-        adata = qxy.load("path/to/qxycell.h5ad")
-
-    **Important contents**
-
-    - `adata.X`: cells × markers intensity matrix.
-    - `adata.var`: marker index with default columns `marker_name`, `classifier_name`, `source_measurement_column`, `threshold`, and `threshold_source`.
-    - `adata.obs`: default import columns `Image`, `Object ID`, `Xµm`, `Yµm`, `quxy_source_file`, `quxy_source_row`, and `quxy_cell_id`.
-    - Optional or project-derived `adata.obs` columns: `TMA Core`, `CoreID`, `Sample`, `annotation__<label>`, `cell_polygon_wkt`, `<marker>_pos`, `celltype`, and YAML-defined feature columns.
-    - `adata.obsm["spatial"]`: cell x–y coordinates in micrometres.
-    - `adata.uns["qxycell"]`: run paths, provenance, and stage status.
-    - Additional summaries may include `qxycell_annotation_labels`, `qxycell_sample_annotations`, `qxycell_core_ids_from_measurements`, `qxycell_thresholding`, and `qxycell_celltyping`.
-
-    The saved H5AD contains the completed QXYCell pipeline state and can be loaded directly into Scanpy, Squidpy, scimap, pandas, or custom Python for clustering, spatial analysis, cell–cell interaction testing, and cellular-neighbourhood analysis.
+Load the completed AnnData object from `qupath_project_run_YYMMDD_HHMM/h5ad/qxycell.h5ad` with `qxy.load()`.
 
 ## Rerun dependencies
 
