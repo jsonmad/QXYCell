@@ -1,8 +1,8 @@
 # QXYCell technical workflow
 
-A staged QuPath-to-AnnData workflow with explicit checkpoints, a mutually exclusive threshold choice, and targeted rerun dependencies.
+A staged QuPath-to-AnnData workflow with explicit checkpoints, a final threshold source, and targeted rerun dependencies.
 
-**Legend:** Optional = dashed treatment in the original diagram; Decision = choose exactly one path; Domain expert review = human approval gate.
+**Legend:** Optional = dashed treatment in the original diagram; Decision = choose the final threshold source; Domain expert review = human approval gate.
 
 ## Forward workflow
 
@@ -46,7 +46,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
     ### Stage 3 — Apply marker thresholds
 
-    Choose exactly one route:
+    Use classifier JSON values directly, or use a reviewed table as the final source. Classifier values can be copied and refined in a table.
 
     #### 3A · Apply classifier JSON directly
 
@@ -56,7 +56,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
     Applies the QuPath classifier thresholds and saves the applied values to `thresholds/classifier_thresholds.tsv`.
 
-    #### 3B · Generate and review a threshold table
+    #### 3B · Generate or refine a threshold table
 
         threshold_file = qxy.generate_threshold_table(
             project_dir
@@ -66,9 +66,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
             adata, threshold_file
         )
 
-    Builds a timestamped threshold table from the classifier JSON files, then applies only the reviewed table.
-
-    3A and 3B are alternatives; run one, not both.
+    Builds a timestamped threshold table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file. Apply only the reviewed table as the final source.
 
 6.  **Stage 4 — Python · QXYCell + LLM**
 

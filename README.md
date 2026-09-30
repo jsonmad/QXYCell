@@ -104,15 +104,15 @@ qxy.remove_cells(adata, remove_cells="folded_tissue")
 ```
 
 ```python
-# Stage 3: choose either 3A or 3B. Do not run both.
-# 3A Classifier thresholding saves the applied values to thresholds/classifier_thresholds.tsv.
-# 3B Table thresholding uses only the named reviewed table.
+# Stage 3: use classifier JSON values directly, or use a reviewed table as the
+# final source. Classifier thresholding saves applied values to
+# thresholds/classifier_thresholds.tsv; copy and edit that file to refine them.
 
 # Stage 3A: apply thresholds from QuPath object-classifier JSON files.
 
 qxy.threshold_from_classifiers(adata)
 
-# Stage 3B: generate, review, and apply a threshold table intstead.
+# Stage 3B: generate or manually refine a table, then apply it as the final source.
 
 threshold_table = qxy.generate_threshold_table(
     project_dir,
@@ -188,7 +188,7 @@ qxy.plot_marker_intensity_heatmap(
 - If annotations are updated after cells have been removed, rerun `adata = qxy.import_cells(project_dir, output_dir=output_dir)` before refreshing
 annotations and removing cells again.
 - Classifier thresholding `qxy.threshold_from_classifiers(adata)` saves the applied values to *<output_dir>/thresholds/classifier_thresholds.tsv*.
-- Table thresholding `qxy.threshold_from_table(adata, "<output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv")` uses only the named reviewed table. Run classifier thresholding once, update the classifier_thresholds.tsv table as required and rerun table thresholding.
+- Table thresholding `qxy.threshold_from_table(adata, "<output_dir>/thresholds/thresholds_YYMMDD-HHMM.tsv")` uses only the named reviewed table. To refine classifier values, copy or rename `classifier_thresholds.tsv`, update the copied table, then apply that copy with table thresholding.
 - You can exit `exit()` after any stage finishes successfully. To restart, activate the same environment, start a new interactive session, recreate the path variables, and load the `.h5ad` from the `output_dir` or the exact `.h5ad` path.
 
 ```python
@@ -207,6 +207,7 @@ adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 
 | Guide | Use it for |
 |---|---|
+| [QuPath quick start](docs/qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
 | [QuPath preparation](docs/qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
 | [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
 | [Running the staged workflow](docs/running_qxycell.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
