@@ -207,6 +207,7 @@ adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 
 | Guide | Use it for |
 |---|---|
+| [QuPath quick start](docs/qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
 | [QuPath preparation](docs/qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
 | [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
 | [Running the staged workflow](docs/running_qxycell.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |

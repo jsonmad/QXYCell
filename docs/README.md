@@ -6,7 +6,7 @@ Prepare a QuPath multiplex-immunofluorescence project folder and convert its sin
 
 Verify image channels and square-pixel calibration, segment cells, and export the exact measurement and GeoJSON assets QXYCell expects. QXYCell defaults to 0.28 µm/pixel; supply the verified value when it differs.
 
-[Read the preparation guide](qupath_preparation.md)
+[Start with the quick guide](qupath_quick_start.md) · [Read the detailed preparation guide](qupath_preparation.md)
 
 ## The core staged workflow
 
