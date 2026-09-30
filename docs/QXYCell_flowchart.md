@@ -6,7 +6,7 @@ A staged QuPath-to-AnnData workflow with explicit checkpoints, a final threshold
 
 ## Forward workflow
 
-Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and `tables/markers_var.csv`. Optional Stage 2b refreshes the filtered H5AD and `cells_obs.csv`; preflight and Stage 6 create reports or plots without changing the active checkpoint.
+Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and `tables/markers_var.csv`. Optional Stage 2b refreshes the filtered H5AD and `cells_obs.csv`; Stage 6 creates plots without changing the active checkpoint.
 
 1.  **Prep — QuPath**
 
@@ -16,11 +16,9 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
     Prepare the measurement table (`measurements.tsv`), annotation GeoJSON (`slide01.geojson`), cell segmentation GeoJSON (`slide01-cells.geojson`), and threshold assets (`thresholds.tsv` or `classifiers/object_classifiers/*.json`) before import.
 
-    **Optional preflight:** Run `qxy.check(project_dir)` to validate the QuPath project and write a timestamped report before creating an analysis checkpoint.
-
 2.  **Stage 1 — Python · QXYCell**
 
-    ### Stage 1 — `qxy.import_cells(project_dir)`
+    ### `qxy.import_cells(project_dir)`
 
     Create the base AnnData object from the QuPath measurement table.
 
@@ -28,7 +26,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
 3.  **Stage 2 — Python · QXYCell**
 
-    ### Stage 2 — `qxy.add_annotations(adata)`
+    ### `qxy.add_annotations(adata)`
 
     Add or refresh GeoJSON-derived annotations, sample assignments, and cell polygons.
 
@@ -36,17 +34,17 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
 4.  **Optional Stage 2b — Python · QXYCell**
 
-    ### Optional Stage 2b — `qxy.remove_cells(adata, remove_cells="<label>")`
+    ### `qxy.remove_cells(adata, remove_cells="<label>")`
 
     Remove cells where a matching `adata.obs["annotation__<label>"]` column is `True`.
 
     Filters the AnnData object in place by removing cells located within the indicated annotation polygons. `<label>` is matched case-insensitively against annotation column names; the default is `"ignore"`.
 
-5.  **Stage 3 — Python · QXYCell — choose one route**
+5.  **Stage 3 — Python · QXYCell — 3A OR 3B**
 
-    ### Stage 3 — Apply marker thresholds
+    ### Apply marker thresholds
 
-    Use classifier JSON values directly, or use a reviewed table as the final source. Classifier values can be copied and refined in a table.
+    Use 3A to apply classifier JSON values directly, or use 3B to apply a reviewed threshold table.
 
     #### 3A · Apply classifier JSON directly
 
@@ -54,7 +52,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
             adata
         )
 
-    Applies the QuPath classifier thresholds and saves the applied values to `thresholds/classifier_thresholds.tsv`.
+    Applies the QuPath classifier thresholds and saves the applied values to `thresholds/classifier_thresholds.tsv`. The table contains per-image threshold columns. Copy or rename it before editing, then manually adjust values for images whose classifier-derived threshold needs changing. Apply that reviewed copy through 3B.
 
     #### 3B · Generate or refine a threshold table
 
@@ -66,11 +64,11 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
             adata, threshold_file
         )
 
-    Builds a timestamped threshold table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file. Apply only the reviewed table as the final source.
+    Build a timestamped table from the classifier JSON files, or use a copied `classifier_thresholds.tsv` file from 3A. Review every marker and image value, then apply the table.
 
 6.  **Stage 4 — Python · QXYCell + LLM**
 
-    ### Stage 4 — `qxy.celltype_prompt(adata, context="<biological context>")`
+    ### `qxy.celltype_prompt(adata, context="<biological context>")`
 
     Create a project-specific LLM prompt for drafting cell-type logic.
 
@@ -86,7 +84,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
 8.  **Stage 5 — Python · QXYCell**
 
-    ### Stage 5 — `qxy.celltype(adata)`
+    ### `qxy.celltype(adata)`
 
     Apply the domain-expert-reviewed YAML to assign cell types.
 
@@ -94,7 +92,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
 9.  **Optional Stage 6 — Python · QXYCell**
 
-    ### Optional Stage 6 — Plot assigned cell types spatially
+    ### Plot assigned cell types spatially
 
         # One plot per Sample annotation
         qxy.plot_spatial(

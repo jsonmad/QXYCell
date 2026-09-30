@@ -90,7 +90,7 @@ For a TMA, retain the exact `TMA Core` column. One export may contain several
 images. Do not resave large tables in spreadsheet software: it can alter
 headers, identifiers, or row counts.
 
-### 5. Export annotations, preflight, and import
+### 5. Export annotations and import
 
 For each annotated image:
 
@@ -110,27 +110,6 @@ For each annotated image:
 
 `slide01-annotations.geojson` does not match `slide01.ome.tif`. QXYCell uses
 this stem match to assign annotation geometry to the correct cell rows.
-
-Before analysis, run the read-only preflight:
-
-```python
-import qxycell as qxy
-
-project_dir = "/path/to/qupath_project"
-report = qxy.check(project_dir, count_rows=True)
-print(report.ok)
-print(report.n_errors, report.n_warnings)
-```
-
-Or run:
-
-```bash
-qxycell check /path/to/qupath_project --count-rows
-```
-
-Resolve reported errors and review warnings. The check validates exported
-assets; it cannot validate channel identity, staining quality, or segmentation
-accuracy.
 
 Then import cells and GeoJSON:
 
@@ -220,7 +199,6 @@ the exported inputs above must remain inside it.
 - [ ] Annotation filenames match their image stems.
 - [ ] Cell GeoJSON retains the measurement-export Object IDs, when used.
 - [ ] Classifier JSONs are simple single-measurement classifiers, when used.
-- [ ] `qxy.check()` errors resolved and warnings reviewed.
 - [ ] Spatial overlay alignment reviewed after import.
 
 ## Official references

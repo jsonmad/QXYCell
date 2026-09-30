@@ -121,8 +121,6 @@ classifier run saves or replaces the applied values in
 `thresholds/classifier_thresholds.tsv`.
 
 `qxy.import_cells()` and `qxy.add_annotations()` do not apply thresholds.
-`qxy.check()` reports the active threshold-definition source but does not apply
-thresholds, run cell typing, or generate an LLM prompt.
 
 ### Generate and review a threshold table
 
@@ -188,8 +186,7 @@ recent timestamped file and reports which source is active.
 
 When multiple classifier JSONs define different thresholds for the same
 measurement and image scope, QXYCell does not choose one by filename order.
-`qxy.check()` reports every candidate and writes
-`tables/classifier_conflicts.csv`. Generated tables mark the row with
+Generated tables mark the row with
 `classifier_conflict=True`, preserve the candidate sources and values, and
 leave image thresholds blank for review.
 

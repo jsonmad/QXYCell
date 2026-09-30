@@ -6,7 +6,7 @@ A Python bridge from a QuPath project folder to AnnData.
 
 QXYCell turns a QuPath project into an analysis-ready AnnData spatial object. It reads cell level measurement tables and GeoJSON annotation polygons into an `.h5ad` file, then applies marker thresholds and cell type rules as explicit downstream steps for Scanpy, Squidpy, pandas, and custom Python workflows.
 
-**Required preparation:** complete the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) before running QXYCell. It covers image and pixel-size verification, segmentation, required project-folder assets, filenames, and preflight checks.
+**Required preparation:** complete the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) before running QXYCell. It covers image and pixel-size verification, segmentation, required project-folder assets, and filenames.
 
 ## Overview
 
@@ -21,8 +21,6 @@ Stage 1 creates the base measurement checkpoint. Later stages refresh the same a
     import qxycell as qxy
 
     qupath_project = "/path/to/qupath_project"
-
-    report = qxy.check(qupath_project)
 
     # 1. Base AnnData from measurements
     adata = qxy.import_cells(qupath_project)
@@ -59,10 +57,6 @@ Stage 1 creates the base measurement checkpoint. Later stages refresh the same a
 | Reviewed threshold table | `qxy.threshold_from_table(adata, table)` | Replaces marker positivity using only the named table; invalidates prompt, cell types, and post-analysis. |
 | Prompt context | `qxy.celltype_prompt(adata, context=...)` | Replaces `celltype/current_prompt.txt` but preserves an expert-edited YAML. |
 | Cell-type YAML | `qxy.celltype(adata)` | Replaces prior cell type, feature, derived-feature, count, and rule-summary outputs. |
-
-If no output folder is supplied, `qxy.check(...)` writes reports to:
-
-    ../qupath_project_check_YYMMDD_HHMM/
 
 The saved `.h5ad` from `qxy.import_cells(...)` is written by default to:
 
@@ -121,9 +115,8 @@ The threshold and cell-type files shown above appear after their corresponding s
 
 ## Technical Overview
 
-QXYCell uses separate, rerunnable functions for validation and each core processing stage:
+QXYCell uses separate, rerunnable functions for each core processing stage:
 
-    qxy.check(project_dir)
     adata = qxy.import_cells(project_dir)
     qxy.add_annotations(adata)
     qxy.remove_cells(adata, remove_cells="ignore")  # optional artifact removal
@@ -131,10 +124,6 @@ QXYCell uses separate, rerunnable functions for validation and each core process
     qxy.celltype_prompt(adata)
     qxy.celltype(adata, "/path/to/celltype_logic.yaml")
     qxy.plot_spatial(adata, category_col="celltype", show=False)
-
-### `check()`
-
-Performs read-only preflight inspection and validation. It discovers measurement tables, threshold definitions, object classifier JSONs, and GeoJSON files; lists every annotation and its planned AnnData assignment; and writes text/JSON reports. It does not generate a threshold table, apply thresholds, apply cell typing, or generate an LLM prompt.
 
 ### Step-by-step workflow
 

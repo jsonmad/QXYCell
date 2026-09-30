@@ -129,19 +129,6 @@ Run the common Python workflow in one call.
 
 Workflow result: 72 cells after Ignore removal.
 
-### qxy.check()
-
-Inspect the export folder, list every annotation and planned AnnData assignment, and audit competing classifier thresholds without silently choosing one. Check never applies thresholds or cell typing and never generates an LLM prompt.
-
-    report = qxy.check(project_dir, output_dir=out_dir, count_rows=True)
-
-| metric            | value              |
-|-------------------|--------------------|
-| ok                | True               |
-| threshold source  | object_classifiers |
-| measurement files | 1                  |
-| geojson files     | 4                  |
-
 ### qxy.generate_threshold_table()
 
 Create a fresh timestamped threshold table. Conflicted channels retain candidate provenance and blank per-image cells until reviewed.
@@ -317,14 +304,6 @@ Find the newest saved cell type YAML.
     path = qxy.find_latest_celltype_yaml(out_dir / 'celltype')
 
 `REPOSITORY_ROOT/docs/_qxy_function_examples_build/outputs/synthetic_run_000000_0000/celltype/celltype_logic.yaml`
-
-### qxy.CheckReport
-
-Result type returned by qxy.check().
-
-    isinstance(report, qxy.CheckReport)
-
-`True`; errors: `0`; warnings: `0`
 
 ### qxy.celltype_prompt()
 

@@ -8,27 +8,6 @@ Before starting, prepare the files described in the
 [QuPath preparation guide](qupath_preparation.md) and
 [input guide](qupath_inputs.md).
 
-## Preflight check
-
-Validate the project folder without running the analysis:
-
-```python
-import qxycell as qxy
-
-report = qxy.check("/path/to/qupath_project")
-```
-
-`qxy.check()` writes a timestamped sibling folder:
-
-```text
-qupath_project_check_YYMMDD_HHMM/
-```
-
-The report describes discovered measurement tables, GeoJSON files,
-annotations, classifiers, threshold files, conflicts, and expected AnnData
-columns. It separates definitions from actions: no thresholds, cell typing, or
-LLM prompt generation are performed.
-
 ## Core staged workflow
 
 ```python
