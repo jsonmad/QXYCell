@@ -217,8 +217,8 @@ qxy.save(adata_cn)
 
 ## Related documentation
 
-- Prepare reviewed labels with the [cell-typing guide](cell_typing.md).
-- Add experimental groups with the [sample-metadata guide](metadata.md).
-- See all figure controls in the [plotting guide](plotting.md).
+- Prepare reviewed labels with the [cell-typing guide](07_cell_typing.md).
+- Add experimental groups with the [sample-metadata guide](06_metadata.md).
+- See all figure controls in the [plotting guide](08_plotting.md).
 - Review stored arrays and save behavior in
-  [AnnData structure and outputs](anndata_and_outputs.md).
+  [AnnData structure and outputs](10_anndata_and_outputs.md).

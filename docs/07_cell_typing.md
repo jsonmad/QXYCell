@@ -258,8 +258,8 @@ marks stale the dependent prompt, cell-type, and post-analysis outputs.
 ## Related documentation
 
 - Prepare and revise thresholds with
-  [QuPath inputs, annotations, and thresholds](qupath_inputs.md).
+  [QuPath inputs, annotations, and thresholds](03_qupath_inputs.md).
 - Follow checkpoint and rerun order in
-  [Running the staged workflow](running_workflow.md).
-- Create validation figures with the [plotting guide](plotting.md).
-- Continue to [cellular neighbourhood analysis](cellular_neighbourhoods.md).
+  [Running the staged workflow](05_running_workflow.md).
+- Create validation figures with the [plotting guide](08_plotting.md).
+- Continue to [cellular neighbourhood analysis](09_cellular_neighbourhoods.md).

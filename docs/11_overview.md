@@ -6,7 +6,7 @@ A Python bridge from a QuPath project folder to AnnData.
 
 QXYCell turns a QuPath project into an analysis-ready AnnData spatial object. It reads cell level measurement tables and GeoJSON annotation polygons into an `.h5ad` file, then applies marker thresholds and cell type rules as explicit downstream steps for Scanpy, Squidpy, pandas, and custom Python workflows.
 
-**Required preparation:** complete the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md) before running QXYCell. It covers image and pixel-size verification, segmentation, required project-folder assets, and filenames.
+**Required preparation:** complete the [QuPath 0.7 multiplex-IF preparation guide](02_qupath_preparation.md) before running QXYCell. It covers image and pixel-size verification, segmentation, required project-folder assets, and filenames.
 
 ## Overview
 

@@ -2,10 +2,10 @@
 
 Use this page for the common QuPath-to-QXYCell route: export cells and
 annotations, choose a threshold source, review cell-type logic, and create a
-spatial plot. The [detailed preparation guide](qupath_preparation.md) covers
+spatial plot. The [detailed preparation guide](02_qupath_preparation.md) covers
 segmentation review, TMA, troubleshooting, and special cases. For pixel
 calibration and annotation rules, see [QuPath inputs, annotations, and
-thresholds](qupath_inputs.md).
+thresholds](03_qupath_inputs.md).
 
 ## 1. Export from QuPath
 
@@ -55,7 +55,7 @@ qxy.add_annotations(adata)
 
 `qxy.add_annotations()` imports annotation membership and any optional
 cell-polygon GeoJSON. If the image pixel size differs from QXYCell's default,
-follow the [pixel-calibration instructions](qupath_inputs.md#pixel-calibration)
+follow the [pixel-calibration instructions](03_qupath_inputs.md#pixel-calibration)
 before this step.
 
 ## 3. Choose one threshold source
@@ -109,7 +109,7 @@ required marker and image, then run:
 qxy.threshold_from_table(adata, "/path/to/reviewed_thresholds.tsv")
 ```
 
-See [threshold sources](qupath_inputs.md#threshold-sources) for how to create
+See [threshold sources](03_qupath_inputs.md#threshold-sources) for how to create
 and review a threshold table.
 
 ## 4. Draft, review, and apply cell types

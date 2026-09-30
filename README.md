@@ -45,7 +45,7 @@ conda env update -f environment.yml --prune
 ## Prepare data in QuPath
 
 Before running QXYCell, follow the
-[QuPath preparation guide](docs/qupath_preparation.md). to create these four inputs:
+[QuPath preparation guide](docs/02_qupath_preparation.md). to create these four inputs:
 
 1. Sample, tissue-feature, and imaging-artifact annotations exported as GeoJSON
    - QuPath > File > Export objects as GeoJSON
@@ -207,21 +207,21 @@ adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 
 | Guide | Use it for |
 |---|---|
-| [QuPath quick start](docs/qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
-| [QuPath preparation](docs/qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
-| [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
-| [Running the staged workflow](docs/running_workflow.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
-| [Sample metadata](docs/metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
-| [Cell typing](docs/cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
-| [Plotting](docs/plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
-| [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
-| [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
+| [QuPath quick start](docs/01_qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
+| [QuPath preparation](docs/02_qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
+| [QuPath inputs, annotations, and thresholds](docs/03_qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
+| [Running the staged workflow](docs/05_running_workflow.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
+| [Sample metadata](docs/06_metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
+| [Cell typing](docs/07_cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
+| [Plotting](docs/08_plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
+| [Cellular neighbourhoods](docs/09_cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
+| [AnnData structure and outputs](docs/10_anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
 
 Additional reference material:
 
-- [QXYCell overview](docs/overview.md)
-- [Function and command reference](docs/function_reference.md)
-- [Synthetic function examples](docs/function_examples.md)
+- [QXYCell overview](docs/11_overview.md)
+- [Function and command reference](docs/12_function_reference.md)
+- [Synthetic function examples](docs/13_function_examples.md)
 - [Documentation index](docs/README.md)
 
 ## Support and license

@@ -5,8 +5,8 @@ updates the active AnnData object and its saved checkpoint, so thresholds,
 annotations, prompts, and cell-type logic can be revised independently.
 
 Before starting, prepare the files described in the
-[QuPath preparation guide](qupath_preparation.md) and
-[input guide](qupath_inputs.md).
+[QuPath preparation guide](02_qupath_preparation.md) and
+[input guide](03_qupath_inputs.md).
 
 ## Core staged workflow
 
@@ -99,7 +99,7 @@ tables; table mode uses only the named table. Each classifier-mode run replaces
 `thresholds/classifier_thresholds.tsv` with the values actually applied.
 To refine those values in table mode, first copy or rename that file so a later
 classifier-mode run cannot overwrite the manual edits. See
-[Refine Stage 3A thresholds with Stage 3B](qupath_inputs.md#refine-stage-3a-thresholds-with-stage-3b).
+[Refine Stage 3A thresholds with Stage 3B](03_qupath_inputs.md#refine-stage-3a-thresholds-with-stage-3b).
 
 ## Annotation and measurement outputs
 
@@ -113,7 +113,7 @@ After Stage 2, the main AnnData locations are:
 | `adata.obsm["spatial"]` | Cell centroid coordinates in micrometres |
 | `adata.uns["qxycell"]` | Run metadata, output paths, stage status, and provenance |
 
-See [AnnData and outputs](anndata_and_outputs.md) for the complete data model.
+See [AnnData and outputs](10_anndata_and_outputs.md) for the complete data model.
 
 ## Explicit pixel size
 
@@ -145,10 +145,10 @@ adata = qxy.workflow(
 
 ## Continue after the staged workflow
 
-- Add experimental fields with the [sample-metadata guide](metadata.md).
-- Create and review assignments with the [cell-typing guide](cell_typing.md).
+- Add experimental fields with the [sample-metadata guide](06_metadata.md).
+- Create and review assignments with the [cell-typing guide](07_cell_typing.md).
 - Analyse local composition with the
-  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
-- Create figures with the [plotting guide](plotting.md).
+  [cellular-neighbourhood guide](09_cellular_neighbourhoods.md).
+- Create figures with the [plotting guide](08_plotting.md).
 - Save, reload, and inspect the object with
-  [AnnData and outputs](anndata_and_outputs.md).
+  [AnnData and outputs](10_anndata_and_outputs.md).

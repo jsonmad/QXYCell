@@ -2,7 +2,7 @@
 
 A Markdown reference for the public `qxy` API. Examples were generated from a small synthetic QuPath export and include real tables and plotting calls produced by the current package code.
 
-**Before using real data:** follow the [QuPath 0.7 multiplex-IF preparation guide](qupath_preparation.md). Verify square-pixel calibration and pass it to `qxy.add_annotations(pixel_size_um=...)`; the default is `0.28` µm/pixel. These synthetic examples deliberately use `1.0`.
+**Before using real data:** follow the [QuPath 0.7 multiplex-IF preparation guide](02_qupath_preparation.md). Verify square-pixel calibration and pass it to `qxy.add_annotations(pixel_size_um=...)`; the default is `0.28` µm/pixel. These synthetic examples deliberately use `1.0`.
 
 | Cells | Markers | Samples | Functions |
 |---:|---:|---:|---:|

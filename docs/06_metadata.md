@@ -194,7 +194,7 @@ qxy.save(adata)
 ## Related documentation
 
 - See how `Image`, `Sample`, and `CoreID` are created in
-  [QuPath inputs, annotations, and thresholds](qupath_inputs.md).
+  [QuPath inputs, annotations, and thresholds](03_qupath_inputs.md).
 - Review stored fields and checkpoints in
-  [AnnData structure and outputs](anndata_and_outputs.md).
-- Use imported experimental groups in the [plotting guide](plotting.md).
+  [AnnData structure and outputs](10_anndata_and_outputs.md).
+- Use imported experimental groups in the [plotting guide](08_plotting.md).

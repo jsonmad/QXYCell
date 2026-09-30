@@ -1,7 +1,7 @@
 # QuPath inputs, annotations, and thresholds
 
 QXYCell reads cell measurements and optional spatial assets from a QuPath
-project folder. Complete the [QuPath preparation guide](qupath_preparation.md)
+project folder. Complete the [QuPath preparation guide](02_qupath_preparation.md)
 before assembling these inputs.
 Keep every exported input somewhere inside the QuPath project folder and pass
 that one folder to QXYCell.
@@ -225,9 +225,9 @@ column, QXYCell reports zero CoreIDs and does not add `CoreID`.
 
 ## Next steps
 
-- Follow the [staged QXYCell workflow](running_workflow.md).
-- Add experimental fields with the [sample-metadata guide](metadata.md).
-- Create reviewed assignments with the [cell-typing guide](cell_typing.md).
+- Follow the [staged QXYCell workflow](05_running_workflow.md).
+- Add experimental fields with the [sample-metadata guide](06_metadata.md).
+- Create reviewed assignments with the [cell-typing guide](07_cell_typing.md).
 - Analyse local composition with the
-  [cellular-neighbourhood guide](cellular_neighbourhoods.md).
-- See the complete [function reference](function_reference.md).
+  [cellular-neighbourhood guide](09_cellular_neighbourhoods.md).
+- See the complete [function reference](12_function_reference.md).
