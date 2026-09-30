@@ -39,22 +39,24 @@ converted into categorical `adata.obs["CoreID"]`. QXYCell does not infer
 
 ## Pixel calibration
 
-QuPath centroid measurements are already in micrometres. GeoJSON geometry is
-stored in full-resolution pixel coordinates and is scaled by
-`qxy.add_annotations(..., pixel_size_um=...)`.
+In the QuPath **Image** tab, check the pixel width and height in µm. QuPath
+centroids are exported in µm, while GeoJSON geometry is in full-resolution
+pixels. Supply the verified scalar when importing GeoJSON:
 
 ```python
+adata = qxy.import_cells("/path/to/qupath_project")
 qxy.add_annotations(adata, pixel_size_um=0.28)
 ```
 
-The default is 0.28 µm. Use the verified image pixel size when it differs:
+`0.28` µm/pixel is QXYCell's default. Replace it with the image pixel
+dimensions only when needed; otherwise use:
 
 ```python
-qxy.add_annotations(adata, pixel_size_um=0.325)
+qxy.add_annotations(adata)
 ```
 
-The value must be positive and finite. QXYCell supports square pixels only; do
-not average unequal pixel width and height values.
+QXYCell supports square pixels only, so do not average unequal pixel width and
+height values.
 
 ## Annotation behavior
 

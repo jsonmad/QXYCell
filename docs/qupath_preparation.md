@@ -26,27 +26,10 @@ the associated QXYCell features.
 
 ## Standard route
 
-### 1. Verify image and calibration
+### 1. Verify image
 
 Open each project image and confirm the intended fluorescence series, expected
-channels, and no obvious channel misregistration. In the **Image** tab, record
-the physical pixel width and height in µm.
-
-- They must be equal: QXYCell supports square pixels only.
-- Use the verified value, not nominal objective magnification.
-- Do not average unequal values; correct or resample the image upstream before
-  segmentation and export.
-
-QuPath centroids are exported in µm, while GeoJSON geometry is in full-
-resolution pixels. Supply the verified scalar when importing GeoJSON:
-
-```python
-adata = qxy.import_cells("/path/to/qupath_project")
-qxy.add_annotations(adata, pixel_size_um=0.325)
-```
-
-`0.28` µm/pixel is QXYCell's default, not a replacement for checking the
-image calibration.
+channels, and no obvious channel misregistration.
 
 ### 2. Create annotations
 
@@ -152,18 +135,17 @@ qxycell check /path/to/qupath_project --count-rows
 ```
 
 Resolve reported errors and review warnings. The check validates exported
-assets; it cannot validate calibration, channel identity, staining quality, or
-segmentation accuracy.
+assets; it cannot validate channel identity, staining quality, or segmentation
+accuracy.
 
-Then import cells and GeoJSON with the recorded pixel size:
+Then import cells and GeoJSON:
 
 ```python
 adata = qxy.import_cells(project_dir)
-qxy.add_annotations(adata, pixel_size_um=0.325)
+qxy.add_annotations(adata)
 ```
 
-Confirm `adata.uns["qxycell"]["annotations"]["pixel_size_um"]` and inspect a
-spatial overlay before downstream analysis.
+Inspect a spatial overlay before downstream analysis.
 
 ## Optional assets
 
@@ -232,21 +214,18 @@ the exported inputs above must remain inside it.
 |---|---|
 | No measurement file is found | Rename it to include `measurement`, or use `detections.csv` / `detections.tsv`. |
 | Required columns are missing | Re-export cells with `Image`, `Object ID`, `Centroid X µm`, and `Centroid Y µm`; do not edit headers. |
-| Annotations are found but not assigned | Match each GeoJSON filename stem to `Image`, then verify `pixel_size_um` against QuPath calibration. |
+| Annotations are found but not assigned | Match each GeoJSON filename stem to `Image`. |
 | Cell polygons are missing | Export cell objects rather than annotations and preserve the matching Object IDs. |
-| Polygons are offset or scaled | Stop analysis; recheck calibration and `pixel_size_um`, then reimport. |
-| Pixel width and height differ | Correct or resample upstream; do not average them for QXYCell. |
 
 ## Final checklist
 
-- [ ] Intended image series, channels, physical units, and square pixel size verified.
+- [ ] Intended image series and channels verified.
 - [ ] Segmentation reviewed across representative regions.
 - [ ] Measurement export contains every required column and, for TMA, `TMA Core`.
 - [ ] Annotation filenames match their image stems.
 - [ ] Cell GeoJSON retains the measurement-export Object IDs, when used.
 - [ ] Classifier JSONs are simple single-measurement classifiers, when used.
 - [ ] `qxy.check()` errors resolved and warnings reviewed.
-- [ ] `qxy.add_annotations()` uses the verified `pixel_size_um`.
 - [ ] Spatial overlay alignment reviewed after import.
 
 ## Official references
