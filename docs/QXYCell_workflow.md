@@ -8,8 +8,6 @@ A staged QuPath-to-AnnData workflow with explicit checkpoints, a final threshold
 
 Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and `tables/markers_var.csv`. Optional Stage 2b refreshes the filtered H5AD and `cells_obs.csv`; Stage 6 creates plots without changing the active checkpoint.
 
----
-
 ## Prep — QuPath
 
 ### Prepare QuPath project
