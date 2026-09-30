@@ -225,9 +225,9 @@ column, QXYCell reports zero CoreIDs and does not add `CoreID`.
 
 ## Next steps
 
-- Follow the [staged QXYCell workflow](running_qxycell.md).
+- Follow the [staged QXYCell workflow](running_workflow.md).
 - Add experimental fields with the [sample-metadata guide](metadata.md).
 - Create reviewed assignments with the [cell-typing guide](cell_typing.md).
 - Analyse local composition with the
   [cellular-neighbourhood guide](cellular_neighbourhoods.md).
-- See the complete [function reference](QXYCell_function_reference.md).
+- See the complete [function reference](function_reference.md).

@@ -163,7 +163,7 @@ analysis rather than reconstructing state from these flat files.
 ## Related documentation
 
 - Understand checkpoint replacement in
-  [Running the staged workflow](running_qxycell.md).
+  [Running the staged workflow](running_workflow.md).
 - Review annotation and threshold provenance in
   [QuPath inputs, annotations, and thresholds](qupath_inputs.md).
 - Add experimental fields with the [sample-metadata guide](metadata.md).

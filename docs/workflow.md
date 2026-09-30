@@ -114,4 +114,4 @@ Load the completed AnnData object from `qupath_project_run_YYMMDD_HHMM/h5ad/qxyc
 
 - **Cell-type YAML changed** → Stage 5 and optional Stage 6
 
-Supporting documentation: [QuPath preparation](qupath_preparation.md) · [QXYCell overview](QXYCell_overview.md) · [Function reference](QXYCell_function_reference.md).
+Supporting documentation: [QuPath preparation](qupath_preparation.md) · [QXYCell overview](overview.md) · [Function reference](function_reference.md).

@@ -43,7 +43,7 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)
 
 **Designed for iteration:** new GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results. Because ignored-region removal deletes cells, changed ignore polygons require rerunning measurements, annotations, and ignored-region removal in order.
 
-[Read the staged workflow guide](QXYCell_overview.md) · [See every stage parameter](QXYCell_function_reference.md)
+[Read the staged workflow guide](overview.md) · [See every stage parameter](function_reference.md)
 
 ## User guides
 
@@ -57,7 +57,7 @@ QuPath exports, sample and artifact annotations, thresholds, pixel calibration, 
 
 Staged checkpoints, rerun rules, output folders, validation, and the workflow shortcut.
 
-[Follow the staged workflow](running_qxycell.md)
+[Follow the staged workflow](running_workflow.md)
 
 ### Sample metadata
 
@@ -71,17 +71,17 @@ Generate, review, apply, diagnose, and revise marker-positivity rules.
 
 [Assign cell types](cell_typing.md)
 
-### Cellular neighbourhoods
-
-Build local composition profiles, cluster them, and review neighbourhood labels.
-
-[Analyse neighbourhoods](cellular_neighbourhoods.md)
-
 ### Plotting
 
 Spatial plots, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes.
 
 [Create figures](plotting.md)
+
+### Cellular neighbourhoods
+
+Build local composition profiles, cluster them, and review neighbourhood labels.
+
+[Analyse neighbourhoods](cellular_neighbourhoods.md)
 
 ### AnnData and outputs
 
@@ -95,19 +95,19 @@ Stored fields, dataset summaries, provenance, output locations, flat-file export
 
 Follow the staged workflow, rerun rules, inputs, outputs, and AnnData model.
 
-[Open overview](QXYCell_overview.md)
+[Open overview](overview.md)
 
 ### Function reference
 
 Python and command-line functions, parameters, and outputs.
 
-[Open reference](QXYCell_function_reference.md)
+[Open reference](function_reference.md)
 
 ### Function examples
 
 Reproducible examples generated from a synthetic QuPath project folder.
 
-[Open examples](qxy_function_examples.md)
+[Open examples](function_examples.md)
 
 ### GitHub README
 

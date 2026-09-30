@@ -210,18 +210,18 @@ adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 | [QuPath quick start](docs/qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
 | [QuPath preparation](docs/qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
 | [QuPath inputs, annotations, and thresholds](docs/qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
-| [Running the staged workflow](docs/running_qxycell.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
+| [Running the staged workflow](docs/running_workflow.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
 | [Sample metadata](docs/metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
 | [Cell typing](docs/cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
-| [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
 | [Plotting](docs/plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
+| [Cellular neighbourhoods](docs/cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
 | [AnnData structure and outputs](docs/anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
 
 Additional reference material:
 
-- [QXYCell overview](docs/QXYCell_overview.md)
-- [Function and command reference](docs/QXYCell_function_reference.md)
-- [Synthetic function examples](docs/qxy_function_examples.md)
+- [QXYCell overview](docs/overview.md)
+- [Function and command reference](docs/function_reference.md)
+- [Synthetic function examples](docs/function_examples.md)
 - [Documentation index](docs/README.md)
 
 ## Support and license
