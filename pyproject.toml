@@ -39,6 +39,7 @@ dependencies = [
   "cmcrameri>=1.0",
   "geopandas>=0.14",
   "matplotlib>=3.8",
+  "marimo>=0.25",
   "numpy>=1.24",
   "pandas>=2.0",
   "pillow>=12.3.0",

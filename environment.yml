@@ -12,6 +12,7 @@ dependencies:
   - hdf5
   - h5py
   - matplotlib>=3.8
+  - marimo>=0.25
   - pillow>=12.3.0
   - seaborn>=0.13
   - scikit-learn>=1.3
