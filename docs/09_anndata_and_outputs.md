@@ -163,11 +163,11 @@ analysis rather than reconstructing state from these flat files.
 ## Related documentation
 
 - Understand checkpoint replacement in
-  [Running the staged workflow](05_running_workflow.md).
+  [Running the staged workflow](04_running_workflow.md).
 - Review annotation and threshold provenance in
-  [QuPath inputs, annotations, and thresholds](03_qupath_inputs.md).
-- Add experimental fields with the [sample-metadata guide](06_metadata.md).
-- Assign reviewed labels with the [cell-typing guide](07_cell_typing.md).
+  [QuPath preparation](02_qupath_preparation.md).
+- Add experimental fields with the [sample-metadata guide](05_metadata.md).
+- Assign reviewed labels with the [cell-typing guide](06_cell_typing.md).
 - Analyse local composition with the
-  [cellular-neighbourhood guide](09_cellular_neighbourhoods.md).
-- Create figures with the [plotting guide](08_plotting.md).
+  [cellular-neighbourhood guide](08_cellular_neighbourhoods.md).
+- Create figures with the [plotting guide](07_plotting.md).

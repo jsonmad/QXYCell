@@ -4,8 +4,7 @@ Use this page for the common QuPath-to-QXYCell route: export cells and
 annotations, choose a threshold source, review cell-type logic, and create a
 spatial plot. The [detailed preparation guide](02_qupath_preparation.md) covers
 segmentation review, TMA, troubleshooting, and special cases. For pixel
-calibration and annotation rules, see [QuPath inputs, annotations, and
-thresholds](03_qupath_inputs.md).
+calibration and annotation rules, see the [detailed preparation guide](02_qupath_preparation.md#calibration-annotations-and-thresholds).
 
 ## 1. Export from QuPath
 
@@ -36,8 +35,9 @@ thresholds](03_qupath_inputs.md).
       0.7 installations, **File > Export objects as GeoJSON**).
    3. Export a GeoJSON `FeatureCollection` without measurements and retain the
       QuPath Object IDs.
-4. Name each annotation or cell-polygon GeoJSON with its image stem. For example,
-   `slide01.ome.tif` uses `slide01.geojson`.
+4. Name annotation GeoJSON with the image stem: `slide01.ome.tif` uses
+   `slide01.geojson`. Name the separate cell-polygon export with the same stem
+   plus `-cells`, for example `slide01-cells.geojson`.
 5. Keep the measurement table and all GeoJSON files inside one QuPath project
    folder.
 
@@ -55,7 +55,7 @@ qxy.add_annotations(adata)
 
 `qxy.add_annotations()` imports annotation membership and any optional
 cell-polygon GeoJSON. If the image pixel size differs from QXYCell's default,
-follow the [pixel-calibration instructions](03_qupath_inputs.md#pixel-calibration)
+follow the [pixel-calibration instructions](02_qupath_preparation.md#pixel-calibration)
 before this step.
 
 ## 3. Choose one threshold source
@@ -109,8 +109,7 @@ required marker and image, then run:
 qxy.threshold_from_table(adata, "/path/to/reviewed_thresholds.tsv")
 ```
 
-See [threshold sources](03_qupath_inputs.md#threshold-sources) for how to create
-and review a threshold table.
+See [threshold tables and refinement](02_qupath_preparation.md#threshold-tables-and-refinement) for how to create and review a threshold table.
 
 ## 4. Draft, review, and apply cell types
 
@@ -138,7 +137,8 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)
 - [ ] Cell measurements include `Image`, `Object ID`, `Centroid X µm`, and
   `Centroid Y µm`.
 - [ ] Annotation GeoJSON filename stems match their `Image` values.
-- [ ] Optional cell-polygon GeoJSON retains the measurement-table Object IDs.
+- [ ] Optional cell-polygon GeoJSON is named `<image-stem>-cells.geojson` and
+  retains the measurement-table Object IDs.
 - [ ] One final threshold source was used: classifier JSON values or a reviewed
   table, including any manually refined classifier-derived table.
 - [ ] The cell-type YAML was reviewed by a biology domain expert before use.

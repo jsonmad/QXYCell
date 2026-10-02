@@ -43,51 +43,45 @@ qxy.plot_spatial(adata, category_col="celltype", show=False)
 
 **Designed for iteration:** new GeoJSON, thresholds, prompts, or YAML replace that stage’s prior outputs and invalidate dependent downstream results. Because ignored-region removal deletes cells, changed ignore polygons require rerunning measurements, annotations, and ignored-region removal in order.
 
-[Read the staged workflow guide](11_overview.md) · [See every stage parameter](12_function_reference.md)
+[Read the staged workflow guide](10_overview.md) · [See every stage parameter](11_function_reference.md)
 
 ## User guides
-
-### Inputs and annotations
-
-QuPath exports, sample and artifact annotations, thresholds, pixel calibration, and TMA cores.
-
-[Prepare QXYCell inputs](03_qupath_inputs.md)
 
 ### Run QXYCell
 
 Staged checkpoints, rerun rules, output folders, validation, and the workflow shortcut.
 
-[Follow the staged workflow](05_running_workflow.md)
+[Follow the staged workflow](04_running_workflow.md)
 
 ### Sample metadata
 
 Match experimental, clinical, and batch fields to images, samples, or TMA cores.
 
-[Add sample metadata](06_metadata.md)
+[Add sample metadata](05_metadata.md)
 
 ### Cell typing
 
 Generate, review, apply, diagnose, and revise marker-positivity rules.
 
-[Assign cell types](07_cell_typing.md)
+[Assign cell types](06_cell_typing.md)
 
 ### Plotting
 
 Spatial plots, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes.
 
-[Create figures](08_plotting.md)
+[Create figures](07_plotting.md)
 
 ### Cellular neighbourhoods
 
 Build local composition profiles, cluster them, and review neighbourhood labels.
 
-[Analyse neighbourhoods](09_cellular_neighbourhoods.md)
+[Analyse neighbourhoods](08_cellular_neighbourhoods.md)
 
 ### AnnData and outputs
 
 Stored fields, dataset summaries, provenance, output locations, flat-file exports, and save/load behavior.
 
-[Inspect the data model](10_anndata_and_outputs.md)
+[Inspect the data model](09_anndata_and_outputs.md)
 
 ## Reference documentation
 
@@ -95,19 +89,19 @@ Stored fields, dataset summaries, provenance, output locations, flat-file export
 
 Follow the staged workflow, rerun rules, inputs, outputs, and AnnData model.
 
-[Open overview](11_overview.md)
+[Open overview](10_overview.md)
 
 ### Function reference
 
 Python and command-line functions, parameters, and outputs.
 
-[Open reference](12_function_reference.md)
+[Open reference](11_function_reference.md)
 
 ### Function examples
 
 Reproducible examples generated from a synthetic QuPath project folder.
 
-[Open examples](13_function_examples.md)
+[Open examples](12_function_examples.md)
 
 ### GitHub README
 

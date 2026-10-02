@@ -12,7 +12,7 @@ Stages 1–5 update the active H5AD and refresh both `tables/cells_obs.csv` and 
 
 ### Prepare QuPath project
 
-Export `measurements.tsv`, annotation GeoJSON (`slide01.geojson`), optional cell segmentation GeoJSON (`slide01-cells.geojson`), and either classifier JSON files (`classifiers/object_classifiers/CD3.json`) or a reviewed threshold table (`thresholds.tsv`) before import.
+Export `measurements.tsv`, annotation GeoJSON (`slide01.geojson`), optional cell segmentation GeoJSON (`slide01-cells.geojson`), and either classifier JSON files (`classifiers/object_classifiers/CD3.json`) or a reviewed threshold table (`thresholds.tsv`) before import. Annotation files use the image stem; cell-polygon files use `<image-stem>-cells.geojson` and preserve Object IDs.
 
 ---
 
@@ -114,4 +114,4 @@ Load the completed AnnData object from `qupath_project_run_YYMMDD_HHMM/h5ad/qxyc
 
 - **Cell-type YAML changed** → Stage 5 and optional Stage 6
 
-Supporting documentation: [QuPath preparation](02_qupath_preparation.md) · [QXYCell overview](11_overview.md) · [Function reference](12_function_reference.md).
+Supporting documentation: [QuPath preparation](02_qupath_preparation.md) · [QXYCell overview](10_overview.md) · [Function reference](11_function_reference.md).

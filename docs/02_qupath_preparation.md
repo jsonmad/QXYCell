@@ -12,7 +12,7 @@ Keep exported inputs inside one QuPath project folder and pass that folder to QX
 |---|---|---|
 | Cell measurements (`.csv` or `.tsv`) | Every run | Filename contains `measurement`, or is `detections.csv` / `detections.tsv` |
 | Annotation GeoJSON | Samples, regions, or exclusions | One file per image; filename stem matches the measurement `Image` value |
-| Cell GeoJSON | Cell boundaries | QuPath cell objects with the Object IDs used in measurements |
+| Cell GeoJSON | Cell boundaries | QuPath cell objects with measurement Object IDs; name `<image-stem>-cells.geojson` |
 | Single-measurement classifier JSON | Classifier-derived thresholds | Simple classifier JSON saved below the project folder |
 | Reviewed threshold table | Table-derived thresholds | Reviewed per-image TSV/CSV |
 
@@ -120,6 +120,54 @@ qxy.add_annotations(adata)
 
 Inspect a spatial overlay before downstream analysis.
 
+## Calibration, annotations, and thresholds
+
+### Pixel calibration
+
+In QuPath's **Image** tab, check that pixel width and height are equal. QuPath
+centroids are already in µm, but GeoJSON uses full-resolution pixels. QXYCell
+uses `0.28` µm/pixel by default; supply the verified value only when it differs:
+
+```python
+qxy.add_annotations(adata, pixel_size_um=0.325)
+```
+
+Do not average unequal pixel dimensions.
+
+### Annotation behavior
+
+Annotations containing `Sample` create `adata.obs["Sample"]`; other labels
+create `annotation__<label>` columns. Use `Ignore` in artifact-region labels
+and remove those cells with:
+
+```python
+adata = qxy.remove_cells(adata, remove_cells="ignore")
+```
+
+Changed Ignore polygons require reimporting measurements, refreshing
+annotations, and removing cells again.
+
+### Threshold tables and refinement
+
+Apply classifier JSON thresholds directly with
+`qxy.threshold_from_classifiers(adata)`, or apply a reviewed table with
+`qxy.threshold_from_table(adata, threshold_file)`. A classifier run writes
+`thresholds/classifier_thresholds.tsv` with one threshold column per image.
+Copy or rename that table before manually adjusting values, then apply the
+reviewed copy with `qxy.threshold_from_table()`.
+
+To begin from a fresh table instead, run:
+
+```python
+threshold_file = qxy.generate_threshold_table(project_dir)
+# Review every marker and image value, then:
+qxy.threshold_from_table(adata, threshold_file)
+```
+
+Classifier-only thresholding refuses conflicting JSON definitions. Generated
+tables preserve conflict information and require a numeric value for every
+affected image before table thresholding can run.
+
 ## Optional assets
 
 ### TMA core identity
@@ -154,12 +202,14 @@ plots. For each image:
 1. Select cell detection objects, not annotations.
 2. Choose the GeoJSON export command and export a `FeatureCollection` without
    measurements.
-3. Preserve QuPath Object IDs and save, for example,
-   `qxycell_input/cells/slide01-cells.geojson`.
+3. Preserve QuPath Object IDs and save as `<image-stem>-cells.geojson`, for
+   example `qxycell_input/cells/slide01-cells.geojson`.
 
-QXYCell matches polygons to measurements by Object ID. Do not regenerate Object
-IDs between the measurement and cell-GeoJSON exports. For large images, export
-one image at a time and sanity-check the feature count.
+QXYCell distinguishes the two exports through QuPath's GeoJSON `objectType`:
+`annotation` features are assigned by their matching image-stem filename,
+while `cell` features are matched to measurements by Object ID. Do not
+regenerate Object IDs between the measurement and cell-GeoJSON exports. For
+large images, export one image at a time and sanity-check the feature count.
 
 ### Suggested input layout
 
@@ -197,7 +247,8 @@ the exported inputs above must remain inside it.
 - [ ] Segmentation reviewed across representative regions.
 - [ ] Measurement export contains every required column and, for TMA, `TMA Core`.
 - [ ] Annotation filenames match their image stems.
-- [ ] Cell GeoJSON retains the measurement-export Object IDs, when used.
+- [ ] Cell GeoJSON is named `<image-stem>-cells.geojson` and retains the
+  measurement-export Object IDs, when used.
 - [ ] Classifier JSONs are simple single-measurement classifiers, when used.
 - [ ] Spatial overlay alignment reviewed after import.
 

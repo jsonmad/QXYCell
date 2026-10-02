@@ -59,23 +59,26 @@ Before running QXYCell, follow the
 
 ## Quick start
 
-- Run this quickstart in an interactive Python session or a Jupyter notebook.
+- Run this quickstart in a Marimo notebook.
 - Each data-processing stage checkpoints (saves) the current `adata` object to the active output folder.
-- Run each stage below in order, using a separate notebook cell or executing it at an interactive Python prompt.
+- Run each stage below in order, using a separate Marimo cell.
 - Pause where noted to review thresholds and cell-type logic YAML.
 - To begin, define the path to the QuPath project directory and an output directory for the QXYCell results.
 - The output directory can be anywhere but should not sit inside of the QuPath project directory.
 
 
 
-#### Activate the qxycell environment and start an interactive Python session. Alternatively, use a Jupyter notebook with the qxycell kernel.
+#### Activate the qxycell environment and start Marimo.
 
 ```console
 conda activate qxycell
-python
+marimo edit
 ```
 
-Run the Python code below one stage at a time.
+Marimo opens in a browser. Save the new notebook as a Python file, for example
+`qxycell_workflow.py`, then run the Python code below one stage at a time in
+separate cells. On the OVD, start Marimo after changing to the folder that
+contains the notebook and project files so relative paths resolve there.
 
 ```python
 import qxycell as qxy
@@ -209,19 +212,18 @@ adata = qxy.load("/path/to/outputs/run_1/h5ad/qxycell.h5ad")
 |---|---|
 | [QuPath quick start](docs/01_qupath_quick_start.md) | Streamlined exports, threshold choice, and cell typing |
 | [QuPath preparation](docs/02_qupath_preparation.md) | Preparing images, segmenting cells, measuring features, and exporting QuPath assets |
-| [QuPath inputs, annotations, and thresholds](docs/03_qupath_inputs.md) | Input requirements, sample and removal annotations, pixel calibration, threshold sources, conflicts, and TMA cores |
-| [Running the staged workflow](docs/05_running_workflow.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
-| [Sample metadata](docs/06_metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
-| [Cell typing](docs/07_cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
-| [Plotting](docs/08_plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
-| [Cellular neighbourhoods](docs/09_cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
-| [AnnData structure and outputs](docs/10_anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
+| [Running the staged workflow](docs/04_running_workflow.md) | Checkpoints, rerun rules, output folders, validation, and the optional single-call workflow |
+| [Sample metadata](docs/05_metadata.md) | Matching experimental, clinical, and batch metadata to images, samples, or TMA cores |
+| [Cell typing](docs/06_cell_typing.md) | Prompt generation, reviewed YAML rules, assignment diagnostics, validation, and reruns |
+| [Plotting](docs/07_plotting.md) | Spatial figures, cell boundaries, annotation polygons, bars, heatmaps, formats, and palettes |
+| [Cellular neighbourhoods](docs/08_cellular_neighbourhoods.md) | Local composition profiles, clustering, naming, parameter review, and neighbourhood plots |
+| [AnnData structure and outputs](docs/09_anndata_and_outputs.md) | Stored fields, dataset summaries, provenance, output files, and save/load behavior |
 
 Additional reference material:
 
-- [QXYCell overview](docs/11_overview.md)
-- [Function and command reference](docs/12_function_reference.md)
-- [Synthetic function examples](docs/13_function_examples.md)
+- [QXYCell overview](docs/10_overview.md)
+- [Function and command reference](docs/11_function_reference.md)
+- [Synthetic function examples](docs/12_function_examples.md)
 - [Documentation index](docs/README.md)
 
 ## Support and license

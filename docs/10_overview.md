@@ -211,7 +211,7 @@ QXYCell can generate a copy-pasteable prompt for an external LLM to draft a firs
 
     prompt = qxy.celltype_prompt(adata)
 
-By default, the prompt is printed to the active Python session and saved to:
+By default, the prompt is displayed in the Marimo cell output and saved to:
 
     <run-folder>/celltype/current_prompt.txt
 

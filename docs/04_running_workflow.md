@@ -5,8 +5,45 @@ updates the active AnnData object and its saved checkpoint, so thresholds,
 annotations, prompts, and cell-type logic can be revised independently.
 
 Before starting, prepare the files described in the
-[QuPath preparation guide](02_qupath_preparation.md) and
-[input guide](03_qupath_inputs.md).
+[QuPath preparation guide](02_qupath_preparation.md).
+
+## Start Marimo on the OVD
+
+QXYCell's interactive workflow is run in a Marimo notebook. In a Windows
+Terminal or PowerShell window on the OVD, activate the shared environment,
+move to the folder where the notebook should live, and start Marimo:
+
+```console
+conda activate qxycell
+cd "Z:\path\to\analysis"
+marimo edit
+```
+
+Marimo opens its editor in a browser. Save the new notebook as a Python file,
+for example `qxycell_workflow.py`. Use a separate cell for each workflow stage;
+Marimo tracks the dependency on `adata` and reruns downstream cells when an
+upstream value changes.
+
+If the `marimo` command is unavailable, run:
+
+```console
+python -m marimo edit
+```
+
+To confirm the OVD session is using the QXYCell environment, run this in a
+Marimo cell:
+
+```python
+import sys
+import qxycell
+
+print(sys.executable)
+print(qxycell.__file__)
+```
+
+The Python executable should be the managed environment, normally
+`C:\CondaCommon\envs\qxycell\python.exe`. Stop the Marimo server with
+`Ctrl+C` in the PowerShell window when finished.
 
 ## Core staged workflow
 
@@ -41,8 +78,8 @@ qxy.celltype(adata, "/path/to/celltype_logic.yaml")
 qxy.plot_spatial(adata, category_col="celltype", show=True)
 ```
 
-Run this sample in a Jupyter notebook or in one persistent `ipython` or
-`python` session so `adata` remains available between stages.
+Run this sample in one Marimo notebook, with the stages in separate cells, so
+`adata` remains available to each downstream stage.
 
 ## Checkpoints and active output folder
 
@@ -99,7 +136,7 @@ tables; table mode uses only the named table. Each classifier-mode run replaces
 `thresholds/classifier_thresholds.tsv` with the values actually applied.
 To refine those values in table mode, first copy or rename that file so a later
 classifier-mode run cannot overwrite the manual edits. See
-[Refine Stage 3A thresholds with Stage 3B](03_qupath_inputs.md#refine-stage-3a-thresholds-with-stage-3b).
+[Threshold tables and refinement](02_qupath_preparation.md#threshold-tables-and-refinement).
 
 ## Annotation and measurement outputs
 
@@ -113,7 +150,7 @@ After Stage 2, the main AnnData locations are:
 | `adata.obsm["spatial"]` | Cell centroid coordinates in micrometres |
 | `adata.uns["qxycell"]` | Run metadata, output paths, stage status, and provenance |
 
-See [AnnData and outputs](10_anndata_and_outputs.md) for the complete data model.
+See [AnnData and outputs](09_anndata_and_outputs.md) for the complete data model.
 
 ## Explicit pixel size
 
@@ -145,10 +182,10 @@ adata = qxy.workflow(
 
 ## Continue after the staged workflow
 
-- Add experimental fields with the [sample-metadata guide](06_metadata.md).
-- Create and review assignments with the [cell-typing guide](07_cell_typing.md).
+- Add experimental fields with the [sample-metadata guide](05_metadata.md).
+- Create and review assignments with the [cell-typing guide](06_cell_typing.md).
 - Analyse local composition with the
-  [cellular-neighbourhood guide](09_cellular_neighbourhoods.md).
-- Create figures with the [plotting guide](08_plotting.md).
+  [cellular-neighbourhood guide](08_cellular_neighbourhoods.md).
+- Create figures with the [plotting guide](07_plotting.md).
 - Save, reload, and inspect the object with
-  [AnnData and outputs](10_anndata_and_outputs.md).
+  [AnnData and outputs](09_anndata_and_outputs.md).
